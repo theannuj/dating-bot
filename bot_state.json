@@ -1,0 +1,661 @@
+{
+  "users": {
+    "5423213007": {
+      "step": "ready",
+      "gender": "I'm male",
+      "city": "Aa",
+      "name": "Tanya",
+      "photo": "AgACAgUAAxkBAAIRCWnXSwz2_ub1buKZBbXDLNRgcVpnAAMOaxuiD7hWpbrVmanAij0BAAMCAAN5AAM7BA",
+      "agreed": true,
+      "paid": false,
+      "awaiting_payment": true,
+      "shown": [
+        1,
+        2,
+        7,
+        8,
+        9,
+        6,
+        5,
+        3
+      ],
+      "liked": [
+        1,
+        7,
+        9
+      ],
+      "skipped": [
+        2
+      ],
+      "incoming_likes": [],
+      "matches": [
+        1,
+        7
+      ],
+      "current_profile_id": 3,
+      "current_match_id": 1,
+      "match_cursor": 0,
+      "chat_open": false,
+      "active_view": "menu",
+      "swipes": 4,
+      "moderation_pending": false,
+      "pending_events": [
+        {
+          "type": "incoming_like",
+          "profile_id": 6,
+          "due_swipes": 5
+        }
+      ],
+      "profile_cache": {
+        "1": {
+          "activity": "Online now",
+          "bio": "Knows how to flirt, still values sincerity."
+        },
+        "2": {
+          "activity": "Active 5 min ago",
+          "bio": "Usually calm, sometimes playful."
+        },
+        "7": {
+          "activity": "Active 28 min ago",
+          "bio": "Loves deep talks and late-night chats."
+        },
+        "8": {
+          "activity": "Active 1 hour ago",
+          "bio": "A bit naughty, a bit sweet 😉"
+        },
+        "9": {
+          "activity": "Active 18 min ago",
+          "bio": "Looking for someone who can keep a conversation alive."
+        },
+        "6": {
+          "activity": "Active 8 min ago",
+          "bio": "Looking for someone who can keep a conversation alive."
+        },
+        "5": {
+          "activity": "Active 18 min ago",
+          "bio": "Can be sweet one minute and teasing the next."
+        },
+        "3": {
+          "activity": "Active 2 min ago",
+          "bio": "Here to see where a real conversation goes."
+        }
+      },
+      "chat_threads": {
+        "1": {
+          "messages": [
+            {
+              "sender": "match",
+              "text": "Hey, you seem interesting 🙂",
+              "ts": 1775717184
+            },
+            {
+              "sender": "user",
+              "text": "Hi",
+              "ts": 1775717225
+            },
+            {
+              "sender": "system",
+              "text": "This conversation is getting interesting...",
+              "ts": 1775717225
+            },
+            {
+              "sender": "match",
+              "text": "Hello ji",
+              "ts": 1775717253
+            },
+            {
+              "sender": "user",
+              "text": "Ok ji where are you from",
+              "ts": 1775717986
+            },
+            {
+              "sender": "match",
+              "text": "Lucknow",
+              "ts": 1775718023
+            }
+          ],
+          "user_unread": 0,
+          "admin_unread": 0,
+          "state": "active",
+          "fomo_sent": true
+        },
+        "7": {
+          "messages": [
+            {
+              "sender": "match",
+              "text": "Hi... I had a feeling we'd get along.",
+              "ts": 1775717960
+            }
+          ],
+          "user_unread": 1,
+          "admin_unread": 0,
+          "state": "available",
+          "fomo_sent": false
+        }
+      }
+    },
+    "526264365": {
+      "step": "start",
+      "gender": "",
+      "city": "",
+      "name": "",
+      "photo": "",
+      "agreed": false,
+      "paid": false,
+      "awaiting_payment": false,
+      "shown": [],
+      "liked": [],
+      "skipped": [],
+      "incoming_likes": [],
+      "matches": [],
+      "current_profile_id": null,
+      "current_match_id": null,
+      "match_cursor": 0,
+      "chat_open": false,
+      "active_view": "menu",
+      "swipes": 0,
+      "moderation_pending": false,
+      "pending_events": [],
+      "profile_cache": {},
+      "chat_threads": {}
+    },
+    "6028813483": {
+      "step": "ready",
+      "gender": "I'm male",
+      "city": "A",
+      "name": "Anaya",
+      "photo": "AgACAgUAAxkBAAIMvmnUCNzq-xKjPF4UlrijBwKu5VRzAAJLDWsb90WhVg7Wr96GWyJ0AQADAgADeQADOwQ",
+      "agreed": true,
+      "paid": false,
+      "awaiting_payment": false,
+      "shown": [
+        3
+      ],
+      "liked": [
+        3,
+        8,
+        2,
+        7,
+        4,
+        5,
+        1
+      ],
+      "skipped": [],
+      "incoming_likes": [
+        9,
+        7,
+        5
+      ],
+      "matches": [
+        2
+      ],
+      "current_profile_id": 3,
+      "current_match_id": 2,
+      "match_cursor": 0,
+      "chat_open": false,
+      "active_view": "inbox",
+      "swipes": 7,
+      "moderation_pending": false,
+      "pending_events": [
+        {
+          "type": "match",
+          "profile_id": 1,
+          "due_swipes": 8
+        }
+      ],
+      "profile_cache": {
+        "3": {
+          "activity": "Active 30 sec ago",
+          "bio": "Coffee lover. Likes good conversations and calm energy."
+        },
+        "8": {
+          "activity": "Active 12 min ago",
+          "bio": "Travel, food, and easy conversations."
+        },
+        "2": {
+          "activity": "Active 2 min ago",
+          "bio": "Into music, walks, and meeting genuine people."
+        },
+        "6": {
+          "activity": "Active 2 min ago",
+          "bio": "Looking for someone respectful and interesting."
+        },
+        "9": {
+          "activity": "Active 1 hour ago",
+          "bio": "Looking for someone respectful and interesting."
+        },
+        "7": {
+          "activity": "Active 28 min ago",
+          "bio": "A little shy at first, warm after that."
+        },
+        "4": {
+          "activity": "Active 30 sec ago",
+          "bio": "Coffee lover. Likes good conversations and calm energy."
+        },
+        "5": {
+          "activity": "Active 28 min ago",
+          "bio": "Travel, food, and easy conversations."
+        },
+        "10": {
+          "activity": "Online now",
+          "bio": "Into music, walks, and meeting genuine people."
+        },
+        "1": {
+          "activity": "Active 3 hours ago",
+          "bio": "Coffee lover. Likes good conversations and calm energy."
+        }
+      },
+      "chat_threads": {
+        "3": {
+          "messages": [
+            {
+              "sender": "match",
+              "text": "You seem interesting, so I said yes.",
+              "ts": 1775503624
+            }
+          ],
+          "user_unread": 0,
+          "admin_unread": 0,
+          "state": "available"
+        },
+        "2": {
+          "messages": [
+            {
+              "sender": "match",
+              "text": "Hey, nice to match with you.",
+              "ts": 1775503675
+            },
+            {
+              "sender": "user",
+              "text": "Hi",
+              "ts": 1775503686
+            },
+            {
+              "sender": "match",
+              "text": "Hello",
+              "ts": 1775503698
+            },
+            {
+              "sender": "user",
+              "text": "Kaha se ho",
+              "ts": 1775503706
+            },
+            {
+              "sender": "match",
+              "text": "Ghar",
+              "ts": 1775503716
+            }
+          ],
+          "user_unread": 0,
+          "admin_unread": 0,
+          "state": "active"
+        }
+      }
+    },
+    "6675571602": {
+      "step": "ready",
+      "gender": "👨 Male",
+      "city": "Safipur",
+      "name": "A",
+      "photo": "AgACAgUAAxkBAAIS8GnXeOj0cat3EhopXDh0Eq6-I0nsAAICEGsbY2W5VmtxBVFAydJvAQADAgADeQADOwQ",
+      "agreed": true,
+      "paid": false,
+      "awaiting_payment": false,
+      "shown": [
+        15,
+        7,
+        12,
+        26,
+        2,
+        4,
+        45,
+        3,
+        22,
+        40,
+        50,
+        23,
+        39,
+        1,
+        47,
+        5,
+        30,
+        37,
+        33,
+        10,
+        43,
+        29,
+        14,
+        49,
+        46,
+        16,
+        27,
+        18,
+        6,
+        42,
+        19,
+        48,
+        21,
+        20,
+        38,
+        31,
+        11,
+        36,
+        17,
+        24,
+        44
+      ],
+      "liked": [
+        26,
+        40,
+        39,
+        1,
+        47,
+        5,
+        30,
+        10,
+        43,
+        29,
+        14,
+        49,
+        16,
+        27,
+        6,
+        42,
+        19,
+        48,
+        20,
+        31,
+        11,
+        36,
+        17,
+        24
+      ],
+      "skipped": [
+        15,
+        7,
+        12,
+        2,
+        4,
+        45,
+        3,
+        22,
+        50,
+        37,
+        33
+      ],
+      "incoming_likes": [
+        3
+      ],
+      "matches": [
+        40,
+        48,
+        20
+      ],
+      "current_profile_id": 44,
+      "current_match_id": 40,
+      "match_cursor": 0,
+      "chat_open": true,
+      "active_view": "chat",
+      "swipes": 35,
+      "moderation_pending": false,
+      "pending_events": [],
+      "profile_cache": {
+        "15": {
+          "activity": "Active 12 min ago",
+          "bio": "Can be quiet, but never boring."
+        },
+        "7": {
+          "activity": "Active 12 min ago",
+          "bio": "Looking for someone who can keep a conversation alive."
+        },
+        "12": {
+          "activity": "Active 28 min ago",
+          "bio": "Can be sweet one minute and teasing the next."
+        },
+        "26": {
+          "activity": "Active 8 min ago",
+          "bio": "Here for good vibes and better conversations."
+        },
+        "2": {
+          "activity": "Active 28 min ago",
+          "bio": "Can be quiet, but never boring."
+        },
+        "4": {
+          "activity": "Active 8 min ago",
+          "bio": "More personality, less pretending."
+        },
+        "45": {
+          "activity": "Active 5 min ago",
+          "bio": "Can be sweet one minute and teasing the next."
+        },
+        "3": {
+          "activity": "Active 30 sec ago",
+          "bio": "Knows how to flirt, still values sincerity."
+        },
+        "22": {
+          "activity": "Active 12 min ago",
+          "bio": "Into music, mood, and meaningful attention."
+        },
+        "40": {
+          "activity": "Active 12 min ago",
+          "bio": "A bit naughty, a bit sweet 😉"
+        },
+        "50": {
+          "activity": "Active 3 hours ago",
+          "bio": "Here for good vibes and better conversations."
+        },
+        "23": {
+          "activity": "Active 12 min ago",
+          "bio": "More personality, less pretending."
+        },
+        "39": {
+          "activity": "Active 28 min ago",
+          "bio": "More into chemistry than small talk."
+        },
+        "1": {
+          "activity": "Active 3 hours ago",
+          "bio": "More personality, less pretending."
+        },
+        "47": {
+          "activity": "Active 2 min ago",
+          "bio": "A little shy at first, but warm once comfortable."
+        },
+        "5": {
+          "activity": "Active 18 min ago",
+          "bio": "Coffee first, feelings later."
+        },
+        "30": {
+          "activity": "Active 8 min ago",
+          "bio": "Looking for someone who can keep a conversation alive."
+        },
+        "37": {
+          "activity": "Active 2 min ago",
+          "bio": "A bit naughty, a bit sweet 😉"
+        },
+        "33": {
+          "activity": "Active 12 min ago",
+          "bio": "Into music, mood, and meaningful attention."
+        },
+        "10": {
+          "activity": "Active 28 min ago",
+          "bio": "Likes people who know how to talk naturally."
+        },
+        "43": {
+          "activity": "Online now",
+          "bio": "Loves deep talks and late-night chats."
+        },
+        "29": {
+          "activity": "Active 12 min ago",
+          "bio": "Into music, mood, and meaningful attention."
+        },
+        "14": {
+          "activity": "Active 30 sec ago",
+          "bio": "Loves deep talks and late-night chats."
+        },
+        "49": {
+          "activity": "Active 5 min ago",
+          "bio": "Can be quiet, but never boring."
+        },
+        "46": {
+          "activity": "Active 28 min ago",
+          "bio": "Friendly energy, selective replies."
+        },
+        "48": {
+          "activity": "Active 1 hour ago",
+          "bio": "Soft heart, sharp mind, easy smile."
+        },
+        "16": {
+          "activity": "Active 1 hour ago",
+          "bio": "Friendly energy, selective replies."
+        },
+        "27": {
+          "activity": "Active 1 hour ago",
+          "bio": "Can be sweet one minute and teasing the next."
+        },
+        "18": {
+          "activity": "Active 2 min ago",
+          "bio": "Coffee first, feelings later."
+        },
+        "6": {
+          "activity": "Active 1 hour ago",
+          "bio": "Likes thoughtful messages more than dry one-word replies."
+        },
+        "42": {
+          "activity": "Active 18 min ago",
+          "bio": "Equal parts sweet, curious, and hard to forget."
+        },
+        "19": {
+          "activity": "Active 12 min ago",
+          "bio": "More personality, less pretending."
+        },
+        "21": {
+          "activity": "Active 18 min ago",
+          "bio": "Likes thoughtful messages more than dry one-word replies."
+        },
+        "20": {
+          "activity": "Active 12 min ago",
+          "bio": "Looking for someone who can keep a conversation alive."
+        },
+        "38": {
+          "activity": "Active 30 sec ago",
+          "bio": "Into music, mood, and meaningful attention."
+        },
+        "31": {
+          "activity": "Active 12 min ago",
+          "bio": "Knows how to flirt, still values sincerity."
+        },
+        "11": {
+          "activity": "Online now",
+          "bio": "Friendly energy, selective replies."
+        },
+        "36": {
+          "activity": "Active 30 sec ago",
+          "bio": "More personality, less pretending."
+        },
+        "17": {
+          "activity": "Online now",
+          "bio": "Into music, mood, and meaningful attention."
+        },
+        "24": {
+          "activity": "Active 12 min ago",
+          "bio": "Knows how to flirt, still values sincerity."
+        },
+        "44": {
+          "activity": "Active 8 min ago",
+          "bio": "Into music, mood, and meaningful attention."
+        }
+      },
+      "chat_threads": {
+        "40": {
+          "messages": [
+            {
+              "sender": "match",
+              "text": "Hey, you seem interesting 🙂",
+              "ts": 1775732335
+            },
+            {
+              "sender": "user",
+              "text": "Hello",
+              "ts": 1775732695
+            },
+            {
+              "sender": "system",
+              "text": "She might go offline soon...",
+              "ts": 1775732695
+            },
+            {
+              "sender": "user",
+              "text": "Hey where are you",
+              "ts": 1775732713
+            },
+            {
+              "sender": "user",
+              "text": "Kaha se ho aap",
+              "ts": 1775732726
+            },
+            {
+              "sender": "match",
+              "text": "Aap kaha se hai",
+              "ts": 1775732800
+            },
+            {
+              "sender": "match",
+              "text": "Kya aap kanpur se hai",
+              "ts": 1775732829
+            },
+            {
+              "sender": "user",
+              "text": "Ha ji",
+              "ts": 1775732839
+            },
+            {
+              "sender": "user",
+              "text": "Kya aap bhi",
+              "ts": 1775732847
+            },
+            {
+              "sender": "user",
+              "text": "Ha ji mai bhi",
+              "ts": 1775734294
+            },
+            {
+              "sender": "match",
+              "text": "Ok good night",
+              "ts": 1775734309
+            }
+          ],
+          "user_unread": 1,
+          "admin_unread": 0,
+          "state": "active",
+          "fomo_sent": true
+        },
+        "48": {
+          "messages": [
+            {
+              "sender": "match",
+              "text": "Hey, you seem interesting 🙂",
+              "ts": 1775732535
+            }
+          ],
+          "user_unread": 1,
+          "admin_unread": 0,
+          "state": "available",
+          "fomo_sent": false
+        },
+        "20": {
+          "messages": [
+            {
+              "sender": "match",
+              "text": "You seem like someone I'd actually enjoy talking to.",
+              "ts": 1775732559
+            }
+          ],
+          "user_unread": 1,
+          "admin_unread": 0,
+          "state": "available",
+          "fomo_sent": false
+        }
+      }
+    }
+  }
+}
