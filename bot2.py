@@ -1096,7 +1096,7 @@ def delayed_moderation_success(user_id):
     bot.send_message(user_id, "✅ Photo approved!")
     send_agreement(user_id)
 
-
+ 
 def unlock_text():
     return f"VIP access:\n{PAYMENT_LINK}\n\nAfter payment, send the screenshot here."
 
@@ -1592,7 +1592,9 @@ def text_handler(message):
         bot.send_message(user_id, "Choose a section.", reply_markup=settings_keyboard())
         return
 
-    if text in {"/buy", BTN_BUY, BTN_GET_VIP, BTN_VIP}:
+    print(f"DEBUG VIP: text='{text}' | BTN_BUY='{BTN_BUY}' | BTN_VIP='{BTN_VIP}' | Checking for match...")
+    if text in {"/buy", BTN_BUY, BTN_GET_VIP, BTN_VIP} or text == "🔒 VIP":
+        print(f"DEBUG: VIP button TRIGGERED for user_id={user_id}")
         bot.send_message(user_id, unlock_text(), reply_markup=buy_keyboard())
         return
 
@@ -1774,6 +1776,7 @@ def text_handler(message):
         if is_on_cooldown(user_id):
             bot.send_message(user_id, "Please wait a moment ⏳")
             return
+        print(f"DEBUG: Forwarding message to admins - text='{text}'")
         forward_user_message_to_admins(message)
         return
 
