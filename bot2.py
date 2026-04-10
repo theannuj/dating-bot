@@ -9,10 +9,10 @@ from pathlib import Path
 import telebot
 from telebot.types import InlineKeyboardButton, InlineKeyboardMarkup, ReplyKeyboardMarkup, ReplyKeyboardRemove
 
-TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "8747771643:AAHTIAHqKjQhDBiUyNFmCgOLrUva16eGggM")
+TOKEN = os.getenv("BOT_TOKEN")
 PAYMENT_ADMINS = [526264365]
 CHAT_ADMINS = [526264365]
-PAYMENT_LINK = "https://your-payment-link"
+PAYMENT_LINK = "https://midnightmatch.creatorapp.club?callback=/fan-home?tier=998255026087117578"
 
 BASE_DIR = Path(__file__).resolve().parent
 PROFILES_FILE = BASE_DIR / "profiles.json"
