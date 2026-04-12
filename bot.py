@@ -1301,6 +1301,25 @@ def start_handler(message):
     send_welcome_screen(message.chat.id)
 
 
+@bot.message_handler(commands=["stats"])
+def stats_handler(message):
+    if message.chat.id not in CHAT_ADMINS:
+        bot.send_message(message.chat.id, "This command is for admins only.")
+        return
+    
+    with state_lock:
+        total_users = len(users)
+        vip_users = sum(1 for user in users.values() if user.get("payment_status") == "approved")
+        pending_users = sum(1 for user in users.values() if user.get("payment_status") == "pending")
+    
+    stats_message = f"""📊 Stats:
+Total Users: {total_users}
+VIP Users: {vip_users}
+Pending Payments: {pending_users}"""
+    
+    bot.send_message(message.chat.id, stats_message)
+
+
 @bot.message_handler(
     func=lambda message: message.chat.id in CHAT_ADMINS and bool(message.reply_to_message),
     content_types=["text"],
@@ -1383,6 +1402,11 @@ def photo_handler(message):
         return
 
     if user["awaiting_payment"]:
+        # Block if already VIP
+        if user["paid"]:
+            bot.send_message(user_id, "✅ You already have VIP access.")
+            return
+        
         # Initialize payment_status if not exists
         if "payment_status" not in user:
             user["payment_status"] = "none"
@@ -1424,6 +1448,11 @@ Status: 🟡 Pending"""
             save_state()
         
         bot.send_message(user_id, "Payment screenshot received. Waiting for review.", reply_markup=main_menu_keyboard(user_id))
+        return
+    
+    # Block if user is already VIP and sends photo without being in payment flow
+    if user["paid"]:
+        bot.send_message(user_id, "✅ You already have VIP access.")
         return
 
     bot.send_message(user_id, "Please use the available buttons to continue.")
@@ -1539,9 +1568,17 @@ def callback_handler(call):
                 if thread.get("state") == "locked":
                     thread["state"] = "available"
             save_state()
+        
+        # Send confirmation to admin
+        bot.send_message(
+            call.message.chat.id,
+            f"✅ User {user_id} approved successfully"
+        )
+        
+        # Send activation message to user
         bot.send_message(
             user_id,
-            "VIP activated successfully.\nYou can now view likes and reply to your matches.",
+            "🎉 Your VIP access has been activated!\n\nYou can now view likes and reply to your matches.",
             reply_markup=main_menu_keyboard(user_id),
         )
         bot.answer_callback_query(call.id, "Approved")
@@ -1666,6 +1703,11 @@ def text_handler(message):
 
     print(f"DEBUG VIP: text='{text}' | BTN_BUY='{BTN_BUY}' | BTN_VIP='{BTN_VIP}' | Checking for match...")
     if text in {"/buy", BTN_BUY, BTN_GET_VIP, BTN_VIP} or text == "🔒 VIP":
+        # Check if user is already VIP
+        if user["paid"]:
+            bot.send_message(user_id, "✅ You already have VIP access.")
+            return
+        
         print(f"DEBUG: VIP button TRIGGERED for user_id={user_id}")
         bot.send_message(user_id, unlock_text(), reply_markup=buy_keyboard())
         return
