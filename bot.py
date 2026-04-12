@@ -1098,7 +1098,20 @@ def delayed_moderation_success(user_id):
 
  
 def unlock_text():
-    return f"VIP access:\n{PAYMENT_LINK}\n\nAfter payment, send the screenshot here."
+    return f"""🔥 VIP ACCESS 🔥
+
+👉 Pay here:
+{PAYMENT_LINK}
+
+📌 Steps:
+
+1. Click the link and complete payment
+2. Take a screenshot after payment
+3. Send the screenshot here
+
+⚠️ Without screenshot, access will NOT be given
+⏳ Fast approval = faster access 😉
+"""
 
 
 def open_likes_you(user_id):
@@ -1781,6 +1794,18 @@ def text_handler(message):
         return
 
     send_main_menu(user_id)
+
+
+@bot.message_handler(content_types=['photo'])
+def handle_payment_proof(message):
+    user_id = message.from_user.id
+
+    # Send info to admin
+    bot.send_message(PAYMENT_ADMINS[0], f"📥 Payment proof received from user: {user_id}")
+    bot.forward_message(PAYMENT_ADMINS[0], user_id, message.message_id)
+
+    # Reply to user
+    bot.reply_to(message, "✅ Screenshot received! Your access will be approved shortly.")
 
 
 print("Running...")
