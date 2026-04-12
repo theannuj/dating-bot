@@ -247,6 +247,8 @@ def load_state():
     for user_id, payload in raw.get("users", {}).items():
         base = default_user()
         base.update(payload)
+        if base.get("payment_status") == "approved":
+            base["paid"] = True
         restored[int(user_id)] = base
     return restored
 
@@ -741,7 +743,7 @@ def inactivity_engagement_worker():
 
 
 def welcome_keyboard():
-    return build_keyboard([BTN_CONTINUE], [BTN_START_OVER])
+    return build_keyboard([BTN_CONTINUE])
 
 
 
@@ -1476,6 +1478,29 @@ def help_command_handler(message):
     )
 
 
+@bot.message_handler(commands=["reset"])
+def reset_command(message):
+    user_id = message.chat.id
+    touch_user_activity(user_id)
+
+    bot.send_message(
+        user_id,
+        "⚠️ This will reset your profile and remove all data (including VIP).\n\nType CONFIRM to continue or anything else to cancel."
+    )
+
+    def confirm_reset(m):
+        if m.chat.id != user_id:
+            return
+        if m.text == "CONFIRM":
+            reset_user(user_id)
+            bot.send_message(user_id, "Your profile has been reset ✅")
+        else:
+            bot.send_message(user_id, "Reset cancelled")
+        bot.clear_step_handler_by_chat_id(user_id)
+
+    bot.register_next_step_handler(message, confirm_reset)
+
+
 @bot.message_handler(commands=["stats"])
 def stats_handler(message):
     if message.chat.id not in CHAT_ADMINS:
@@ -1859,15 +1884,6 @@ def text_handler(message):
     touch_user_activity(user_id)
     text = message.text.strip()
     user = get_user(user_id)
-
-    if text == BTN_START_OVER:
-        reset_user(user_id)
-        bot.send_message(
-            user_id,
-            "Your test profile has been reset.\nLet's start again.",
-            reply_markup=welcome_keyboard(),
-        )
-        return
 
     if text == BTN_CONTINUE:
         if user["step"] == "start":
