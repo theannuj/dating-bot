@@ -1301,6 +1301,54 @@ def start_handler(message):
     send_welcome_screen(message.chat.id)
 
 
+@bot.message_handler(commands=["menu"])
+def menu_command_handler(message):
+    if is_admin(message.chat.id):
+        bot.send_message(message.chat.id, "Admin menu is ready.", reply_markup=admin_menu_keyboard())
+        return
+    send_main_menu(message.chat.id)
+
+
+@bot.message_handler(commands=["matches"])
+def matches_command_handler(message):
+    if is_admin(message.chat.id):
+        send_admin_chat_list(message.chat.id)
+        return
+    show_matches(message.chat.id)
+
+
+@bot.message_handler(commands=["chat"])
+def chat_command_handler(message):
+    if is_admin(message.chat.id):
+        bot.send_message(message.chat.id, "Use the admin buttons to open chats.", reply_markup=admin_menu_keyboard())
+        return
+
+    user_id = message.chat.id
+    user = get_user(user_id)
+    if not user["current_match_id"]:
+        bot.send_message(user_id, "Open one of your matches first.", reply_markup=main_menu_keyboard(user_id))
+        return
+    open_match_chat(user_id, user["current_match_id"], show_history=True)
+
+
+@bot.message_handler(commands=["vip"])
+def vip_command_handler(message):
+    user_id = message.chat.id
+    user = get_user(user_id)
+    if user["paid"]:
+        bot.send_message(user_id, "✅ You already have VIP access.")
+        return
+    bot.send_message(user_id, unlock_text(), reply_markup=buy_keyboard())
+
+
+@bot.message_handler(commands=["help"])
+def help_command_handler(message):
+    bot.send_message(
+        message.chat.id,
+        "🤖 Commands:\n/menu - Main menu\n/matches - View matches\n/chat - Open chat\n/vip - VIP access",
+    )
+
+
 @bot.message_handler(commands=["stats"])
 def stats_handler(message):
     if message.chat.id not in CHAT_ADMINS:
