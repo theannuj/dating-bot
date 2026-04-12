@@ -1383,16 +1383,46 @@ def photo_handler(message):
         return
 
     if user["awaiting_payment"]:
+        # Initialize payment_status if not exists
+        if "payment_status" not in user:
+            user["payment_status"] = "none"
+        
+        # Check if already under review
+        if user.get("payment_status") == "pending":
+            bot.send_message(user_id, "⏳ Your payment is already under review. Please wait.")
+            return
+        
+        # Check if already approved
+        if user.get("payment_status") == "approved" or user["paid"]:
+            bot.send_message(user_id, "✅ You already have VIP access.")
+            return
+        
+        # Get user info for admin notification
+        first_name = message.from_user.first_name or "User"
+        username = message.from_user.username or "N/A"
+        
+        # Enhanced caption with user info and status
+        caption = f"""📥 Payment Proof Received
+
+User ID: {user_id}
+Name: {first_name}
+Username: @{username}
+
+Status: 🟡 Pending"""
+        
         for admin in PAYMENT_ADMINS:
             bot.send_photo(
                 admin,
                 file_id,
-                caption=f"Payment screenshot\nUser ID: {user_id}",
+                caption=caption,
                 reply_markup=payment_markup(user_id),
             )
+        
         with state_lock:
             user["awaiting_payment"] = False
+            user["payment_status"] = "pending"
             save_state()
+        
         bot.send_message(user_id, "Payment screenshot received. Waiting for review.", reply_markup=main_menu_keyboard(user_id))
         return
 
@@ -1504,6 +1534,7 @@ def callback_handler(call):
     if action == "approve":
         with state_lock:
             user["paid"] = True
+            user["payment_status"] = "approved"
             for thread in user.get("chat_threads", {}).values():
                 if thread.get("state") == "locked":
                     thread["state"] = "available"
@@ -1517,6 +1548,9 @@ def callback_handler(call):
         return
 
     if action == "reject":
+        with state_lock:
+            user["payment_status"] = "rejected"
+            save_state()
         bot.send_message(user_id, "Payment wasn't approved. Please send a clear screenshot again.", reply_markup=buy_keyboard())
         bot.answer_callback_query(call.id, "Rejected")
         return
