@@ -111,6 +111,7 @@ bot = telebot.TeleBot(TOKEN)
 state_lock = threading.RLock()
 chat_map = {}
 LAST_ACTION_TIME = {}
+LAST_ACTIVITY_TIME = {}
 LAST_ENGAGEMENT_PING = {}
 COOLDOWN_SECONDS = 2.5
 INACTIVITY_MIN_SECONDS = 10 * 60
@@ -129,7 +130,7 @@ def is_on_cooldown(user_id):
 
 
 def touch_user_activity(user_id):
-    LAST_ACTION_TIME[user_id] = time.time()
+    LAST_ACTIVITY_TIME[user_id] = time.time()
 
 
 def send_typing_then_message(user_id, text, reply_markup=None, parse_mode=None, delay=None):
@@ -675,7 +676,7 @@ def inactivity_engagement_worker():
                 if user.get("chat_open"):
                     continue
 
-                last_active = LAST_ACTION_TIME.get(user_id, 0)
+                last_active = LAST_ACTIVITY_TIME.get(user_id, 0)
                 if not last_active:
                     continue
 
