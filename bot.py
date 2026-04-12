@@ -43,6 +43,8 @@ BTN_VIP = "🔒 VIP"
 BTN_CHAT = "💬 Chat"
 BTN_SEND_PAYMENT = "Send payment screenshot"
 BTN_NEXT_MATCH = "Next match"
+BTN_PREV_MATCH = "⬅️ Prev"
+BTN_MATCH_NEXT = "➡️ Next"
 BTN_END_CHAT = "End Chat"
 BTN_ADMIN_CHATS = "💬 Admin Chats"
 BTN_ADMIN_REFRESH = "🔄 Refresh"
@@ -603,7 +605,7 @@ def send_match_card(user_id, match_id):
         user_id,
         profile["photo"],
         caption="\n".join(lines),
-        reply_markup=match_keyboard(bool(user["paid"])),
+        reply_markup=match_nav_keyboard(),
     )
 
 
@@ -717,6 +719,10 @@ def match_keyboard(paid):
     if paid:
         return build_keyboard([BTN_CHAT, BTN_END_CHAT], [BTN_MATCHES, BTN_MAIN_MENU])
     return build_keyboard([BTN_CHAT, BTN_NEXT_MATCH], [BTN_MAIN_MENU])
+
+
+def match_nav_keyboard():
+    return build_keyboard([BTN_PREV_MATCH, BTN_CHAT, BTN_MATCH_NEXT])
 
 
 
@@ -1193,6 +1199,21 @@ def show_next_match(user_id):
     send_match_card(user_id, matches[next_cursor])
 
 
+def show_prev_match(user_id):
+    user = get_user(user_id)
+    matches = get_visible_match_ids(user_id)
+    if not matches:
+        bot.send_message(user_id, "No matches yet. Keep exploring.", reply_markup=main_menu_keyboard(user_id))
+        return
+
+    current_cursor = int(user.get("match_cursor", 0))
+    prev_cursor = (current_cursor - 1) % len(matches)
+    with state_lock:
+        user["match_cursor"] = prev_cursor
+        save_state()
+    send_match_card(user_id, matches[prev_cursor])
+
+
 def text_from_message(message):
     if message.content_type == "text":
         return message.text
@@ -1597,8 +1618,12 @@ def text_handler(message):
         show_matches(user_id)
         return
 
-    if text == BTN_NEXT_MATCH:
+    if text == BTN_NEXT_MATCH or text == BTN_MATCH_NEXT:
         show_next_match(user_id)
+        return
+
+    if text == BTN_PREV_MATCH:
+        show_prev_match(user_id)
         return
 
     if text in {"/settings", BTN_SETTINGS}:
