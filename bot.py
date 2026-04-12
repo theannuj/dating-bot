@@ -111,7 +111,11 @@ bot = telebot.TeleBot(TOKEN)
 state_lock = threading.RLock()
 chat_map = {}
 LAST_ACTION_TIME = {}
+LAST_ENGAGEMENT_PING = {}
 COOLDOWN_SECONDS = 2.5
+INACTIVITY_MIN_SECONDS = 10 * 60
+INACTIVITY_MAX_SECONDS = 15 * 60
+INACTIVITY_CHECK_SECONDS = 60
 
 
 def is_on_cooldown(user_id):
@@ -122,6 +126,16 @@ def is_on_cooldown(user_id):
         return True
     LAST_ACTION_TIME[user_id] = now
     return False
+
+
+def touch_user_activity(user_id):
+    LAST_ACTION_TIME[user_id] = time.time()
+
+
+def send_typing_then_message(user_id, text, reply_markup=None, parse_mode=None, delay=None):
+    bot.send_chat_action(user_id, "typing")
+    time.sleep(delay if delay is not None else typing_delay_for_text(text))
+    bot.send_message(user_id, text, reply_markup=reply_markup, parse_mode=parse_mode)
 
 
 def load_profiles():
@@ -495,8 +509,6 @@ def typing_delay_for_text(text):
 
 
 def send_typing_then_match_message(user_id, match_id, text, delay=None):
-    profile = get_profile(match_id)
-    match_name = profile["name"] if profile else "Your match"
     bot.send_chat_action(user_id, 'typing')
     time.sleep(delay if delay is not None else typing_delay_for_text(text))
     notify_user_of_match_message(user_id, match_id, text)
@@ -524,7 +536,12 @@ def maybe_send_fomo_message(user_id, match_id):
             save_state()
 
     if should_send:
-        bot.send_message(user_id, fomo_text, reply_markup=match_keyboard(False))
+        threading.Thread(
+            target=send_typing_then_message,
+            args=(user_id, fomo_text),
+            kwargs={"reply_markup": match_keyboard(False)},
+            daemon=True,
+        ).start()
 
 
 def notify_admin_chat_status(user_id, match_id, status_text):
@@ -641,6 +658,48 @@ def build_keyboard(*rows):
 
 def is_admin(user_id):
     return user_id in CHAT_ADMINS or user_id in PAYMENT_ADMINS
+
+
+def inactivity_engagement_worker():
+    while True:
+        time.sleep(INACTIVITY_CHECK_SECONDS)
+        now = time.time()
+        targets = []
+
+        with state_lock:
+            for user_id, user in users.items():
+                if is_admin(user_id):
+                    continue
+                if not user.get("matches"):
+                    continue
+                if user.get("chat_open"):
+                    continue
+
+                last_active = LAST_ACTION_TIME.get(user_id, 0)
+                if not last_active:
+                    continue
+
+                inactive_for = now - last_active
+                if inactive_for < INACTIVITY_MIN_SECONDS or inactive_for > INACTIVITY_MAX_SECONDS:
+                    continue
+
+                last_ping = LAST_ENGAGEMENT_PING.get(user_id, 0)
+                if last_ping and now - last_ping < INACTIVITY_MAX_SECONDS:
+                    continue
+
+                LAST_ENGAGEMENT_PING[user_id] = now
+                targets.append(user_id)
+
+        for user_id in targets:
+            try:
+                send_typing_then_message(
+                    user_id,
+                    "💬 Someone is waiting for your reply 😉",
+                    reply_markup=main_menu_keyboard(user_id),
+                    delay=random.uniform(1.0, 2.0),
+                )
+            except Exception:
+                continue
 
 
 
@@ -1036,21 +1095,22 @@ def create_match(user_id, profile_id, source="system"):
 
     match_line = "🔥 <b>It's a match!</b>\n\nYou both liked each other 😉\nStart chatting now..."
     bot.send_message(user_id, match_line, parse_mode="HTML")
-    bot.send_chat_action(user_id, 'typing')
-    time.sleep(random.uniform(2.0, 4.0))
-
     opener = random.choice(OPENERS)
     append_chat_message(user_id, profile_id, "match", opener)
     increment_unread(user_id, profile_id)
     if paid:
-        notify_user_of_match_message(user_id, profile_id, opener)
+        threading.Thread(
+            target=send_typing_then_match_message,
+            args=(user_id, profile_id, opener),
+            daemon=True,
+        ).start()
     else:
-        bot.send_message(
-            user_id,
-            f"<b>{html.escape(profile['name'])}:</b> {html.escape(opener)}",
-            reply_markup=match_keyboard(False),
-            parse_mode="HTML",
-        )
+        threading.Thread(
+            target=send_typing_then_message,
+            args=(user_id, f"<b>{html.escape(profile['name'])}:</b> {html.escape(opener)}"),
+            kwargs={"reply_markup": match_keyboard(False), "parse_mode": "HTML"},
+            daemon=True,
+        ).start()
 
 
 def process_pending_events(user_id):
@@ -1118,6 +1178,15 @@ def unlock_text():
 ⚠️ Without screenshot, access will NOT be given
 ⏳ Fast approval = faster access 😉
 """
+
+
+def send_vip_already_message(user_id):
+    with state_lock:
+        user = get_user(user_id)
+        if user.get("awaiting_payment"):
+            user["awaiting_payment"] = False
+            save_state()
+    bot.send_message(user_id, "✅ You already have VIP access.")
 
 
 def open_likes_you(user_id):
@@ -1294,6 +1363,7 @@ def start_handler(message):
     if is_admin(message.chat.id):
         bot.send_message(message.chat.id, "Admin menu is ready.", reply_markup=admin_menu_keyboard())
         return
+    touch_user_activity(message.chat.id)
     with state_lock:
         user["chat_open"] = False
         user["active_view"] = "start"
@@ -1306,6 +1376,7 @@ def menu_command_handler(message):
     if is_admin(message.chat.id):
         bot.send_message(message.chat.id, "Admin menu is ready.", reply_markup=admin_menu_keyboard())
         return
+    touch_user_activity(message.chat.id)
     send_main_menu(message.chat.id)
 
 
@@ -1314,6 +1385,7 @@ def matches_command_handler(message):
     if is_admin(message.chat.id):
         send_admin_chat_list(message.chat.id)
         return
+    touch_user_activity(message.chat.id)
     show_matches(message.chat.id)
 
 
@@ -1324,6 +1396,7 @@ def chat_command_handler(message):
         return
 
     user_id = message.chat.id
+    touch_user_activity(user_id)
     user = get_user(user_id)
     if not user["current_match_id"]:
         bot.send_message(user_id, "Open one of your matches first.", reply_markup=main_menu_keyboard(user_id))
@@ -1334,15 +1407,18 @@ def chat_command_handler(message):
 @bot.message_handler(commands=["vip"])
 def vip_command_handler(message):
     user_id = message.chat.id
+    touch_user_activity(user_id)
     user = get_user(user_id)
     if user["paid"]:
-        bot.send_message(user_id, "✅ You already have VIP access.")
+        send_vip_already_message(user_id)
         return
     bot.send_message(user_id, unlock_text(), reply_markup=buy_keyboard())
 
 
 @bot.message_handler(commands=["help"])
 def help_command_handler(message):
+    if not is_admin(message.chat.id):
+        touch_user_activity(message.chat.id)
     bot.send_message(
         message.chat.id,
         "🤖 Commands:\n/menu - Main menu\n/matches - View matches\n/chat - Open chat\n/vip - VIP access",
@@ -1475,6 +1551,8 @@ def admin_menu_handler(message):
 @bot.message_handler(content_types=["photo"])
 def photo_handler(message):
     user_id = message.chat.id
+    if not is_admin(user_id):
+        touch_user_activity(user_id)
     if is_on_cooldown(user_id):
         bot.send_message(user_id, "Please wait a moment ⏳")
         return
@@ -1516,7 +1594,7 @@ def photo_handler(message):
     if user["awaiting_payment"]:
         # Block if already VIP
         if user["paid"]:
-            bot.send_message(user_id, "✅ You already have VIP access.")
+            send_vip_already_message(user_id)
             return
         
         # Initialize payment_status if not exists
@@ -1530,7 +1608,7 @@ def photo_handler(message):
         
         # Check if already approved
         if user.get("payment_status") == "approved" or user["paid"]:
-            bot.send_message(user_id, "✅ You already have VIP access.")
+            send_vip_already_message(user_id)
             return
         
         # Get user info for admin notification
@@ -1566,7 +1644,7 @@ Status: 🟡 Pending"""
     
     # Block if user is already VIP and sends photo without being in payment flow
     if user["paid"]:
-        bot.send_message(user_id, "✅ You already have VIP access.")
+        send_vip_already_message(user_id)
         return
 
     bot.send_message(user_id, "Please use the available buttons to continue.")
@@ -1576,6 +1654,9 @@ Status: 🟡 Pending"""
 
 @bot.callback_query_handler(func=lambda call: True)
 def callback_handler(call):
+    if not is_admin(call.message.chat.id):
+        touch_user_activity(call.message.chat.id)
+
     if call.data.startswith("chatctl_"):
         parts = call.data.split("_")
         if len(parts) == 4 and parts[2].isdigit() and parts[3].isdigit():
@@ -1677,6 +1758,7 @@ def callback_handler(call):
     if action == "approve":
         with state_lock:
             user["paid"] = True
+            user["awaiting_payment"] = False
             user["payment_status"] = "approved"
             for thread in user.get("chat_threads", {}).values():
                 if thread.get("state") == "locked":
@@ -1707,7 +1789,10 @@ def callback_handler(call):
             # Clear stored photo_id on rejection
             user["payment_proof_photo_id"] = None
             save_state()
-        bot.send_message(user_id, "Payment wasn't approved. Please send a clear screenshot again.", reply_markup=buy_keyboard())
+        if user["paid"]:
+            send_vip_already_message(user_id)
+        else:
+            bot.send_message(user_id, "Payment wasn't approved. Please send a clear screenshot again.", reply_markup=buy_keyboard())
         bot.answer_callback_query(call.id, "Rejected")
         
         # Auto-open next pending user
@@ -1720,6 +1805,7 @@ def callback_handler(call):
 @bot.message_handler(func=lambda message: message.chat.id not in CHAT_ADMINS, content_types=["text"])
 def text_handler(message):
     user_id = message.chat.id
+    touch_user_activity(user_id)
     text = message.text.strip()
     user = get_user(user_id)
 
@@ -1827,7 +1913,7 @@ def text_handler(message):
     if text in {"/buy", BTN_BUY, BTN_GET_VIP, BTN_VIP} or text == "🔒 VIP":
         # Check if user is already VIP
         if user["paid"]:
-            bot.send_message(user_id, "✅ You already have VIP access.")
+            send_vip_already_message(user_id)
             return
         
         print(f"DEBUG: VIP button TRIGGERED for user_id={user_id}")
@@ -1835,6 +1921,9 @@ def text_handler(message):
         return
 
     if text == BTN_SEND_PAYMENT:
+        if user["paid"]:
+            send_vip_already_message(user_id)
+            return
         if is_on_cooldown(user_id):
             bot.send_message(user_id, "Please wait a moment ⏳")
             return
@@ -1875,7 +1964,8 @@ def text_handler(message):
         return
 
     if text == BTN_SEND_GIFT:
-        bot.send_message(user_id, "Gifts can be enabled later with coins or VIP.", reply_markup=buy_keyboard())
+        reply_markup = main_menu_keyboard(user_id) if user["paid"] else buy_keyboard()
+        bot.send_message(user_id, "Gifts can be enabled later with coins or VIP.", reply_markup=reply_markup)
         return
 
     if text == BTN_CHAT:
@@ -2019,17 +2109,6 @@ def text_handler(message):
     send_main_menu(user_id)
 
 
-@bot.message_handler(content_types=['photo'])
-def handle_payment_proof(message):
-    user_id = message.from_user.id
-
-    # Send info to admin
-    bot.send_message(PAYMENT_ADMINS[0], f"📥 Payment proof received from user: {user_id}")
-    bot.forward_message(PAYMENT_ADMINS[0], user_id, message.message_id)
-
-    # Reply to user
-    bot.reply_to(message, "✅ Screenshot received! Your access will be approved shortly.")
-
-
+threading.Thread(target=inactivity_engagement_worker, daemon=True).start()
 print("Running...")
 bot.infinity_polling(skip_pending=True, timeout=30, long_polling_timeout=30)
