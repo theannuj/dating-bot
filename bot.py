@@ -1320,6 +1320,70 @@ Pending Payments: {pending_users}"""
     bot.send_message(message.chat.id, stats_message)
 
 
+@bot.message_handler(commands=["pending"])
+def pending_handler(message):
+    if message.chat.id not in CHAT_ADMINS:
+        bot.send_message(message.chat.id, "This command is for admins only.")
+        return
+    
+    with state_lock:
+        pending_users = [(uid, user) for uid, user in users.items() if user.get("payment_status") == "pending"]
+    
+    if not pending_users:
+        bot.send_message(message.chat.id, "✅ No pending payments right now.")
+        return
+    
+    lines = [f"⏳ Pending Payments ({len(pending_users)}):"]
+    for uid, user in pending_users:
+        name = user.get("name") or f"User {uid}"
+        lines.append(f"• {name} (ID: {uid})")
+    
+    bot.send_message(message.chat.id, "\n".join(lines))
+
+
+def get_next_pending_user_id():
+    """Get the next pending user ID"""
+    with state_lock:
+        for uid, user in users.items():
+            if user.get("payment_status") == "pending":
+                return uid
+    return None
+
+
+def send_next_pending_to_admin(admin_id):
+    """Send next pending user's payment proof to admin or notify if none"""
+    next_uid = get_next_pending_user_id()
+    if not next_uid:
+        bot.send_message(admin_id, "✅ No more pending payments")
+        return
+    
+    next_user = get_user(next_uid)
+    photo_id = next_user.get("payment_proof_photo_id")
+    
+    if not photo_id:
+        name = next_user.get("name") or f"User {next_uid}"
+        bot.send_message(admin_id, f"📥 Next pending: {name} (ID: {next_uid})")
+        return
+    
+    first_name = next_user.get("name") or "User"
+    username = next_user.get("payment_username", "N/A")
+    
+    caption = f"""📥 Payment Proof Received
+
+User ID: {next_uid}
+Name: {first_name}
+Username: @{username}
+
+Status: 🟡 Pending"""
+    
+    bot.send_photo(
+        admin_id,
+        photo_id,
+        caption=caption,
+        reply_markup=payment_markup(next_uid),
+    )
+
+
 @bot.message_handler(
     func=lambda message: message.chat.id in CHAT_ADMINS and bool(message.reply_to_message),
     content_types=["text"],
@@ -1445,6 +1509,8 @@ Status: 🟡 Pending"""
         with state_lock:
             user["awaiting_payment"] = False
             user["payment_status"] = "pending"
+            user["payment_proof_photo_id"] = file_id
+            user["payment_username"] = username
             save_state()
         
         bot.send_message(user_id, "Payment screenshot received. Waiting for review.", reply_markup=main_menu_keyboard(user_id))
@@ -1582,14 +1648,22 @@ def callback_handler(call):
             reply_markup=main_menu_keyboard(user_id),
         )
         bot.answer_callback_query(call.id, "Approved")
+        
+        # Auto-open next pending user
+        send_next_pending_to_admin(call.message.chat.id)
         return
 
     if action == "reject":
         with state_lock:
             user["payment_status"] = "rejected"
+            # Clear stored photo_id on rejection
+            user["payment_proof_photo_id"] = None
             save_state()
         bot.send_message(user_id, "Payment wasn't approved. Please send a clear screenshot again.", reply_markup=buy_keyboard())
         bot.answer_callback_query(call.id, "Rejected")
+        
+        # Auto-open next pending user
+        send_next_pending_to_admin(call.message.chat.id)
         return
 
     bot.answer_callback_query(call.id, "Unknown action")
