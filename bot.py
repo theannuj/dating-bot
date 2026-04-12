@@ -90,14 +90,49 @@ BIOS = [
 ]
 
 OPENERS = [
-    "Hey, you seem interesting 🙂",
-    "Hi... I had a feeling we'd get along.",
-    "Hey, how's your evening going?",
-    "You seem easy to talk to.",
-    "Nice to match with you. What are you like?",
-    "You caught my attention, so I had to say hi.",
-    "Hey, how's your day been so far?",
-    "You seem like someone I'd actually enjoy talking to.",
+    # --- Short & natural ---
+    "hey…",
+    "hmm hi",
+    "hey you",
+    "hi :)",
+    "hmm…",
+    "hello… maybe 😄",
+    
+    # --- Curious ---
+    "you seem interesting 👀",
+    "hmm… not sure why I texted",
+    "idk… just felt like texting",
+    "you don't look boring 😄",
+    "something about you…",
+    "okay… I'm curious now",
+    
+    # --- Soft human feel ---
+    "wasn't going to text… but okay",
+    "I usually don't text first 😅",
+    "this feels random 😄",
+    "hmm this is a bit weird",
+    "not sure if I should say hi…",
+    
+    # --- Playful doubt (trust builder) ---
+    "you're real right? 😅",
+    "tum real ho na?",
+    "btw you're not a bot… right?",
+    "don't tell me you're a bot 😄",
+    "idk thoda suspicious lag raha 😄",
+    
+    # --- Light tease ---
+    "you look like trouble 😄",
+    "I think you reply late…",
+    "don't be boring please 😄",
+    "let's see how this goes",
+    "try not to be dry 😏",
+    
+    # --- Light question (limited use) ---
+    "btw where are you from? 😄",
+    "tum kaha se ho?",
+    "random… where are you from?",
+    "I feel you're not from here 😄",
+    "waise tum kaha ke ho?",
 ]
 
 FOMO_MESSAGES = [
@@ -1096,7 +1131,22 @@ def create_match(user_id, profile_id, source="system"):
 
     match_line = "🔥 <b>It's a match!</b>\n\nYou both liked each other 😉\nStart chatting now..."
     bot.send_message(user_id, match_line, parse_mode="HTML")
-    opener = random.choice(OPENERS)
+    
+    # Non-repeating opener logic
+    used = user.get("used_openers", [])
+    available = [msg for msg in OPENERS if msg not in used]
+    
+    # Reset if all openers have been used
+    if not available:
+        used = []
+        available = OPENERS.copy()
+    
+    opener = random.choice(available)
+    used.append(opener)
+    with state_lock:
+        user["used_openers"] = used
+        save_state()
+    
     append_chat_message(user_id, profile_id, "match", opener)
     increment_unread(user_id, profile_id)
     if paid:
