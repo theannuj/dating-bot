@@ -625,7 +625,7 @@ def send_matches_inbox(user_id):
         save_state()
 
     if not matches:
-        bot.send_message(user_id, "No matches yet. Keep exploring.", reply_markup=main_menu_keyboard(user_id))
+        bot.send_message(user_id, "No matches yet…\n\nKeep exploring, something might click 😉", reply_markup=main_menu_keyboard(user_id))
         return
 
     bot.send_message(user_id, "💖 Your chats", reply_markup=build_user_inbox_markup(user_id, matches))
@@ -747,7 +747,7 @@ def welcome_keyboard():
 def send_welcome_screen(user_id):
     bot.send_message(
         user_id,
-        "<b>Hey 😉 Welcome!</b>\n\nReady to meet someone interesting? 🔥\n\nCreate your profile and start exploring amazing matches 💫\n\nTap Continue to resume\nor choose Start Over for a fresh profile",
+        "<b>Hey 😉 Welcome!</b>\n\nExplore profiles, find your matches,\nand start chatting with someone new 💫\n\nLet’s see how this goes…\n\nTap Continue 👇",
         reply_markup=welcome_keyboard(),
         parse_mode="HTML",
     )
@@ -958,7 +958,7 @@ def send_current_step_prompt(user_id):
     if step == "start":
         bot.send_message(
             user_id,
-            "<b>Hey 😉 Welcome!</b>\n\nReady to meet someone interesting? 🔥\n\nCreate your profile and start exploring amazing matches 💫\n\nTap Continue to resume\nor choose Start Over for a fresh profile",
+            "<b>Hey 😉 Welcome!</b>\n\nExplore profiles, find your matches,\nand start chatting with someone new 💫\n\nLet’s see how this goes…\n\nTap Continue 👇",
             reply_markup=welcome_keyboard(),
             parse_mode="HTML",
         )
@@ -1089,7 +1089,7 @@ def schedule_reaction_after_like(user, profile_id):
 def send_like_feedback(user_id, profile):
     bot.send_message(
         user_id,
-        f"<b>You liked {profile['name']}.</b>\nIf there's mutual interest, you'll hear back later.",
+        f"<b>You liked {profile['name']} 😉</b>\n\nLet’s see if it’s a match…",
         reply_markup=build_keyboard([BTN_MAIN_MENU]),
         parse_mode="HTML",
     )
@@ -1099,7 +1099,7 @@ def announce_incoming_like(user_id, profile_id):
     profile = get_profile(profile_id)
     if not profile:
         return
-    bot.send_message(user_id, "Someone new noticed your profile.")
+    bot.send_message(user_id, "Someone liked your profile 😉\n\nCheck it now")
     time.sleep(random.uniform(1.0, 2.0))
     bot.send_photo(
         user_id,
@@ -1129,7 +1129,7 @@ def create_match(user_id, profile_id, source="system"):
     if not profile:
         return
 
-    match_line = "🔥 <b>It's a match!</b>\n\nYou both liked each other 😉\nStart chatting now..."
+    match_line = "🔥 <b>It’s a match!</b>\n\nYou both liked each other 😉\n\nSay something… let’s see where this goes 💬"
     bot.send_message(user_id, match_line, parse_mode="HTML")
     
     # Non-repeating opener logic
@@ -1215,10 +1215,14 @@ def delayed_moderation_success(user_id):
 
  
 def unlock_text():
-    return f"""🔥 VIP ACCESS 🔥
+    return f"""🔥 <b>VIP ACCESS</b>
 
-👉 Pay here:
+Continue your chat and unlock full access
+
+👉 Unlock access:
 {PAYMENT_LINK}
+
+Send screenshot after payment to continue
 
 📌 Steps:
 
@@ -1247,7 +1251,7 @@ def open_likes_you(user_id):
         paid = user["paid"]
 
     if not incoming:
-        bot.send_message(user_id, "No new likes right now.", reply_markup=main_menu_keyboard(user_id))
+        bot.send_message(user_id, "No new likes right now…\n\nCheck back later 😉", reply_markup=main_menu_keyboard(user_id))
         return
 
     profile_id = incoming[0]
@@ -1288,7 +1292,7 @@ def show_matches(user_id):
     user = get_user(user_id)
     matches = get_visible_match_ids(user_id)
     if not matches:
-        bot.send_message(user_id, "No matches yet. Keep exploring.", reply_markup=main_menu_keyboard(user_id))
+        bot.send_message(user_id, "No matches yet…\n\nKeep exploring, something might click 😉", reply_markup=main_menu_keyboard(user_id))
         return
 
     current_match_id = user.get("current_match_id")
@@ -1308,7 +1312,7 @@ def show_next_match(user_id):
     user = get_user(user_id)
     matches = get_visible_match_ids(user_id)
     if not matches:
-        bot.send_message(user_id, "No matches yet. Keep exploring.", reply_markup=main_menu_keyboard(user_id))
+        bot.send_message(user_id, "No matches yet…\n\nKeep exploring, something might click 😉", reply_markup=main_menu_keyboard(user_id))
         return
 
     current_cursor = int(user.get("match_cursor", 0))
@@ -1323,7 +1327,7 @@ def show_prev_match(user_id):
     user = get_user(user_id)
     matches = get_visible_match_ids(user_id)
     if not matches:
-        bot.send_message(user_id, "No matches yet. Keep exploring.", reply_markup=main_menu_keyboard(user_id))
+        bot.send_message(user_id, "No matches yet…\n\nKeep exploring, something might click 😉", reply_markup=main_menu_keyboard(user_id))
         return
 
     current_cursor = int(user.get("match_cursor", 0))
@@ -1370,7 +1374,7 @@ def open_match_chat(user_id, match_id, show_history=True):
             bot.send_message(user_id, format_chat_history(name, history), parse_mode="HTML")
         bot.send_message(
             user_id,
-            "She was about to reply...\n\nUnlock VIP to continue chatting \U0001F513",
+            "She was about to say something…\n\nUnlock to continue 🔓",
             reply_markup=likes_locked_keyboard(),
         )
         return
@@ -1403,7 +1407,7 @@ def open_match_chat(user_id, match_id, show_history=True):
     bot.send_message(user_id, format_chat_history(name, history), reply_markup=match_keyboard(paid), parse_mode="HTML")
     bot.send_message(
         user_id,
-        "Type your message below.",
+        "Send a message…",
         reply_markup=match_keyboard(paid),
     )
 
@@ -1629,7 +1633,7 @@ def photo_handler(message):
             bot.send_message(user_id, "This chat has ended.", reply_markup=main_menu_keyboard(user_id))
             return
         if state == "locked" and not user["paid"]:
-            bot.send_message(user_id, "She was about to reply...\n\nUnlock VIP to continue chatting.", reply_markup=likes_locked_keyboard())
+            bot.send_message(user_id, "She was about to say something…\n\nUnlock to continue 🔓", reply_markup=likes_locked_keyboard())
             return
         if state in {"available", "locked"}:
             if not can_activate_chat(user_id, match_id):
@@ -1690,7 +1694,7 @@ Status: 🟡 Pending"""
             user["payment_username"] = username
             save_state()
         
-        bot.send_message(user_id, "Payment screenshot received. Waiting for review.", reply_markup=main_menu_keyboard(user_id))
+        bot.send_message(user_id, "Screenshot received ✅\n\nWe’re verifying it… please wait a moment", reply_markup=main_menu_keyboard(user_id))
         return
     
     # Block if user is already VIP and sends photo without being in payment flow
@@ -1698,7 +1702,7 @@ Status: 🟡 Pending"""
         send_vip_already_message(user_id)
         return
 
-    bot.send_message(user_id, "Please use the available buttons to continue.")
+    bot.send_message(user_id, "Something went wrong…\n\nPlease try again")
 
 
 
@@ -1725,8 +1729,8 @@ def callback_handler(call):
                     bot.answer_callback_query(call.id, "Chat is not active")
                     return
                 set_chat_state(user_id, match_id, "locked")
-                append_system_message(user_id, match_id, "She was about to reply… Unlock VIP to continue chatting 🔓")
-                bot.send_message(user_id, "She was about to reply…\n\nUnlock VIP to continue chatting 🔓", reply_markup=likes_locked_keyboard())
+                append_system_message(user_id, match_id, "She was about to say something…\n\nUnlock to continue 🔓")
+                bot.send_message(user_id, "She was about to say something…\n\nUnlock to continue 🔓", reply_markup=likes_locked_keyboard())
                 bot.answer_callback_query(call.id, "Chat locked")
                 return
 
@@ -1735,11 +1739,11 @@ def callback_handler(call):
                     bot.answer_callback_query(call.id, "Chat already closed")
                     return
                 set_chat_state(user_id, match_id, "ended")
-                append_system_message(user_id, match_id, "This conversation has ended.")
+                append_system_message(user_id, match_id, "This chat has ended.\n\nYou can start a new one anytime 🙂")
                 remove_match_from_inbox(user_id, match_id)
                 bot.send_message(
                     user_id,
-                    "This conversation has ended.\n\nYou can start a new chat anytime.",
+                    "This chat has ended.\n\nYou can start a new one anytime 🙂",
                     reply_markup=main_menu_keyboard(user_id),
                 )
                 bot.answer_callback_query(call.id, "Chat ended")
@@ -2040,12 +2044,12 @@ def text_handler(message):
             bot.send_message(user_id, "This chat is already closed.", reply_markup=main_menu_keyboard(user_id))
             return
         set_chat_state(user_id, match_id, "ended")
-        append_system_message(user_id, match_id, "This conversation has ended.")
+        append_system_message(user_id, match_id, "This chat has ended.\n\nYou can start a new one anytime 🙂")
         notify_admin_chat_status(user_id, match_id, "User ended chat")
         remove_match_from_inbox(user_id, match_id)
         bot.send_message(
             user_id,
-            "This conversation has ended.\n\nYou can start a new chat anytime.",
+            "This chat has ended.\n\nYou can start a new one anytime 🙂",
             reply_markup=main_menu_keyboard(user_id),
         )
         return
@@ -2135,7 +2139,7 @@ def text_handler(message):
             if not user["chat_open"]:
                 open_match_chat(user_id, match_id, show_history=False)
         elif state == "locked" and not user["paid"]:
-            bot.send_message(user_id, "She was about to reply...\n\nUnlock VIP to continue chatting.", reply_markup=likes_locked_keyboard())
+            bot.send_message(user_id, "She was about to say something…\n\nUnlock to continue 🔓", reply_markup=likes_locked_keyboard())
             return
         elif state == "locked" and user["paid"]:
             if not can_activate_chat(user_id, match_id):
