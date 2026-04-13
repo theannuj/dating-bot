@@ -539,17 +539,6 @@ def notify_user_of_match_message(user_id, match_id, text):
 
     bot.send_message(user_id, message_text, reply_markup=match_keyboard(bool(user["paid"])), parse_mode="HTML")
 
-    for admin_id, ctx in admin_active_chat.items():
-        if ctx["user_id"] == user_id and ctx["match_id"] == match_id:
-            try:
-                bot.send_message(
-                    admin_id,
-                    f"<b>{html.escape(match_name)}:</b> {html.escape(text)}",
-                    parse_mode="HTML"
-                )
-            except:
-                pass
-
 
 def typing_delay_for_text(text):
     length = len((text or "").strip())
@@ -1388,7 +1377,6 @@ def forward_user_message_to_admins(message):
             admin,
             f"<b>{html.escape(user_name)}:</b> {html.escape(message_text)}",
             parse_mode="HTML",
-            reply_to_message_id=anchor_message_id,
         )
         with state_lock:
             chat_map[sent.message_id] = {"user_id": message.chat.id, "match_id": match_id, "admin_id": admin}
@@ -1627,36 +1615,6 @@ Status: 🟡 Pending"""
         caption=caption,
         reply_markup=payment_markup(next_uid),
     )
-
-
-@bot.message_handler(
-    func=lambda message: message.chat.id in CHAT_ADMINS and not bool(message.reply_to_message) and message.text not in {BTN_ADMIN_CHATS, BTN_ADMIN_UNREAD, BTN_ADMIN_REFRESH},
-    content_types=["text"],
-)
-def admin_direct_reply(message):
-    admin_id = message.chat.id
-
-    if admin_id not in admin_active_chat:
-        return
-
-    context = admin_active_chat[admin_id]
-    user_id = context["user_id"]
-    match_id = context["match_id"]
-
-    state = get_chat_state(user_id, match_id)
-    if state != "active":
-        return
-
-    text = message.text
-
-    append_chat_message(user_id, match_id, "match", text)
-    increment_unread(user_id, match_id)
-
-    threading.Thread(
-        target=send_typing_then_match_message,
-        args=(user_id, match_id, text),
-        daemon=True,
-    ).start()
 
 
 @bot.message_handler(func=lambda message: message.chat.id in CHAT_ADMINS and not message.reply_to_message and message.text.strip() not in {BTN_ADMIN_CHATS, BTN_ADMIN_REFRESH, BTN_ADMIN_UNREAD}, content_types=["text"])
