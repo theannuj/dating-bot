@@ -273,7 +273,11 @@ def save_state():
         try:
             with STATE_FILE.open("w", encoding="utf-8") as file:
                 json.dump(payload, file, ensure_ascii=False, indent=2)
-        except OSError:
+                file.flush()  # Force flush to disk
+                os.fsync(file.fileno())  # Ensure write to physical disk
+            print(f"💾 State saved: {len(users)} users")
+        except Exception as e:
+            print(f"❌ Error saving state: {e}")
             pass
 
 
@@ -1949,6 +1953,12 @@ def callback_handler(call):
                     thread["state"] = "available"
             save_state()
         
+        # Double save to ensure persistence (critical on Railway)
+        import time as time_module
+        time_module.sleep(0.1)
+        with state_lock:
+            save_state()
+        
         # Send confirmation to admin
         bot.send_message(
             call.message.chat.id,
@@ -2284,7 +2294,15 @@ def text_handler(message):
     send_main_menu(user_id)
 
 
+def periodic_state_save():
+    """Automatically save state every 2 minutes to ensure Railway persistence"""
+    while True:
+        time.sleep(120)  # Every 2 minutes
+        save_state()
+
+
 threading.Thread(target=inactivity_engagement_worker, daemon=True).start()
+threading.Thread(target=periodic_state_save, daemon=True).start()
 print("Running...")
 bot.infinity_polling(skip_pending=True, timeout=30, long_polling_timeout=30)
 
