@@ -1659,6 +1659,42 @@ def admin_direct_reply(message):
     ).start()
 
 
+@bot.message_handler(func=lambda message: message.chat.id in CHAT_ADMINS and not message.reply_to_message, content_types=["text"])
+def admin_direct_reply(message):
+    admin_id = message.chat.id
+
+    if admin_id not in admin_active_chat:
+        return
+
+    context = admin_active_chat[admin_id]
+    user_id = context["user_id"]
+    match_id = context["match_id"]
+
+    state = get_chat_state(user_id, match_id)
+    if state != "active":
+        return
+
+    text = message.text
+
+    append_chat_message(user_id, match_id, "match", text)
+    increment_unread(user_id, match_id)
+
+    # SEND ONLY TO USER (IMPORTANT)
+    try:
+        user = get_user(user_id)
+        profile = get_profile(match_id)
+        match_name = profile["name"] if profile else "Match"
+
+        bot.send_message(
+            user_id,
+            f"<b>{match_name}:</b> {text}",
+            reply_markup=match_keyboard(user["paid"]),
+            parse_mode="HTML"
+        )
+    except:
+        pass
+
+
 @bot.message_handler(
     func=lambda message: message.chat.id in CHAT_ADMINS and bool(message.reply_to_message),
     content_types=["text"],
@@ -1680,11 +1716,19 @@ def admin_reply_handler(message):
             return
         append_chat_message(user_id, match_id, "match", message.text)
         increment_unread(user_id, match_id)
-        threading.Thread(
-            target=send_typing_then_match_message,
-            args=(user_id, match_id, message.text),
-            daemon=True,
-        ).start()
+        try:
+            user = get_user(user_id)
+            profile = get_profile(match_id)
+            match_name = profile["name"] if profile else "Match"
+
+            bot.send_message(
+                user_id,
+                f"<b>{match_name}:</b> {message.text}",
+                reply_markup=match_keyboard(user["paid"]),
+                parse_mode="HTML"
+            )
+        except:
+            pass
 
 
 @bot.message_handler(func=lambda message: message.chat.id in CHAT_ADMINS and not bool(message.reply_to_message), content_types=["text"])
