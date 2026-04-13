@@ -50,6 +50,7 @@ def init_vip_table():
 def save_vip_to_db(user_id, user):
     conn = get_db_connection()
     if not conn:
+        print("DB not connected")
         return
     try:
         cur = conn.cursor()
@@ -57,13 +58,14 @@ def save_vip_to_db(user_id, user):
         INSERT INTO vip_users (user_id, paid, payment_status)
         VALUES (%s, %s, %s)
         ON CONFLICT (user_id)
-        DO UPDATE SET paid = EXCLUDED.paid, payment_status = EXCLUDED.payment_status
+        DO UPDATE SET paid = EXCLUDED.paid,
+        payment_status = EXCLUDED.payment_status
         """, (user_id, user.get("paid"), user.get("payment_status")))
         conn.commit()
         cur.close()
         conn.close()
-    except:
-        pass
+    except Exception as e:
+        print("DB error:", e)
 
 
 def load_vip_from_db():
@@ -320,6 +322,7 @@ def load_state():
         restored[int(user_id)] = base
 
     vip_data = load_vip_from_db()
+    print("VIP DB loaded:", len(vip_data))
     for uid, vip in vip_data.items():
         if uid in restored:
             restored[uid]["paid"] = vip.get("paid", False)
@@ -2016,7 +2019,11 @@ def callback_handler(call):
             user["paid"] = True
             user["awaiting_payment"] = False
             user["payment_status"] = "approved"
-            save_vip_to_db(user_id, user)
+            try:
+                save_vip_to_db(user_id, user)
+                print(f"VIP saved to DB: {user_id}")
+            except Exception as e:
+                print("VIP DB save error:", e)
             for thread in user.get("chat_threads", {}).values():
                 if thread.get("state") == "locked":
                     thread["state"] = "available"
