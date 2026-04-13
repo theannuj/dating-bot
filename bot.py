@@ -1659,7 +1659,7 @@ def admin_direct_reply(message):
     ).start()
 
 
-@bot.message_handler(func=lambda message: message.chat.id in CHAT_ADMINS and not message.reply_to_message, content_types=["text"])
+@bot.message_handler(func=lambda message: message.chat.id in CHAT_ADMINS and not message.reply_to_message and message.text.strip() not in {BTN_ADMIN_CHATS, BTN_ADMIN_REFRESH, BTN_ADMIN_UNREAD}, content_types=["text"])
 def admin_direct_reply(message):
     admin_id = message.chat.id
 
