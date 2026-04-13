@@ -209,6 +209,9 @@ def default_user():
         "agreed": False,
         "paid": False,
         "awaiting_payment": False,
+        "payment_status": "none",
+        "payment_proof_photo_id": None,
+        "payment_username": "N/A",
         "shown": [],
         "liked": [],
         "skipped": [],
@@ -224,6 +227,7 @@ def default_user():
         "pending_events": [],
         "profile_cache": {},
         "chat_threads": {},
+        "used_openers": [],
     }
 
 
@@ -248,9 +252,15 @@ def load_state():
     for user_id, payload in raw.get("users", {}).items():
         base = default_user()
         base.update(payload)
+        # Restore VIP status properly
         if base.get("payment_status") == "approved":
             base["paid"] = True
         restored[int(user_id)] = base
+    
+    # Debug: Show loaded users count and VIP count
+    vip_count = sum(1 for u in restored.values() if u.get("paid"))
+    print(f"✅ Loaded {len(restored)} users | VIP users: {vip_count}")
+    
     return restored
 
 
