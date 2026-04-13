@@ -145,6 +145,7 @@ FOMO_MESSAGES = [
 bot = telebot.TeleBot(TOKEN)
 state_lock = threading.RLock()
 chat_map = {}
+admin_active_chat = {}
 LAST_ACTION_TIME = {}
 LAST_ACTIVITY_TIME = {}
 LAST_ENGAGEMENT_PING = {}
@@ -538,26 +539,16 @@ def notify_user_of_match_message(user_id, match_id, text):
 
     bot.send_message(user_id, message_text, reply_markup=match_keyboard(bool(user["paid"])), parse_mode="HTML")
 
-    for admin in CHAT_ADMINS:
-        with state_lock:
-            active_entries = [
-                (message_id, context)
-                for message_id, context in chat_map.items()
-                if context.get("admin_id") == admin
-            ]
-        if not active_entries:
-            continue
-        anchor_message_id, anchor_context = max(active_entries, key=lambda item: item[0])
-        if anchor_context.get("user_id") != user_id or anchor_context.get("match_id") != match_id:
-            continue
-        sent = bot.send_message(
-            admin,
-            f"<b>{html.escape(match_name)}:</b> {html.escape(text)}",
-            parse_mode="HTML",
-            reply_to_message_id=anchor_message_id,
-        )
-        with state_lock:
-            chat_map[sent.message_id] = {"user_id": user_id, "match_id": match_id, "admin_id": admin}
+    for admin_id, ctx in admin_active_chat.items():
+        if ctx["user_id"] == user_id and ctx["match_id"] == match_id:
+            try:
+                bot.send_message(
+                    admin_id,
+                    f"<b>{html.escape(match_name)}:</b> {html.escape(text)}",
+                    parse_mode="HTML"
+                )
+            except:
+                pass
 
 
 def typing_delay_for_text(text):
@@ -880,8 +871,6 @@ def build_admin_chat_list_markup(unread_only=False):
     with state_lock:
         for user_id, user in users.items():
             user_name = user.get("name") or f"User {user_id}"
-            is_vip = user.get("paid", False)
-            tag = "🟢 VIP" if is_vip else "🟡 FREE"
             for match_key, thread in user.get("chat_threads", {}).items():
                 messages = thread.get("messages", [])
                 if not messages:
@@ -893,11 +882,13 @@ def build_admin_chat_list_markup(unread_only=False):
                 if unread_only and admin_unread <= 0:
                     continue
                 last_ts = int(messages[-1].get("ts", 0)) if messages else 0
-                label = f"{user_name} × {match_name}"
+                user = get_user(user_id)
+                tag = "🟢 VIP" if user.get("paid") else "🟡 FREE"
+                label = f"{tag} • {user_name} × {match_name}"
                 if admin_unread:
                     label += f" ({admin_unread})"
                 preview = get_last_message_preview(user_id, match_id, limit=26)
-                label += f"\n{preview}\n{tag}"
+                label += f"\n{preview}"
                 chat_rows.append((last_ts, admin_unread, label, user_id, match_id))
 
     chat_rows.sort(key=lambda item: (-item[1], -item[0], item[2].lower()))
@@ -926,9 +917,13 @@ def send_admin_chat_history(admin_id, user_id, match_id):
     unread_count = get_admin_unread_count(user_id, match_id)
     chat_state = get_chat_state(user_id, match_id)
     reset_admin_unread(user_id, match_id)
+    admin_active_chat[admin_id] = {
+        "user_id": user_id,
+        "match_id": match_id
+    }
     bot.send_message(
         admin_id,
-        "🔒 Lock | ❌ End",
+        "Choose action:",
         reply_markup=build_admin_chat_controls(user_id, match_id),
     )
     sent = bot.send_message(
@@ -1635,6 +1630,36 @@ Status: 🟡 Pending"""
 
 
 @bot.message_handler(
+    func=lambda message: message.chat.id in CHAT_ADMINS and not bool(message.reply_to_message) and message.text not in {BTN_ADMIN_CHATS, BTN_ADMIN_UNREAD, BTN_ADMIN_REFRESH},
+    content_types=["text"],
+)
+def admin_direct_reply(message):
+    admin_id = message.chat.id
+
+    if admin_id not in admin_active_chat:
+        return
+
+    context = admin_active_chat[admin_id]
+    user_id = context["user_id"]
+    match_id = context["match_id"]
+
+    state = get_chat_state(user_id, match_id)
+    if state != "active":
+        return
+
+    text = message.text
+
+    append_chat_message(user_id, match_id, "match", text)
+    increment_unread(user_id, match_id)
+
+    threading.Thread(
+        target=send_typing_then_match_message,
+        args=(user_id, match_id, text),
+        daemon=True,
+    ).start()
+
+
+@bot.message_handler(
     func=lambda message: message.chat.id in CHAT_ADMINS and bool(message.reply_to_message),
     content_types=["text"],
 )
@@ -1783,7 +1808,7 @@ def callback_handler(call):
     if not is_admin(call.message.chat.id):
         touch_user_activity(call.message.chat.id)
 
-    if call.data.startswith("chatctl_"):
+    if call.data.startswith("chatctlyes_"):
         parts = call.data.split("_")
         if len(parts) == 4 and parts[2].isdigit() and parts[3].isdigit():
             action = parts[1]
@@ -1831,6 +1856,27 @@ def callback_handler(call):
                 bot.answer_callback_query(call.id, "Chat blocked")
                 return
 
+        bot.answer_callback_query(call.id, "Invalid action")
+        return
+
+    if call.data == "chatctlcancel":
+        bot.answer_callback_query(call.id, "Cancelled")
+        return
+
+    if call.data.startswith("chatctl_"):
+        parts = call.data.split("_")
+        if len(parts) == 4 and parts[2].isdigit() and parts[3].isdigit():
+            action = parts[1]
+            user_id = int(parts[2])
+            match_id = int(parts[3])
+            markup = InlineKeyboardMarkup()
+            markup.row(
+                InlineKeyboardButton("Yes", callback_data=f"chatctlyes_{action}_{user_id}_{match_id}"),
+                InlineKeyboardButton("Cancel", callback_data="chatctlcancel"),
+            )
+            bot.send_message(call.message.chat.id, "Are you sure?", reply_markup=markup)
+            bot.answer_callback_query(call.id)
+            return
         bot.answer_callback_query(call.id, "Invalid action")
         return
 
@@ -2229,3 +2275,4 @@ def text_handler(message):
 threading.Thread(target=inactivity_engagement_worker, daemon=True).start()
 print("Running...")
 bot.infinity_polling(skip_pending=True, timeout=30, long_polling_timeout=30)
+
