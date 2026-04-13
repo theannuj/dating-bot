@@ -496,8 +496,10 @@ def get_last_message_preview(user_id, match_id, limit=40):
     return f"{speaker}: {text}"
 
 
-def format_admin_chat_history(user_name, match_name, messages, unread_count, chat_state):
-    lines = [f"💬 {html.escape(user_name)} x {html.escape(match_name)}"]
+def format_admin_chat_history(user_id, user_name, match_name, messages, unread_count, chat_state):
+    user = get_user(user_id)
+    tag = "🟢 VIP" if user.get("paid") else "🟡 FREE"
+    lines = [f"💬 <b>{html.escape(user_name)}</b> × <b>{html.escape(match_name)}</b> {tag}"]
     if unread_count:
         lines.append(f"Unread: {unread_count}")
     lines.append(f"State: {chat_state}")
@@ -535,6 +537,27 @@ def notify_user_of_match_message(user_id, match_id, text):
         )
 
     bot.send_message(user_id, message_text, reply_markup=match_keyboard(bool(user["paid"])), parse_mode="HTML")
+
+    for admin in CHAT_ADMINS:
+        with state_lock:
+            active_entries = [
+                (message_id, context)
+                for message_id, context in chat_map.items()
+                if context.get("admin_id") == admin
+            ]
+        if not active_entries:
+            continue
+        anchor_message_id, anchor_context = max(active_entries, key=lambda item: item[0])
+        if anchor_context.get("user_id") != user_id or anchor_context.get("match_id") != match_id:
+            continue
+        sent = bot.send_message(
+            admin,
+            f"<b>{html.escape(match_name)}:</b> {html.escape(text)}",
+            parse_mode="HTML",
+            reply_to_message_id=anchor_message_id,
+        )
+        with state_lock:
+            chat_map[sent.message_id] = {"user_id": user_id, "match_id": match_id, "admin_id": admin}
 
 
 def typing_delay_for_text(text):
@@ -772,7 +795,7 @@ def agreement_keyboard():
 
 
 def admin_menu_keyboard():
-    return build_keyboard([BTN_ADMIN_CHATS, BTN_ADMIN_UNREAD], [BTN_ADMIN_REFRESH])
+    return build_keyboard([BTN_ADMIN_CHATS, BTN_ADMIN_UNREAD])
 
 
 
@@ -857,6 +880,8 @@ def build_admin_chat_list_markup(unread_only=False):
     with state_lock:
         for user_id, user in users.items():
             user_name = user.get("name") or f"User {user_id}"
+            is_vip = user.get("paid", False)
+            tag = "🟢 VIP" if is_vip else "🟡 FREE"
             for match_key, thread in user.get("chat_threads", {}).items():
                 messages = thread.get("messages", [])
                 if not messages:
@@ -868,25 +893,24 @@ def build_admin_chat_list_markup(unread_only=False):
                 if unread_only and admin_unread <= 0:
                     continue
                 last_ts = int(messages[-1].get("ts", 0)) if messages else 0
-                label = f"{user_name} x {match_name}"
+                label = f"{user_name} × {match_name}"
                 if admin_unread:
                     label += f" ({admin_unread})"
-                chat_rows.append((last_ts, admin_unread, label[:60], user_id, match_id))
+                preview = get_last_message_preview(user_id, match_id, limit=26)
+                label += f"\n{preview}\n{tag}"
+                chat_rows.append((last_ts, admin_unread, label, user_id, match_id))
 
     chat_rows.sort(key=lambda item: (-item[1], -item[0], item[2].lower()))
     for _, _, label, user_id, match_id in chat_rows[:25]:
         markup.row(InlineKeyboardButton(label, callback_data=f"adminchat_{user_id}_{match_id}"))
-    markup.row(
-        InlineKeyboardButton("Refresh", callback_data="adminrefresh"),
-        InlineKeyboardButton("Unread", callback_data="adminunread"),
-    )
+    markup.row(InlineKeyboardButton("Unread", callback_data="adminunread"))
     return markup if chat_rows else None
 
 
 def send_admin_chat_list(admin_id, unread_only=False):
     markup = build_admin_chat_list_markup(unread_only=unread_only)
     if not markup:
-        empty_text = "No unread chats right now." if unread_only else "No active chats yet."
+        empty_text = "No unread messages right now." if unread_only else "No chats available right now."
         bot.send_message(admin_id, empty_text, reply_markup=admin_menu_keyboard())
         return
     title = "Unread chats" if unread_only else "Recent chats"
@@ -902,14 +926,18 @@ def send_admin_chat_history(admin_id, user_id, match_id):
     unread_count = get_admin_unread_count(user_id, match_id)
     chat_state = get_chat_state(user_id, match_id)
     reset_admin_unread(user_id, match_id)
+    bot.send_message(
+        admin_id,
+        "🔒 Lock | ❌ End",
+        reply_markup=build_admin_chat_controls(user_id, match_id),
+    )
     sent = bot.send_message(
         admin_id,
-        format_admin_chat_history(user_name, match_name, history, unread_count, chat_state),
-        reply_markup=build_admin_chat_controls(user_id, match_id),
+        format_admin_chat_history(user_id, user_name, match_name, history, unread_count, chat_state),
         parse_mode="HTML",
     )
     with state_lock:
-        chat_map[sent.message_id] = {"user_id": user_id, "match_id": match_id}
+        chat_map[sent.message_id] = {"user_id": user_id, "match_id": match_id, "admin_id": admin_id}
 
 
 def payment_markup(user_id):
@@ -1345,8 +1373,30 @@ def forward_user_message_to_admins(message):
     match_id = user["current_match_id"]
     if not match_id:
         return
-    append_chat_message(message.chat.id, match_id, "user", text_from_message(message))
+    message_text = text_from_message(message)
+    append_chat_message(message.chat.id, match_id, "user", message_text)
     increment_admin_unread(message.chat.id, match_id)
+    user_name = user["name"] or f"User {message.chat.id}"
+    for admin in CHAT_ADMINS:
+        with state_lock:
+            active_entries = [
+                (message_id, context)
+                for message_id, context in chat_map.items()
+                if context.get("admin_id") == admin
+            ]
+        if not active_entries:
+            continue
+        anchor_message_id, anchor_context = max(active_entries, key=lambda item: item[0])
+        if anchor_context.get("user_id") != message.chat.id or anchor_context.get("match_id") != match_id:
+            continue
+        sent = bot.send_message(
+            admin,
+            f"<b>{html.escape(user_name)}:</b> {html.escape(message_text)}",
+            parse_mode="HTML",
+            reply_to_message_id=anchor_message_id,
+        )
+        with state_lock:
+            chat_map[sent.message_id] = {"user_id": message.chat.id, "match_id": match_id, "admin_id": admin}
     maybe_send_fomo_message(message.chat.id, match_id)
 
 
