@@ -6,6 +6,7 @@ import threading
 import time
 from pathlib import Path
 
+import psycopg2
 import telebot
 from telebot.types import InlineKeyboardButton, InlineKeyboardMarkup, ReplyKeyboardMarkup, ReplyKeyboardRemove
 
@@ -17,6 +18,67 @@ PAYMENT_LINK = "https://midnightmatch.creatorapp.club?callback=/fan-home?tier=99
 BASE_DIR = Path(__file__).resolve().parent
 PROFILES_FILE = BASE_DIR / "profiles.json"
 STATE_FILE = BASE_DIR / "bot_state.json"
+
+
+def get_db_connection():
+    database_url = os.getenv("DATABASE_URL")
+    if not database_url:
+        return None
+    try:
+        return psycopg2.connect(database_url)
+    except:
+        return None
+
+
+def init_vip_table():
+    conn = get_db_connection()
+    if not conn:
+        return
+    cur = conn.cursor()
+    cur.execute("""
+    CREATE TABLE IF NOT EXISTS vip_users (
+    user_id BIGINT PRIMARY KEY,
+    paid BOOLEAN,
+    payment_status TEXT
+    )
+    """)
+    conn.commit()
+    cur.close()
+    conn.close()
+
+
+def save_vip_to_db(user_id, user):
+    conn = get_db_connection()
+    if not conn:
+        return
+    try:
+        cur = conn.cursor()
+        cur.execute("""
+        INSERT INTO vip_users (user_id, paid, payment_status)
+        VALUES (%s, %s, %s)
+        ON CONFLICT (user_id)
+        DO UPDATE SET paid = EXCLUDED.paid, payment_status = EXCLUDED.payment_status
+        """, (user_id, user.get("paid"), user.get("payment_status")))
+        conn.commit()
+        cur.close()
+        conn.close()
+    except:
+        pass
+
+
+def load_vip_from_db():
+    conn = get_db_connection()
+    if not conn:
+        return {}
+    try:
+        cur = conn.cursor()
+        cur.execute("SELECT user_id, paid, payment_status FROM vip_users")
+        rows = cur.fetchall()
+        cur.close()
+        conn.close()
+        return {row[0]: {"paid": row[1], "payment_status": row[2]} for row in rows}
+    except:
+        return {}
 
 BTN_CONTINUE = "Continue"
 BTN_18_YES = "Yes, I am 18+ ✔️"
@@ -256,6 +318,12 @@ def load_state():
         if base.get("payment_status") == "approved":
             base["paid"] = True
         restored[int(user_id)] = base
+
+    vip_data = load_vip_from_db()
+    for uid, vip in vip_data.items():
+        if uid in restored:
+            restored[uid]["paid"] = vip.get("paid", False)
+            restored[uid]["payment_status"] = vip.get("payment_status", "none")
     
     # Debug: Show loaded users count and VIP count
     vip_count = sum(1 for u in restored.values() if u.get("paid"))
@@ -1948,6 +2016,7 @@ def callback_handler(call):
             user["paid"] = True
             user["awaiting_payment"] = False
             user["payment_status"] = "approved"
+            save_vip_to_db(user_id, user)
             for thread in user.get("chat_threads", {}).values():
                 if thread.get("state") == "locked":
                     thread["state"] = "available"
@@ -2303,6 +2372,8 @@ def periodic_state_save():
 
 threading.Thread(target=inactivity_engagement_worker, daemon=True).start()
 threading.Thread(target=periodic_state_save, daemon=True).start()
+init_vip_table()
+print("VIP DB ready")
 print("Running...")
 bot.infinity_polling(skip_pending=True, timeout=30, long_polling_timeout=30)
 
