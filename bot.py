@@ -123,6 +123,12 @@ BTN_END_CHAT = "End Chat"
 BTN_ADMIN_CHATS = "💬 Admin Chats"
 BTN_ADMIN_REFRESH = "🔄 Refresh"
 BTN_ADMIN_UNREAD = "📩 Unread Only"
+BTN_ADMIN_PANEL = "📊 Admin Panel"
+BTN_ADMIN_STATS = "📊 Stats"
+BTN_ADMIN_PENDING = "⏳ Pending"
+BTN_ADMIN_BACK = "🔙 Back"
+BTN_CONFIRM_END_CHAT = "✅ Yes, End Chat"
+BTN_CANCEL_END_CHAT = "❌ Cancel"
 BTN_START_OVER = "Start Over"
 MAX_CHAT_MESSAGES = 30
 CHAT_PREVIEW_MESSAGES = 8
@@ -725,7 +731,7 @@ def send_matches_inbox(user_id):
         save_state()
 
     if not matches:
-        bot.send_message(user_id, "No matches yet…\n\nKeep exploring, something might click 😉", reply_markup=main_menu_keyboard(user_id))
+        bot.send_message(user_id, "Hmm… no one caught your vibe yet 😏\nTry again…", reply_markup=main_menu_keyboard(user_id))
         return
 
     bot.send_message(user_id, "<b>💖 Your chats</b>", reply_markup=build_user_inbox_markup(user_id, matches), parse_mode="HTML")
@@ -870,7 +876,11 @@ def agreement_keyboard():
 
 
 def admin_menu_keyboard():
-    return build_keyboard([BTN_ADMIN_CHATS, BTN_ADMIN_UNREAD])
+    return build_keyboard([BTN_ADMIN_CHATS, BTN_ADMIN_UNREAD], [BTN_ADMIN_PANEL])
+
+
+def admin_panel_keyboard():
+    return build_keyboard([BTN_ADMIN_STATS, BTN_ADMIN_PENDING], [BTN_ADMIN_BACK])
 
 
 
@@ -897,7 +907,7 @@ def main_menu_keyboard(user_id=None):
 
 
 def browse_keyboard():
-    return build_keyboard([BTN_VIEW_PROFILE], [BTN_SKIP, BTN_LIKE], [BTN_MAIN_MENU, BTN_SEND_GIFT])
+    return build_keyboard([BTN_SKIP, BTN_LIKE], [BTN_MAIN_MENU, BTN_SEND_GIFT])
 
 
 
@@ -1114,8 +1124,6 @@ def choose_next_profile(user):
 
 def profile_caption_from_view(profile, profile_view, detailed=False):
     lines = [f"♀️ <b>{profile['name']}</b>, {profile['age']}", f"🟢 {profile_view['activity']}"]
-    if detailed:
-        lines.extend(["", f"\"{profile_view['bio']}\""])
     return "\n".join(lines)
 
 
@@ -1125,7 +1133,7 @@ def send_profile_card(user_id, detailed=False, profile_id=None):
         if profile_id is None:
             profile_id = choose_next_profile(user)
         if profile_id is None:
-            bot.send_message(user_id, "No profiles available right now.", reply_markup=main_menu_keyboard(user_id))
+            bot.send_message(user_id, "Hmm… no one caught your vibe yet 😏\nTry again…", reply_markup=main_menu_keyboard(user_id))
             return
         if profile_id not in user["shown"]:
             user["shown"].append(profile_id)
@@ -1347,6 +1355,10 @@ def send_vip_already_message(user_id):
     bot.send_message(user_id, "✅ You already have VIP access.")
 
 
+def unlock_text():
+    return "Wait… don’t go now 😶\nWe were just getting interesting…"
+
+
 def open_likes_you(user_id):
     user = get_user(user_id)
     with state_lock:
@@ -1395,7 +1407,7 @@ def show_matches(user_id):
     user = get_user(user_id)
     matches = get_visible_match_ids(user_id)
     if not matches:
-        bot.send_message(user_id, "No matches yet…\n\nKeep exploring, something might click 😉", reply_markup=main_menu_keyboard(user_id))
+        bot.send_message(user_id, "Hmm… no one caught your vibe yet 😏\nTry again…", reply_markup=main_menu_keyboard(user_id))
         return
 
     current_match_id = user.get("current_match_id")
@@ -1415,7 +1427,7 @@ def show_next_match(user_id):
     user = get_user(user_id)
     matches = get_visible_match_ids(user_id)
     if not matches:
-        bot.send_message(user_id, "No matches yet…\n\nKeep exploring, something might click 😉", reply_markup=main_menu_keyboard(user_id))
+        bot.send_message(user_id, "Hmm… no one caught your vibe yet 😏\nTry again…", reply_markup=main_menu_keyboard(user_id))
         return
 
     current_cursor = int(user.get("match_cursor", 0))
@@ -1430,7 +1442,7 @@ def show_prev_match(user_id):
     user = get_user(user_id)
     matches = get_visible_match_ids(user_id)
     if not matches:
-        bot.send_message(user_id, "No matches yet…\n\nKeep exploring, something might click 😉", reply_markup=main_menu_keyboard(user_id))
+        bot.send_message(user_id, "Hmm… no one caught your vibe yet 😏\nTry again…", reply_markup=main_menu_keyboard(user_id))
         return
 
     current_cursor = int(user.get("match_cursor", 0))
@@ -1712,7 +1724,7 @@ Status: 🟡 Pending"""
     )
 
 
-@bot.message_handler(func=lambda message: message.chat.id in CHAT_ADMINS and not message.reply_to_message and message.text.strip() not in {BTN_ADMIN_CHATS, BTN_ADMIN_REFRESH, BTN_ADMIN_UNREAD}, content_types=["text"])
+@bot.message_handler(func=lambda message: message.chat.id in CHAT_ADMINS and not message.reply_to_message and message.text.strip() not in {BTN_ADMIN_CHATS, BTN_ADMIN_REFRESH, BTN_ADMIN_UNREAD, BTN_ADMIN_PANEL, BTN_ADMIN_STATS, BTN_ADMIN_PENDING, BTN_ADMIN_BACK}, content_types=["text"])
 def admin_direct_reply(message):
     admin_id = message.chat.id
 
@@ -1792,6 +1804,18 @@ def admin_menu_handler(message):
         return
     if text == BTN_ADMIN_UNREAD:
         send_admin_chat_list(message.chat.id, unread_only=True)
+        return
+    if text == BTN_ADMIN_PANEL:
+        bot.send_message(message.chat.id, "Choose an admin option.", reply_markup=admin_panel_keyboard())
+        return
+    if text == BTN_ADMIN_STATS:
+        stats_handler(message)
+        return
+    if text == BTN_ADMIN_PENDING:
+        pending_handler(message)
+        return
+    if text == BTN_ADMIN_BACK:
+        bot.send_message(message.chat.id, "Admin menu is ready.", reply_markup=admin_menu_keyboard())
         return
     bot.send_message(message.chat.id, "Use the admin buttons to open chats.", reply_markup=admin_menu_keyboard())
 
@@ -1904,6 +1928,36 @@ Status: 🟡 Pending"""
 def callback_handler(call):
     if not is_admin(call.message.chat.id):
         touch_user_activity(call.message.chat.id)
+
+    if call.data == "userend_cancel":
+        bot.answer_callback_query(call.id, "Cancelled")
+        return
+
+    if call.data == "userend_yes":
+        user_id = call.message.chat.id
+        user = get_user(user_id)
+        if not user["paid"]:
+            bot.answer_callback_query(call.id, "VIP required")
+            return
+        if not user["current_match_id"]:
+            bot.answer_callback_query(call.id, "Open a chat first")
+            return
+        match_id = user["current_match_id"]
+        state = get_chat_state(user_id, match_id)
+        if state != "active":
+            bot.answer_callback_query(call.id, "Chat already closed")
+            return
+        set_chat_state(user_id, match_id, "ended")
+        append_system_message(user_id, match_id, "This chat has ended.\n\nYou can start a new one anytime 🙂")
+        notify_admin_chat_status(user_id, match_id, "User ended chat")
+        remove_match_from_inbox(user_id, match_id)
+        bot.send_message(
+            user_id,
+            "This chat has ended.\n\nYou can start a new one anytime 🙂",
+            reply_markup=main_menu_keyboard(user_id),
+        )
+        bot.answer_callback_query(call.id, "Chat ended")
+        return
 
     if call.data.startswith("chatctlyes_"):
         parts = call.data.split("_")
@@ -2152,14 +2206,6 @@ def text_handler(message):
         send_profile_card(user_id)
         return
 
-    if text == BTN_VIEW_PROFILE:
-        profile_id = user["current_profile_id"]
-        if profile_id is None:
-            send_profile_card(user_id, detailed=True)
-        else:
-            send_profile_card(user_id, detailed=True, profile_id=profile_id)
-        return
-
     if text in {"/likes_you", BTN_LIKES, BTN_SEE_LIKES}:
         open_likes_you(user_id)
         return
@@ -2254,19 +2300,15 @@ def text_handler(message):
         if not user["current_match_id"]:
             bot.send_message(user_id, "Open a chat first.", reply_markup=main_menu_keyboard(user_id))
             return
-        match_id = user["current_match_id"]
-        state = get_chat_state(user_id, match_id)
-        if state != "active":
-            bot.send_message(user_id, "This chat is already closed.", reply_markup=main_menu_keyboard(user_id))
-            return
-        set_chat_state(user_id, match_id, "ended")
-        append_system_message(user_id, match_id, "This chat has ended.\n\nYou can start a new one anytime 🙂")
-        notify_admin_chat_status(user_id, match_id, "User ended chat")
-        remove_match_from_inbox(user_id, match_id)
+        markup = InlineKeyboardMarkup()
+        markup.row(
+            InlineKeyboardButton(BTN_CONFIRM_END_CHAT, callback_data="userend_yes"),
+            InlineKeyboardButton(BTN_CANCEL_END_CHAT, callback_data="userend_cancel"),
+        )
         bot.send_message(
             user_id,
-            "This chat has ended.\n\nYou can start a new one anytime 🙂",
-            reply_markup=main_menu_keyboard(user_id),
+            "⚠️ Are you sure?\nEnding chat will stop this conversation.",
+            reply_markup=markup,
         )
         return
 
