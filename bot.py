@@ -25,7 +25,13 @@ def get_db_connection():
     if not database_url:
         return None
     try:
-        return psycopg2.connect(database_url)
+        print("Connecting to DB...")
+        conn = psycopg2.connect(database_url)
+        cur = conn.cursor()
+        cur.execute("SELECT current_database()")
+        print("Connected DB:", cur.fetchone())
+        cur.close()
+        return conn
     except:
         return None
 
@@ -62,6 +68,9 @@ def save_vip_to_db(user_id, user):
         payment_status = EXCLUDED.payment_status
         """, (user_id, user.get("paid"), user.get("payment_status")))
         conn.commit()
+        cur.execute("SELECT COUNT(*) FROM vip_users")
+        count = cur.fetchone()[0]
+        print("VIP rows after insert:", count)
         cur.close()
         conn.close()
     except Exception as e:
@@ -76,6 +85,7 @@ def load_vip_from_db():
         cur = conn.cursor()
         cur.execute("SELECT user_id, paid, payment_status FROM vip_users")
         rows = cur.fetchall()
+        print("Rows fetched from DB:", len(rows))
         cur.close()
         conn.close()
         return {row[0]: {"paid": row[1], "payment_status": row[2]} for row in rows}
@@ -2379,6 +2389,7 @@ def periodic_state_save():
 
 threading.Thread(target=inactivity_engagement_worker, daemon=True).start()
 threading.Thread(target=periodic_state_save, daemon=True).start()
+print("DATABASE_URL:", os.getenv("DATABASE_URL"))
 init_vip_table()
 print("VIP DB ready")
 print("Running...")
