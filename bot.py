@@ -2393,5 +2393,10 @@ print("DATABASE_URL:", os.getenv("DATABASE_URL"))
 init_vip_table()
 print("VIP DB ready")
 print("Running...")
+try:
+    print("Clearing old updates...")
+    bot.delete_webhook(drop_pending_updates=True)
+except Exception as e:
+    print("Webhook clear error:", e)
 bot.infinity_polling(skip_pending=True, timeout=30, long_polling_timeout=30)
 
