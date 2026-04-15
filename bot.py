@@ -1349,19 +1349,18 @@ def send_vip_already_message(user_id):
 
 
 def unlock_text():
-    return f"""Wait… don't go now 😶
-We were just getting interesting…
-
-🔥 <b>VIP ACCESS</b>
-
-Continue your chat and unlock full access
-
-👉 <b>Unlock access:</b>
-{PAYMENT_LINK}
-
-<b>After payment:</b>
-Send screenshot to activate
-"""
+    return (
+        "<b>🔒 VIP Access Required</b>\n\n"
+        "Wait… don't go 😶\n"
+        "We were just getting interesting…\n\n"
+        "To continue this chat, unlock VIP 👇\n\n"
+        "<b>💳 Secure Payment Link:</b>\n"
+        f"{PAYMENT_LINK}\n\n"
+        "<b>📌 Steps:</b>\n"
+        "1. Make payment\n"
+        "2. Send screenshot\n"
+        "3. Get VIP access"
+    )
 
 
 def open_likes_you(user_id):
