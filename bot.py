@@ -2528,9 +2528,6 @@ def text_handler(message):
                 open_match_chat(user_id, match_id, show_history=False)
         elif not user["chat_open"]:
             open_match_chat(user_id, match_id, show_history=False)
-        if is_on_cooldown(user_id):
-            bot.send_message(user_id, "Please wait a moment ⏳")
-            return
         print(f"DEBUG: Forwarding message to admins - text='{text}'")
         forward_user_message_to_admins(message)
         return
