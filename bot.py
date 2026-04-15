@@ -102,7 +102,7 @@ BTN_START = "🔥 Start"
 BTN_MATCHES = "💖 Matches"
 BTN_LIKES = "👀 Likes"
 BTN_SETTINGS = "⚙️ Settings"
-BTN_BUY = "🔒 VIP"
+BTN_BUY = "� Unlock Chat"
 BTN_VIEW_PROFILE = "View profile"
 BTN_LIKE = "💚"
 BTN_SKIP = "❌"
@@ -113,7 +113,7 @@ BTN_GET_VIP = "🔒 Get VIP"
 BTN_MY_PROFILE = "👤 My profile"
 BTN_SEARCH_SETTINGS = "🔎 Search settings"
 BTN_BOOST = "🚀 Boost"
-BTN_VIP = "🔒 VIP"
+BTN_VIP = "� Unlock Chat"
 BTN_CHAT = "💬 Chat"
 BTN_SEND_PAYMENT = "Send payment screenshot"
 BTN_NEXT_MATCH = "Next match"
@@ -543,7 +543,7 @@ def chat_limit_message(user_id):
     user = get_user(user_id)
     if user["paid"]:
         return "You can chat with 2 people at a time.\n\nEnd one chat to start a new one."
-    return "You can chat with one person at a time right now.\n\nUnlock VIP to chat with more matches."
+    return "You can chat with one person at a time right now.\n\nUnlock chat to connect with more matches."
 
 
 def is_visible_in_inbox(user_id, match_id):
@@ -1353,13 +1353,14 @@ def unlock_text():
         "<b>🔒 VIP Access Required</b>\n\n"
         "Wait… don't go 😶\n"
         "We were just getting interesting…\n\n"
-        "To continue this chat, unlock VIP 👇\n\n"
+        "To continue this chat, unlock chat 👇\n\n"
         "<b>💳 Secure Payment Link:</b>\n"
         f"{PAYMENT_LINK}\n\n"
         "<b>📌 Steps:</b>\n"
         "1. Make payment\n"
         "2. Send screenshot\n"
-        "3. Get VIP access"
+        "3. Get VIP access\n\n"
+        "⚠️ After payment, send screenshot here to activate VIP"
     )
 
 
@@ -1551,7 +1552,7 @@ def open_match_chat(user_id, match_id, show_history=True):
     bot.send_message(user_id, format_chat_history(name, history), reply_markup=match_keyboard(paid), parse_mode="HTML")
     bot.send_message(
         user_id,
-        "Send a message…",
+        "Say something… don't be boring 😄",
         reply_markup=match_keyboard(paid),
     )
 
@@ -2247,7 +2248,7 @@ def text_handler(message):
         return
 
     print(f"DEBUG VIP: text='{text}' | BTN_BUY='{BTN_BUY}' | BTN_VIP='{BTN_VIP}' | Checking for match...")
-    if text in {"/buy", BTN_BUY, BTN_GET_VIP, BTN_VIP} or text == "🔒 VIP":
+    if text in {"/buy", BTN_BUY, BTN_GET_VIP, BTN_VIP} or text == "� Unlock Chat":
         # Check if user is already VIP
         if user["paid"]:
             send_vip_already_message(user_id)
