@@ -1750,6 +1750,13 @@ def admin_direct_reply(message):
         profile = get_profile(match_id)
         match_name = profile["name"] if profile else "Match"
 
+        # Show typing indicator
+        try:
+            bot.send_chat_action(user_id, "typing")
+            time.sleep(2)
+        except:
+            pass
+
         bot.send_message(
             user_id,
             f"<b>{match_name}:</b> {text}",
@@ -1785,6 +1792,13 @@ def admin_reply_handler(message):
             user = get_user(user_id)
             profile = get_profile(match_id)
             match_name = profile["name"] if profile else "Match"
+
+            # Show typing indicator
+            try:
+                bot.send_chat_action(user_id, "typing")
+                time.sleep(2)
+            except:
+                pass
 
             bot.send_message(
                 user_id,
