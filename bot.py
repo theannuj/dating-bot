@@ -94,6 +94,56 @@ def load_vip_from_db():
     except:
         return {}
 
+
+def init_users_table():
+    conn = get_db_connection()
+    if not conn:
+        return
+    cur = conn.cursor()
+    cur.execute("""
+    CREATE TABLE IF NOT EXISTS users (
+    user_id BIGINT PRIMARY KEY,
+    data TEXT
+    )
+    """)
+    conn.commit()
+    cur.close()
+    conn.close()
+
+
+def save_user_to_db(user_id, user):
+    conn = get_db_connection()
+    if not conn:
+        return
+    try:
+        cur = conn.cursor()
+        cur.execute("""
+        INSERT INTO users (user_id, data)
+        VALUES (%s, %s)
+        ON CONFLICT (user_id)
+        DO UPDATE SET data = EXCLUDED.data
+        """, (user_id, json.dumps(user)))
+        conn.commit()
+        cur.close()
+        conn.close()
+    except Exception as e:
+        print(f"DB save error: {e}")
+
+
+def load_users_from_db():
+    conn = get_db_connection()
+    if not conn:
+        return {}
+    try:
+        cur = conn.cursor()
+        cur.execute("SELECT user_id, data FROM users")
+        rows = cur.fetchall()
+        cur.close()
+        conn.close()
+        return {str(row[0]): json.loads(row[1]) for row in rows}
+    except:
+        return {}
+
 BTN_CONTINUE = "Continue"
 BTN_18_YES = "Yes, I am 18+ ✔️"
 BTN_GENDER_MALE = "👨 Male"
@@ -314,6 +364,14 @@ def default_user():
 
 
 def load_state():
+    # Try to load from PostgreSQL first (most reliable after restart)
+    db_users = load_users_from_db()
+    if db_users:
+        print(f"✅ Loaded {len(db_users)} users from PostgreSQL")
+        # Convert string keys back to int
+        return {int(uid): user for uid, user in db_users.items()}
+    
+    # Fallback to JSON if database is empty
     if not STATE_FILE.exists():
         try:
             STATE_FILE.write_text(json.dumps({"users": {}}, ensure_ascii=False, indent=2), encoding="utf-8")
@@ -378,6 +436,10 @@ def save_state():
         except Exception as e:
             print(f"❌ Error saving state: {e}")
             pass
+        
+        # Also save full user data to PostgreSQL for persistence
+        for uid, user in users.items():
+            save_user_to_db(uid, user)
 
 
 def get_user(user_id):
@@ -2479,6 +2541,7 @@ threading.Thread(target=inactivity_engagement_worker, daemon=True).start()
 threading.Thread(target=periodic_state_save, daemon=True).start()
 print("DATABASE_URL:", os.getenv("DATABASE_URL"))
 init_vip_table()
+init_users_table()
 print("VIP DB ready")
 print("Running...")
 try:
