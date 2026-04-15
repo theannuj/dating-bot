@@ -335,6 +335,9 @@ def load_state():
         # Restore VIP status properly
         if base.get("payment_status") == "approved":
             base["paid"] = True
+        # Ensure matches persist
+        if "matches" not in base:
+            base["matches"] = []
         restored[int(user_id)] = base
 
     vip_data = load_vip_from_db()
@@ -343,6 +346,9 @@ def load_state():
         if uid in restored:
             restored[uid]["paid"] = vip.get("paid", False)
             restored[uid]["payment_status"] = vip.get("payment_status", "none")
+            # Preserve matches when updating from VIP data
+            if "matches" not in restored[uid]:
+                restored[uid]["matches"] = []
         else:
             restored[uid] = default_user()
             restored[uid]["paid"] = vip.get("paid", False)
@@ -940,6 +946,10 @@ def buy_keyboard():
     return build_keyboard([BTN_SEND_PAYMENT], [BTN_MAIN_MENU])
 
 
+def chat_limit_keyboard():
+    return build_keyboard([BTN_BUY], ["🔙 Main Menu"])
+
+
 def build_admin_chat_controls(user_id, match_id):
     user = get_user(user_id)
     state = get_chat_state(user_id, match_id)
@@ -1524,7 +1534,7 @@ def open_match_chat(user_id, match_id, show_history=True):
         return
 
     if state == "available" and not can_activate_chat(user_id, match_id):
-        reply_markup = buy_keyboard() if not user["paid"] else main_menu_keyboard(user_id)
+        reply_markup = chat_limit_keyboard() if not user["paid"] else main_menu_keyboard(user_id)
         bot.send_message(user_id, chat_limit_message(user_id), reply_markup=reply_markup)
         return
 
@@ -1875,7 +1885,7 @@ def photo_handler(message):
             return
         if state in {"available", "locked"}:
             if not can_activate_chat(user_id, match_id):
-                reply_markup = buy_keyboard() if not user["paid"] else main_menu_keyboard(user_id)
+                reply_markup = chat_limit_keyboard() if not user["paid"] else main_menu_keyboard(user_id)
                 bot.send_message(user_id, chat_limit_message(user_id), reply_markup=reply_markup)
                 return
             set_chat_state(user_id, match_id, "active")
@@ -2407,7 +2417,7 @@ def text_handler(message):
             return
         if state == "available":
             if not can_activate_chat(user_id, match_id):
-                reply_markup = buy_keyboard() if not user["paid"] else main_menu_keyboard(user_id)
+                reply_markup = chat_limit_keyboard() if not user["paid"] else main_menu_keyboard(user_id)
                 bot.send_message(
                     user_id,
                     chat_limit_message(user_id),
