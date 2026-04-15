@@ -500,13 +500,20 @@ def set_chat_state(user_id, match_id, state):
 def remove_match_from_inbox(user_id, match_id):
     with state_lock:
         user = get_user(user_id)
-        if match_id in user["matches"]:
-            user["matches"] = [item for item in user["matches"] if item != match_id]
+        
+        state = get_chat_state(user_id, match_id)
+        
+        # ONLY remove if chat is ended or blocked
+        if state in ["ended", "blocked"]:
+            if match_id in user["matches"]:
+                user["matches"] = [item for item in user["matches"] if item != match_id]
+        
         if user.get("current_match_id") == match_id:
             user["current_match_id"] = None
             user["chat_open"] = False
             if user.get("active_view") in {"match", "chat", "inbox"}:
                 user["active_view"] = "menu"
+        
         save_state()
 
 
