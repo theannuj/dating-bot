@@ -102,7 +102,7 @@ BTN_START = "🔥 Start"
 BTN_MATCHES = "💖 Matches"
 BTN_LIKES = "👀 Likes"
 BTN_SETTINGS = "⚙️ Settings"
-BTN_BUY = "� Unlock Chat"
+BTN_BUY = "🔑 Unlock Chat"
 BTN_VIEW_PROFILE = "View profile"
 BTN_LIKE = "💚"
 BTN_SKIP = "❌"
@@ -113,7 +113,7 @@ BTN_GET_VIP = "🔒 Get VIP"
 BTN_MY_PROFILE = "👤 My profile"
 BTN_SEARCH_SETTINGS = "🔎 Search settings"
 BTN_BOOST = "🚀 Boost"
-BTN_VIP = "� Unlock Chat"
+BTN_VIP = "🔑 Unlock Chat"
 BTN_CHAT = "💬 Chat"
 BTN_SEND_PAYMENT = "Send payment screenshot"
 BTN_NEXT_MATCH = "Next match"
@@ -762,7 +762,7 @@ def send_match_card(user_id, match_id):
         lines.append(f"Unread: {unread}")
     lines.append(preview)
     if state == "locked":
-        lines.extend(["", "Upgrade to reply and unlock full chats 🔓"])
+        lines.extend(["", "Upgrade to reply and unlock full chats �"])
 
     with state_lock:
         user["current_match_id"] = match_id
@@ -1527,7 +1527,7 @@ def open_match_chat(user_id, match_id, show_history=True):
             bot.send_message(user_id, format_chat_history(name, history), parse_mode="HTML")
         bot.send_message(
             user_id,
-            "<b>She was about to say something…</b>\n\nUnlock to continue 🔓",
+            "<b>She was about to say something…</b>\n\nUnlock to continue �",
             reply_markup=likes_locked_keyboard(),
             parse_mode="HTML",
         )
@@ -1881,7 +1881,7 @@ def photo_handler(message):
             bot.send_message(user_id, "This chat has ended.", reply_markup=main_menu_keyboard(user_id))
             return
         if state == "locked" and not user["paid"]:
-            bot.send_message(user_id, "<b>She was about to say something…</b>\n\nUnlock to continue 🔓", reply_markup=likes_locked_keyboard(), parse_mode="HTML")
+            bot.send_message(user_id, "<b>She was about to say something…</b>\n\nUnlock to continue �", reply_markup=likes_locked_keyboard(), parse_mode="HTML")
             return
         if state in {"available", "locked"}:
             if not can_activate_chat(user_id, match_id):
@@ -2007,8 +2007,8 @@ def callback_handler(call):
                     bot.answer_callback_query(call.id, "Chat is not active")
                     return
                 set_chat_state(user_id, match_id, "locked")
-                append_system_message(user_id, match_id, "She was about to say something…\n\nUnlock to continue 🔓")
-                bot.send_message(user_id, "<b>She was about to say something…</b>\n\nUnlock to continue 🔓", reply_markup=likes_locked_keyboard(), parse_mode="HTML")
+                append_system_message(user_id, match_id, "She was about to say something…\n\nUnlock to continue �")
+                bot.send_message(user_id, "<b>She was about to say something…</b>\n\nUnlock to continue �", reply_markup=likes_locked_keyboard(), parse_mode="HTML")
                 bot.answer_callback_query(call.id, "Chat locked")
                 return
 
@@ -2307,7 +2307,7 @@ def text_handler(message):
         bot.send_message(user_id, "Boost can be connected to coins later.", reply_markup=settings_keyboard())
         return
 
-    if text == BTN_MAIN_MENU:
+    if text == BTN_MAIN_MENU or text == "🔙 Main Menu":
         send_main_menu(user_id)
         return
 
@@ -2428,7 +2428,7 @@ def text_handler(message):
             if not user["chat_open"]:
                 open_match_chat(user_id, match_id, show_history=False)
         elif state == "locked" and not user["paid"]:
-            bot.send_message(user_id, "<b>She was about to say something…</b>\n\nUnlock to continue 🔓", reply_markup=likes_locked_keyboard(), parse_mode="HTML")
+            bot.send_message(user_id, "<b>She was about to say something…</b>\n\nUnlock to continue 🔑", reply_markup=likes_locked_keyboard(), parse_mode="HTML")
             return
         elif state == "locked" and user["paid"]:
             if not can_activate_chat(user_id, match_id):
