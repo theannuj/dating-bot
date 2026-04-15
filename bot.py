@@ -343,6 +343,10 @@ def load_state():
         if uid in restored:
             restored[uid]["paid"] = vip.get("paid", False)
             restored[uid]["payment_status"] = vip.get("payment_status", "none")
+        else:
+            restored[uid] = default_user()
+            restored[uid]["paid"] = vip.get("paid", False)
+            restored[uid]["payment_status"] = vip.get("payment_status", "none")
     
     # Debug: Show loaded users count and VIP count
     vip_count = sum(1 for u in restored.values() if u.get("paid"))
@@ -1027,6 +1031,8 @@ def send_admin_chat_history(admin_id, user_id, match_id):
     )
     with state_lock:
         chat_map[sent.message_id] = {"user_id": user_id, "match_id": match_id, "admin_id": admin_id}
+        if len(chat_map) > 50:
+            chat_map.clear()
 
 
 def payment_markup(user_id):
@@ -1333,19 +1339,6 @@ def delayed_moderation_success(user_id):
     send_agreement(user_id)
 
  
-def unlock_text():
-    return f"""🔥 <b>VIP ACCESS</b>
-
-Continue your chat and unlock full access
-
-👉 <b>Unlock access:</b>
-{PAYMENT_LINK}
-
-<b>After payment:</b>
-Send screenshot to activate
-"""
-
-
 def send_vip_already_message(user_id):
     with state_lock:
         user = get_user(user_id)
@@ -1487,6 +1480,8 @@ def forward_user_message_to_admins(message):
         )
         with state_lock:
             chat_map[sent.message_id] = {"user_id": message.chat.id, "match_id": match_id, "admin_id": admin}
+            if len(chat_map) > 50:
+                chat_map.clear()
     maybe_send_fomo_message(message.chat.id, match_id)
 
 
