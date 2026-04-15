@@ -406,13 +406,17 @@ def load_state():
         if uid in restored:
             restored[uid]["paid"] = vip.get("paid", False)
             restored[uid]["payment_status"] = vip.get("payment_status", "none")
-            # Override matches from VIP DB (more reliable than JSON)
-            restored[uid]["matches"] = vip.get("matches", [])
+            # Only override matches from VIP DB for paid users (more reliable).
+            # Free users keep matches from JSON/users table to prevent data loss
+            if restored[uid]["paid"]:
+                restored[uid]["matches"] = vip.get("matches", [])
         else:
             restored[uid] = default_user()
             restored[uid]["paid"] = vip.get("paid", False)
             restored[uid]["payment_status"] = vip.get("payment_status", "none")
-            restored[uid]["matches"] = vip.get("matches", [])
+            # Only assign matches from VIP DB for paid users
+            if vip.get("paid", False):
+                restored[uid]["matches"] = vip.get("matches", [])
     
     # Debug: Show loaded users count and VIP count
     vip_count = sum(1 for u in restored.values() if u.get("paid"))
@@ -580,8 +584,10 @@ def remove_match_from_inbox(user_id, match_id):
         
         save_state()
     
-    # Sync matches to database for persistence after Railway restart
-    save_vip_to_db(user_id, user)
+    # Only sync paid users to vip_users table to prevent free user data loss
+    # Free users rely on the full users table for match persistence
+    if user["paid"]:
+        save_vip_to_db(user_id, user)
 
 
 def append_system_message(user_id, match_id, text):
@@ -1334,8 +1340,10 @@ def create_match(user_id, profile_id, source="system"):
         paid = user["paid"]
         save_state()
     
-    # Sync matches to database for persistence after Railway restart
-    save_vip_to_db(user_id, user)
+    # Only sync paid users to vip_users table to prevent free user data loss
+    # Free users rely on the full users table for match persistence
+    if paid:
+        save_vip_to_db(user_id, user)
 
     profile = get_profile(profile_id)
     if not profile:
