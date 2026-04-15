@@ -45,7 +45,8 @@ def init_vip_table():
     CREATE TABLE IF NOT EXISTS vip_users (
     user_id BIGINT PRIMARY KEY,
     paid BOOLEAN,
-    payment_status TEXT
+    payment_status TEXT,
+    matches TEXT
     )
     """)
     conn.commit()
@@ -61,12 +62,13 @@ def save_vip_to_db(user_id, user):
     try:
         cur = conn.cursor()
         cur.execute("""
-        INSERT INTO vip_users (user_id, paid, payment_status)
-        VALUES (%s, %s, %s)
+        INSERT INTO vip_users (user_id, paid, payment_status, matches)
+        VALUES (%s, %s, %s, %s)
         ON CONFLICT (user_id)
         DO UPDATE SET paid = EXCLUDED.paid,
-        payment_status = EXCLUDED.payment_status
-        """, (user_id, user.get("paid"), user.get("payment_status")))
+        payment_status = EXCLUDED.payment_status,
+        matches = EXCLUDED.matches
+        """, (user_id, user.get("paid"), user.get("payment_status"), json.dumps(user.get("matches", []))))
         conn.commit()
         cur.execute("SELECT COUNT(*) FROM vip_users")
         count = cur.fetchone()[0]
@@ -83,12 +85,12 @@ def load_vip_from_db():
         return {}
     try:
         cur = conn.cursor()
-        cur.execute("SELECT user_id, paid, payment_status FROM vip_users")
+        cur.execute("SELECT user_id, paid, payment_status, matches FROM vip_users")
         rows = cur.fetchall()
         print("Rows fetched from DB:", len(rows))
         cur.close()
         conn.close()
-        return {row[0]: {"paid": row[1], "payment_status": row[2]} for row in rows}
+        return {row[0]: {"paid": row[1], "payment_status": row[2], "matches": json.loads(row[3]) if row[3] else []} for row in rows}
     except:
         return {}
 
@@ -346,13 +348,13 @@ def load_state():
         if uid in restored:
             restored[uid]["paid"] = vip.get("paid", False)
             restored[uid]["payment_status"] = vip.get("payment_status", "none")
-            # Preserve matches when updating from VIP data
-            if "matches" not in restored[uid]:
-                restored[uid]["matches"] = []
+            # Override matches from VIP DB (more reliable than JSON)
+            restored[uid]["matches"] = vip.get("matches", [])
         else:
             restored[uid] = default_user()
             restored[uid]["paid"] = vip.get("paid", False)
             restored[uid]["payment_status"] = vip.get("payment_status", "none")
+            restored[uid]["matches"] = vip.get("matches", [])
     
     # Debug: Show loaded users count and VIP count
     vip_count = sum(1 for u in restored.values() if u.get("paid"))
@@ -515,6 +517,9 @@ def remove_match_from_inbox(user_id, match_id):
                 user["active_view"] = "menu"
         
         save_state()
+    
+    # Sync matches to database for persistence after Railway restart
+    save_vip_to_db(user_id, user)
 
 
 def append_system_message(user_id, match_id, text):
@@ -1266,6 +1271,9 @@ def create_match(user_id, profile_id, source="system"):
         thread["state"] = "available"
         paid = user["paid"]
         save_state()
+    
+    # Sync matches to database for persistence after Railway restart
+    save_vip_to_db(user_id, user)
 
     profile = get_profile(profile_id)
     if not profile:
