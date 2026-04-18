@@ -2593,60 +2593,43 @@ def text_handler(message):
         send_profile_card(user_id)
         return
 
-    if user["current_match_id"] and user.get("active_view") in {"match", "chat"}:
+    if user["current_match_id"]:
         match_id = user["current_match_id"]
         state = get_chat_state(user_id, match_id)
-        if state == "blocked":
-            bot.send_message(user_id, "This chat is no longer available.", reply_markup=main_menu_keyboard(user_id))
-            return
-        if state == "ended":
-            bot.send_message(user_id, "This chat has ended.", reply_markup=main_menu_keyboard(user_id))
-            return
-        if state == "available":
-            if not can_activate_chat(user_id, match_id):
-                reply_markup = chat_limit_keyboard() if not user["paid"] else main_menu_keyboard(user_id)
-                bot.send_message(
-                    user_id,
-                    chat_limit_message(user_id),
-                    reply_markup=reply_markup,
-                )
-                return
-            set_chat_state(user_id, match_id, "active")
-            if not user["chat_open"]:
-                open_match_chat(user_id, match_id, show_history=False)
-        elif state == "locked" and not user["paid"]:
-            bot.send_message(user_id, "<b>She was about to say something…</b>\n\nUnlock to continue 🔑", reply_markup=likes_locked_keyboard(), parse_mode="HTML")
-            return
-        elif state == "locked" and user["paid"]:
-            if not can_activate_chat(user_id, match_id):
-                bot.send_message(
-                    user_id,
-                    chat_limit_message(user_id),
-                    reply_markup=main_menu_keyboard(user_id),
-                )
-                return
-            set_chat_state(user_id, match_id, "active")
-            if not user["chat_open"]:
-                open_match_chat(user_id, match_id, show_history=False)
-        elif not user["chat_open"]:
-            open_match_chat(user_id, match_id, show_history=True)
-        print(f"DEBUG: Forwarding message to admins - text='{text}'")
-        forward_user_message_to_admins(message)
-        
-        # Send "Chat started" system message on first message in new chat
-        user = get_user(user_id)
-        state = get_chat_state(user_id, match_id)
         if state == "active":
-            chat_started_notified = user.get("chat_started_notified", {})
-            match_id_str = str(match_id)
-            if match_id_str not in chat_started_notified:
-                chats_left = get_chats_left(user_id)
-                bot.send_message(user_id, f"<b>Chat started ✅</b>\nChats left: {chats_left} / {user['chat_limit']}", parse_mode="HTML")
-                with state_lock:
-                    user = get_user(user_id)
-                    user.setdefault("chat_started_notified", {})[match_id_str] = True
-                    save_state()
-        return
+            print(f"DEBUG: Forwarding message to admins - text='{text}'")
+            forward_user_message_to_admins(message)
+            
+            # Send "Chat started" system message on first message in new chat
+            user = get_user(user_id)
+            state = get_chat_state(user_id, match_id)
+            if state == "active":
+                chat_started_notified = user.get("chat_started_notified", {})
+                match_id_str = str(match_id)
+                if match_id_str not in chat_started_notified:
+                    chats_left = get_chats_left(user_id)
+                    bot.send_message(user_id, f"<b>Chat started ✅</b>\nChats left: {chats_left} / {user['chat_limit']}", parse_mode="HTML")
+                    with state_lock:
+                        user = get_user(user_id)
+                        user.setdefault("chat_started_notified", {})[match_id_str] = True
+                        save_state()
+        else:
+            # Chat is not active, block message
+            if state == "available":
+                if not can_start_new_chat(user_id):
+                    bot.send_message(user_id, "You've used all your chats\n\nUnlock VIP to continue 🔓", reply_markup=main_menu_keyboard(user_id))
+                else:
+                    bot.send_message(user_id, "Open the chat first to start messaging", reply_markup=main_menu_keyboard(user_id))
+            elif state == "blocked":
+                bot.send_message(user_id, "This chat is no longer available.", reply_markup=main_menu_keyboard(user_id))
+            elif state == "ended":
+                bot.send_message(user_id, "This chat has ended.", reply_markup=main_menu_keyboard(user_id))
+            elif state == "locked":
+                if user["paid"]:
+                    bot.send_message(user_id, "This chat is locked.", reply_markup=main_menu_keyboard(user_id))
+                else:
+                    bot.send_message(user_id, "<b>She was about to say something…</b>\n\nUnlock to continue 🔑", reply_markup=likes_locked_keyboard(), parse_mode="HTML")
+            return
 
     send_main_menu(user_id)
 
