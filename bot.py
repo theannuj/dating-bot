@@ -672,6 +672,13 @@ def chat_limit_message(user_id):
     return "You can chat with one person at a time right now.\n\nUnlock chat to connect with more matches."
 
 
+def unlock_vip_usage_message(user_id):
+    user = get_user(user_id)
+    if user.get("payment_status") == "approved":
+        return "You've used all your chats\n\nUnlock VIP again to continue 🔓"
+    return "You've used all your chats\n\nUnlock VIP to continue 🔓"
+
+
 def is_visible_in_inbox(user_id, match_id):
     state = get_chat_state(user_id, match_id)
     return state in {"available", "active", "locked"}
@@ -2130,7 +2137,7 @@ def callback_handler(call):
             return
         match_id = int(match_id_str)
         if not can_start_new_chat(user_id):
-            bot.send_message(user_id, "You've used all your chats\n\nUnlock VIP again to continue 🔓", reply_markup=main_menu_keyboard(user_id))
+            bot.send_message(user_id, unlock_vip_usage_message(user_id), reply_markup=main_menu_keyboard(user_id))
             bot.answer_callback_query(call.id, "No chats left")
             return
         bot.edit_message_text("Opening chat...", user_id, call.message.message_id)
@@ -2476,18 +2483,13 @@ def text_handler(message):
             bot.send_message(user_id, "Open one of your matches first.", reply_markup=main_menu_keyboard(user_id))
             return
         match_id = user["current_match_id"]
-        
-        # Check if chat is already active - if so, just return (they're already chatting)
         current_state = get_chat_state(user_id, match_id)
         if current_state == "active":
+            open_match_chat(user_id, match_id, show_history=True)
             return
-        
-        # Check chat limit
         if not can_start_new_chat(user_id):
-            bot.send_message(user_id, "You've used all your chats\n\nUnlock VIP again to continue 🔓", reply_markup=main_menu_keyboard(user_id))
+            bot.send_message(user_id, unlock_vip_usage_message(user_id), reply_markup=main_menu_keyboard(user_id))
             return
-        
-        # Show confirmation before opening chat
         chats_left = get_chats_left(user_id)
         markup = InlineKeyboardMarkup()
         markup.row(
@@ -2621,7 +2623,7 @@ def text_handler(message):
             if not user["chat_open"]:
                 open_match_chat(user_id, match_id, show_history=False)
         elif not user["chat_open"]:
-            open_match_chat(user_id, match_id, show_history=False)
+            open_match_chat(user_id, match_id, show_history=True)
         print(f"DEBUG: Forwarding message to admins - text='{text}'")
         forward_user_message_to_admins(message)
         
