@@ -2614,6 +2614,7 @@ def text_handler(message):
                         user = get_user(user_id)
                         user.setdefault("chat_started_notified", {})[match_id_str] = True
                         save_state()
+            return
         else:
             # Chat is not active, block message
             if state == "available":
