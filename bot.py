@@ -360,6 +360,9 @@ def default_user():
         "profile_cache": {},
         "chat_threads": {},
         "used_openers": [],
+        "total_chats_used": 0,
+        "chat_limit": 1,
+        "chat_started_notified": {},
     }
 
 
@@ -398,6 +401,17 @@ def load_state():
         # Ensure matches persist
         if "matches" not in base:
             base["matches"] = []
+        # Ensure new chat limit fields exist
+        if "total_chats_used" not in base:
+            base["total_chats_used"] = 0
+        if "chat_limit" not in base:
+            base["chat_limit"] = 5 if base["paid"] else 1
+        if "chat_started_notified" not in base:
+            base["chat_started_notified"] = {}
+        if "chat_threads" in base:
+            for thread in base["chat_threads"].values():
+                if "counted_for_limit" not in thread:
+                    thread["counted_for_limit"] = False
         restored[int(user_id)] = base
 
     vip_data = load_vip_from_db()
@@ -478,6 +492,7 @@ def ensure_chat_thread(user, match_id):
             "admin_unread": 0,
             "state": "available",
             "fomo_sent": False,
+            "counted_for_limit": False,
         }
     else:
         if "messages" not in threads[thread_key]:
@@ -490,6 +505,8 @@ def ensure_chat_thread(user, match_id):
             threads[thread_key]["state"] = "available"
         if "fomo_sent" not in threads[thread_key]:
             threads[thread_key]["fomo_sent"] = False
+        if "counted_for_limit" not in threads[thread_key]:
+            threads[thread_key]["counted_for_limit"] = False
     return threads[thread_key]
 
 
@@ -559,6 +576,13 @@ def set_chat_state(user_id, match_id, state):
     with state_lock:
         user = get_user(user_id)
         thread = ensure_chat_thread(user, match_id)
+        old_state = thread.get("state", "available")
+        if state == "active" and old_state == "available":
+            chat_started_notified = user.get("chat_started_notified", {})
+            match_id_str = str(match_id)
+            if not thread.get("counted_for_limit", False) and match_id_str not in chat_started_notified:
+                user["total_chats_used"] = user.get("total_chats_used", 0) + 1
+                thread["counted_for_limit"] = True
         thread["state"] = state
         if state != "active":
             user["chat_open"] = False
@@ -616,6 +640,22 @@ def count_free_chat_slots_used(user_id, exclude_match_id=None):
             if thread["state"] in {"active", "locked"}:
                 total += 1
         return total
+
+
+def can_start_new_chat(user_id):
+    """Check if user has chats left in their lifetime chat limit (NEW system)"""
+    user = get_user(user_id)
+    total_used = user.get("total_chats_used", 0)
+    chat_limit = user.get("chat_limit", 1)
+    return total_used < chat_limit
+
+
+def get_chats_left(user_id):
+    """Calculate how many chats user has left"""
+    user = get_user(user_id)
+    total_used = user.get("total_chats_used", 0)
+    chat_limit = user.get("chat_limit", 1)
+    return max(0, chat_limit - total_used)
 
 
 def can_activate_chat(user_id, match_id):
@@ -2075,6 +2115,28 @@ def callback_handler(call):
         bot.answer_callback_query(call.id, "Chat ended")
         return
 
+    if call.data.startswith("start_chat:"):
+        user_id = call.message.chat.id
+        match_id_str = call.data.split(":", 1)[1]
+        if not match_id_str.isdigit():
+            bot.answer_callback_query(call.id, "Invalid match")
+            return
+        match_id = int(match_id_str)
+        if not can_start_new_chat(user_id):
+            bot.send_message(user_id, "You've used all your chats\n\nUnlock VIP again to continue 🔓", reply_markup=main_menu_keyboard(user_id))
+            bot.answer_callback_query(call.id, "No chats left")
+            return
+        bot.edit_message_text("Opening chat...", user_id, call.message.message_id)
+        open_match_chat(user_id, match_id, show_history=True)
+        bot.answer_callback_query(call.id, "Chat opened")
+        return
+
+    if call.data == "cancel_start_chat":
+        user_id = call.message.chat.id
+        bot.edit_message_text("Cancelled. Choose another action.", user_id, call.message.message_id)
+        bot.answer_callback_query(call.id, "Cancelled")
+        return
+
     if call.data.startswith("chatctlyes_"):
         parts = call.data.split("_")
         if len(parts) == 4 and parts[2].isdigit() and parts[3].isdigit():
@@ -2197,6 +2259,7 @@ def callback_handler(call):
     if action == "approve":
         with state_lock:
             user["paid"] = True
+            user["chat_limit"] = 5
             user["awaiting_payment"] = False
             user["payment_status"] = "approved"
             try:
@@ -2224,7 +2287,7 @@ def callback_handler(call):
         # Send activation message to user
         bot.send_message(
             user_id,
-            "🎉 Your VIP access has been activated!\n\nYou can now view likes and reply to your matches.",
+            "VIP activated 💎\n\nYou can now start up to 5 chats in total\n(including any chats you've already used)\n\nChoose wisely 😉",
             reply_markup=main_menu_keyboard(user_id),
         )
         bot.answer_callback_query(call.id, "Approved")
@@ -2406,7 +2469,29 @@ def text_handler(message):
             bot.send_message(user_id, "Open one of your matches first.", reply_markup=main_menu_keyboard(user_id))
             return
         match_id = user["current_match_id"]
-        open_match_chat(user_id, match_id, show_history=True)
+        
+        # Check if chat is already active - if so, just return (they're already chatting)
+        current_state = get_chat_state(user_id, match_id)
+        if current_state == "active":
+            return
+        
+        # Check chat limit
+        if not can_start_new_chat(user_id):
+            bot.send_message(user_id, "You've used all your chats\n\nUnlock VIP again to continue 🔓", reply_markup=main_menu_keyboard(user_id))
+            return
+        
+        # Show confirmation before opening chat
+        chats_left = get_chats_left(user_id)
+        markup = InlineKeyboardMarkup()
+        markup.row(
+            InlineKeyboardButton("Start Chat", callback_data=f"start_chat:{match_id}"),
+            InlineKeyboardButton("Cancel", callback_data="cancel_start_chat")
+        )
+        bot.send_message(
+            user_id,
+            f"Start a new chat?\n\nChats left: {chats_left} / {user['chat_limit']}\nThis will use 1 chat.\n\nContinue?",
+            reply_markup=markup
+        )
         return
 
     if text == BTN_END_CHAT:
@@ -2416,6 +2501,8 @@ def text_handler(message):
         if not user["current_match_id"]:
             bot.send_message(user_id, "Open a chat first.", reply_markup=main_menu_keyboard(user_id))
             return
+        match_id = user["current_match_id"]
+        chats_left = get_chats_left(user_id)
         markup = InlineKeyboardMarkup()
         markup.row(
             InlineKeyboardButton(BTN_CONFIRM_END_CHAT, callback_data="userend_yes"),
@@ -2423,7 +2510,7 @@ def text_handler(message):
         )
         bot.send_message(
             user_id,
-            "⚠️ Are you sure?\nEnding chat will stop this conversation.",
+            f"End this chat?\n\nThis chat will be lost and your chat limit will not increase.\nChats left: {chats_left} / {user['chat_limit']}\n\nAre you sure?",
             reply_markup=markup,
         )
         return
@@ -2530,6 +2617,20 @@ def text_handler(message):
             open_match_chat(user_id, match_id, show_history=False)
         print(f"DEBUG: Forwarding message to admins - text='{text}'")
         forward_user_message_to_admins(message)
+        
+        # Send "Chat started" system message on first message in new chat
+        user = get_user(user_id)
+        state = get_chat_state(user_id, match_id)
+        if state == "active":
+            chat_started_notified = user.get("chat_started_notified", {})
+            match_id_str = str(match_id)
+            if match_id_str not in chat_started_notified:
+                chats_left = get_chats_left(user_id)
+                bot.send_message(user_id, f"<b>Chat started ✅</b>\nChats left: {chats_left} / {user['chat_limit']}", parse_mode="HTML")
+                with state_lock:
+                    user = get_user(user_id)
+                    user.setdefault("chat_started_notified", {})[match_id_str] = True
+                    save_state()
         return
 
     send_main_menu(user_id)
