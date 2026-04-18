@@ -1613,14 +1613,8 @@ def forward_user_message_to_admins(message):
     if not match_id:
         return
     state = get_chat_state(user_id, match_id)
-    if state == "available":
-        if not can_start_new_chat(user_id):
-            bot.send_message(user_id, "You’ve used all your chats\n\nUnlock VIP to continue 🔓", reply_markup=main_menu_keyboard(user_id))
-            return
-        if not can_activate_chat(user_id, match_id):
-            bot.send_message(user_id, chat_limit_message(user_id), reply_markup=main_menu_keyboard(user_id))
-            return
-        set_chat_state(user_id, match_id, "active")
+    if state != "active":
+        return
     message_text = text_from_message(message)
     append_chat_message(user_id, match_id, "user", message_text)
     increment_admin_unread(user_id, match_id)
@@ -1937,15 +1931,7 @@ def admin_reply_handler(message):
         user_id = chat_context["user_id"]
         match_id = chat_context["match_id"]
         state = get_chat_state(user_id, match_id)
-        if state == "available":
-            if not can_start_new_chat(user_id):
-                bot.send_message(message.chat.id, "You’ve used all your chats\n\nUnlock VIP to continue 🔓")
-                return
-            if not can_activate_chat(user_id, match_id):
-                bot.send_message(message.chat.id, f"Cannot activate this chat.\n{chat_limit_message(user_id)}")
-                return
-            set_chat_state(user_id, match_id, "active")
-        elif state != "active":
+        if state != "active":
             bot.send_message(message.chat.id, "This chat is not active anymore.")
             return
         append_chat_message(user_id, match_id, "match", message.text)
@@ -2632,28 +2618,3 @@ def text_handler(message):
                 else:
                     bot.send_message(user_id, "<b>She was about to say something…</b>\n\nUnlock to continue 🔑", reply_markup=likes_locked_keyboard(), parse_mode="HTML")
             return
-
-    send_main_menu(user_id)
-
-
-def periodic_state_save():
-    """Automatically save state every 2 minutes to ensure Railway persistence"""
-    while True:
-        time.sleep(120)  # Every 2 minutes
-        save_state()
-
-
-threading.Thread(target=inactivity_engagement_worker, daemon=True).start()
-threading.Thread(target=periodic_state_save, daemon=True).start()
-print("DATABASE_URL:", os.getenv("DATABASE_URL"))
-init_vip_table()
-init_users_table()
-print("VIP DB ready")
-print("Running...")
-try:
-    print("Clearing old updates...")
-    bot.delete_webhook(drop_pending_updates=True)
-except Exception as e:
-    print("Webhook clear error:", e)
-bot.infinity_polling(skip_pending=True, timeout=30, long_polling_timeout=30)
-
