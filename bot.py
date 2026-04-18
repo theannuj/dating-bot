@@ -2146,6 +2146,7 @@ def callback_handler(call):
             bot.send_message(user_id, unlock_vip_usage_message(user_id), reply_markup=main_menu_keyboard(user_id))
             bot.answer_callback_query(call.id, "No chats left")
             return
+        set_chat_state(user_id, match_id, "active")
         bot.edit_message_text("Opening chat...", user_id, call.message.message_id)
         open_match_chat(user_id, match_id, show_history=True)
         bot.answer_callback_query(call.id, "Chat opened")
