@@ -1614,6 +1614,9 @@ def forward_user_message_to_admins(message):
         return
     state = get_chat_state(user_id, match_id)
     if state == "available":
+        if not can_start_new_chat(user_id):
+            bot.send_message(user_id, "You’ve used all your chats\n\nUnlock VIP to continue 🔓", reply_markup=main_menu_keyboard(user_id))
+            return
         if not can_activate_chat(user_id, match_id):
             bot.send_message(user_id, chat_limit_message(user_id), reply_markup=main_menu_keyboard(user_id))
             return
@@ -1935,6 +1938,9 @@ def admin_reply_handler(message):
         match_id = chat_context["match_id"]
         state = get_chat_state(user_id, match_id)
         if state == "available":
+            if not can_start_new_chat(user_id):
+                bot.send_message(message.chat.id, "You’ve used all your chats\n\nUnlock VIP to continue 🔓")
+                return
             if not can_activate_chat(user_id, match_id):
                 bot.send_message(message.chat.id, f"Cannot activate this chat.\n{chat_limit_message(user_id)}")
                 return
