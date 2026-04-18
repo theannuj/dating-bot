@@ -1600,14 +1600,21 @@ def text_from_message(message):
 
 
 def forward_user_message_to_admins(message):
-    user = get_user(message.chat.id)
+    user_id = message.chat.id
+    user = get_user(user_id)
     match_id = user["current_match_id"]
     if not match_id:
         return
+    state = get_chat_state(user_id, match_id)
+    if state == "available":
+        if not can_activate_chat(user_id, match_id):
+            bot.send_message(user_id, chat_limit_message(user_id), reply_markup=main_menu_keyboard(user_id))
+            return
+        set_chat_state(user_id, match_id, "active")
     message_text = text_from_message(message)
-    append_chat_message(message.chat.id, match_id, "user", message_text)
-    increment_admin_unread(message.chat.id, match_id)
-    user_name = user["name"] or f"User {message.chat.id}"
+    append_chat_message(user_id, match_id, "user", message_text)
+    increment_admin_unread(user_id, match_id)
+    user_name = user["name"] or f"User {user_id}"
     for admin in CHAT_ADMINS:
         with state_lock:
             active_entries = [
@@ -1618,7 +1625,7 @@ def forward_user_message_to_admins(message):
         if not active_entries:
             continue
         anchor_message_id, anchor_context = max(active_entries, key=lambda item: item[0])
-        if anchor_context.get("user_id") != message.chat.id or anchor_context.get("match_id") != match_id:
+        if anchor_context.get("user_id") != user_id or anchor_context.get("match_id") != match_id:
             continue
         sent = bot.send_message(
             admin,
@@ -1626,7 +1633,7 @@ def forward_user_message_to_admins(message):
             parse_mode="HTML",
         )
         with state_lock:
-            chat_map[sent.message_id] = {"user_id": message.chat.id, "match_id": match_id, "admin_id": admin}
+            chat_map[sent.message_id] = {"user_id": user_id, "match_id": match_id, "admin_id": admin}
             if len(chat_map) > 50:
                 chat_map.clear()
     maybe_send_fomo_message(message.chat.id, match_id)
