@@ -2618,3 +2618,19 @@ def text_handler(message):
                 else:
                     bot.send_message(user_id, "<b>She was about to say something…</b>\n\nUnlock to continue 🔑", reply_markup=likes_locked_keyboard(), parse_mode="HTML")
             return
+
+
+def periodic_state_save():
+    """Automatically save state every 2 minutes to ensure Railway persistence"""
+    while True:
+        time.sleep(120)  # Every 2 minutes
+        save_state()
+
+
+threading.Thread(target=inactivity_engagement_worker, daemon=True).start()
+threading.Thread(target=periodic_state_save, daemon=True).start()
+print("DATABASE_URL:", os.getenv("DATABASE_URL"))
+init_vip_table()
+init_users_table()
+print("VIP DB ready")
+bot.infinity_polling()
