@@ -4,6 +4,7 @@ import os
 import random
 import threading
 import time
+import urllib.request
 from pathlib import Path
 
 import psycopg2
@@ -2639,5 +2640,15 @@ print("DATABASE_URL:", os.getenv("DATABASE_URL"))
 init_vip_table()
 init_users_table()
 print("VIP DB ready")
+
+# Explicitly delete webhook via Telegram API to ensure clean state
+try:
+    webhook_url = f"https://api.telegram.org/bot{TOKEN}/deleteWebhook"
+    response = urllib.request.urlopen(webhook_url)
+    result = json.loads(response.read().decode('utf-8'))
+    print(f"✅ Webhook deleted: {result}")
+except Exception as e:
+    print(f"⚠️ Webhook deletion attempt: {e}")
+
 bot.remove_webhook()
 bot.infinity_polling(skip_pending=True)
