@@ -493,7 +493,7 @@ def ensure_chat_thread(user, match_id):
         threads[thread_key] = {
             "messages": [],
             "user_unread": 0,
-            "admin_unread": 0,
+            "admin_unread": {},
             "state": "available",
             "fomo_sent": False,
             "counted_for_limit": False,
@@ -505,7 +505,7 @@ def ensure_chat_thread(user, match_id):
         if "user_unread" not in threads[thread_key]:
             threads[thread_key]["user_unread"] = int(threads[thread_key].get("unread", 0))
         if "admin_unread" not in threads[thread_key]:
-            threads[thread_key]["admin_unread"] = 0
+            threads[thread_key]["admin_unread"] = {}
         if "state" not in threads[thread_key]:
             threads[thread_key]["state"] = "available"
         if "fomo_sent" not in threads[thread_key]:
@@ -549,8 +549,31 @@ def can_admin_access_chat(admin_id, user_id, match_id):
     return admin_id == get_assigned_admin_id(user_id, match_id)
 
 
+def is_admin_viewing_chat(admin_id, user_id, match_id):
+    context = admin_active_chat.get(admin_id)
+    if not context:
+        return False
+    return context.get("user_id") == user_id and context.get("match_id") == match_id
+
+
+def get_thread_admin_unread_map(user, match_id, fallback_admin_ids=None):
+    thread = ensure_chat_thread(user, match_id)
+    admin_unread = thread.get("admin_unread", {})
+    if isinstance(admin_unread, dict):
+        return admin_unread
+
+    unread_count = int(admin_unread or 0)
+    unread_map = {}
+    for admin_id in fallback_admin_ids or []:
+        unread_map[str(admin_id)] = unread_count
+    thread["admin_unread"] = unread_map
+    return unread_map
+
+
 def mirror_admin_reply_to_main_admin(source_admin_id, user_id, match_id, text):
     if source_admin_id == MAIN_ADMIN_ID:
+        return
+    if not is_admin_viewing_chat(MAIN_ADMIN_ID, user_id, match_id):
         return
     profile = get_profile(match_id)
     match_name = profile["name"] if profile else "Match"
@@ -597,27 +620,39 @@ def get_unread_count(user_id, match_id):
         return thread["user_unread"]
 
 
-def increment_admin_unread(user_id, match_id):
+def increment_admin_unread(user_id, match_id, admin_ids=None):
     with state_lock:
         user = get_user(user_id)
-        thread = ensure_chat_thread(user, match_id)
-        thread["admin_unread"] += 1
+        if admin_ids is None:
+            admin_ids = get_admin_recipients(user_id, match_id)
+        admin_unread = get_thread_admin_unread_map(user, match_id, fallback_admin_ids=admin_ids)
+        for admin_id in admin_ids:
+            admin_key = str(admin_id)
+            admin_unread[admin_key] = int(admin_unread.get(admin_key, 0)) + 1
         save_state()
 
 
-def reset_admin_unread(user_id, match_id):
+def reset_admin_unread(user_id, match_id, admin_id=None):
     with state_lock:
         user = get_user(user_id)
-        thread = ensure_chat_thread(user, match_id)
-        thread["admin_unread"] = 0
+        fallback_admin_ids = get_admin_recipients(user_id, match_id)
+        admin_unread = get_thread_admin_unread_map(user, match_id, fallback_admin_ids=fallback_admin_ids)
+        if admin_id is None:
+            for admin_key in list(admin_unread):
+                admin_unread[admin_key] = 0
+        else:
+            admin_unread[str(admin_id)] = 0
         save_state()
 
 
-def get_admin_unread_count(user_id, match_id):
+def get_admin_unread_count(user_id, match_id, admin_id=None):
     with state_lock:
         user = get_user(user_id)
-        thread = ensure_chat_thread(user, match_id)
-        return thread["admin_unread"]
+        fallback_admin_ids = get_admin_recipients(user_id, match_id)
+        admin_unread = get_thread_admin_unread_map(user, match_id, fallback_admin_ids=fallback_admin_ids)
+        if admin_id is None:
+            return sum(int(count) for count in admin_unread.values())
+        return int(admin_unread.get(str(admin_id), 0))
 
 
 def get_chat_state(user_id, match_id):
@@ -1180,7 +1215,7 @@ def build_admin_chat_list_markup(admin_id, unread_only=False):
                     continue
                 profile = get_profile(match_id)
                 match_name = profile["name"] if profile else f"Match {match_id}"
-                admin_unread = int(thread.get("admin_unread", 0))
+                admin_unread = get_admin_unread_count(user_id, match_id, admin_id)
                 if unread_only and admin_unread <= 0:
                     continue
                 last_ts = int(messages[-1].get("ts", 0)) if messages else 0
@@ -1219,10 +1254,9 @@ def send_admin_chat_history(admin_id, user_id, match_id):
     match_name = profile["name"] if profile else f"Match {match_id}"
     user_name = user["name"] or f"User {user_id}"
     history = get_recent_chat_history(user_id, match_id)
-    unread_count = get_admin_unread_count(user_id, match_id)
+    unread_count = get_admin_unread_count(user_id, match_id, admin_id)
     chat_state = get_chat_state(user_id, match_id)
-    if admin_id == get_assigned_admin_id(user_id, match_id):
-        reset_admin_unread(user_id, match_id)
+    reset_admin_unread(user_id, match_id, admin_id)
     admin_active_chat[admin_id] = {
         "user_id": user_id,
         "match_id": match_id
@@ -1696,9 +1730,13 @@ def forward_user_message_to_admins(message):
         return
     message_text = text_from_message(message)
     append_chat_message(user_id, match_id, "user", message_text)
-    increment_admin_unread(user_id, match_id)
     user_name = user["name"] or f"User {user_id}"
+    unread_admins = []
     for admin in get_admin_recipients(user_id, match_id):
+        if not is_admin_viewing_chat(admin, user_id, match_id):
+            unread_admins.append(admin)
+            continue
+        reset_admin_unread(user_id, match_id, admin)
         sent = bot.send_message(
             admin,
             f"<b>{html.escape(user_name)}:</b> {html.escape(message_text)}",
@@ -1708,6 +1746,8 @@ def forward_user_message_to_admins(message):
             chat_map[sent.message_id] = {"user_id": user_id, "match_id": match_id, "admin_id": admin}
             if len(chat_map) > 50:
                 chat_map.clear()
+    if unread_admins:
+        increment_admin_unread(user_id, match_id, admin_ids=unread_admins)
     maybe_send_fomo_message(message.chat.id, match_id)
 
 
@@ -1963,6 +2003,7 @@ def admin_direct_reply(message):
 
     append_chat_message(user_id, match_id, "match", text)
     increment_unread(user_id, match_id)
+    reset_admin_unread(user_id, match_id, admin_id)
     mirror_admin_reply_to_main_admin(admin_id, user_id, match_id, text)
 
     # SEND ONLY TO USER (IMPORTANT)
@@ -2007,6 +2048,7 @@ def admin_reply_handler(message):
             return
         append_chat_message(user_id, match_id, "match", message.text)
         increment_unread(user_id, match_id)
+        reset_admin_unread(user_id, match_id, message.chat.id)
         mirror_admin_reply_to_main_admin(message.chat.id, user_id, match_id, message.text)
         try:
             user = get_user(user_id)
