@@ -578,6 +578,7 @@ def set_chat_state(user_id, match_id, state):
         thread = ensure_chat_thread(user, match_id)
         old_state = thread.get("state", "available")
         if state == "active" and old_state == "available":
+            print(f"DEBUG: CHAT ACTIVATED for match_id={match_id}")
             chat_started_notified = user.get("chat_started_notified", {})
             match_id_str = str(match_id)
             if not thread.get("counted_for_limit", False) and match_id_str not in chat_started_notified:
@@ -647,6 +648,7 @@ def can_start_new_chat(user_id):
     user = get_user(user_id)
     total_used = user.get("total_chats_used", 0)
     chat_limit = user.get("chat_limit", 1)
+    print(f"DEBUG LIMIT: total_chats_used={total_used}, chat_limit={chat_limit}")
     return total_used < chat_limit
 
 
@@ -2110,6 +2112,7 @@ def callback_handler(call):
             bot.answer_callback_query(call.id, "Chat already closed")
             return
         set_chat_state(user_id, match_id, "ended")
+        print("DEBUG: CHAT ENDED")
         append_system_message(user_id, match_id, "This chat has ended.\n\nYou can start a new one anytime 🙂")
         notify_admin_chat_status(user_id, match_id, "User ended chat")
         remove_match_from_inbox(user_id, match_id)
@@ -2122,12 +2125,14 @@ def callback_handler(call):
         return
 
     if call.data.startswith("start_chat:"):
+        print("DEBUG: CHAT BUTTON CLICKED")
         user_id = call.message.chat.id
         match_id_str = call.data.split(":", 1)[1]
         if not match_id_str.isdigit():
             bot.answer_callback_query(call.id, "Invalid match")
             return
         match_id = int(match_id_str)
+        print(f"DEBUG: thread.state = {get_chat_state(user_id, match_id)}")
         if not can_start_new_chat(user_id):
             bot.send_message(user_id, unlock_vip_usage_message(user_id), reply_markup=main_menu_keyboard(user_id))
             bot.answer_callback_query(call.id, "No chats left")
@@ -2583,6 +2588,7 @@ def text_handler(message):
     if user["current_match_id"]:
         match_id = user["current_match_id"]
         state = get_chat_state(user_id, match_id)
+        print(f"DEBUG MESSAGE HANDLER: user_id={user_id}, current_match_id={match_id}, state={state}")
         if state == "active":
             print(f"DEBUG: Forwarding message to admins - text='{text}'")
             forward_user_message_to_admins(message)
