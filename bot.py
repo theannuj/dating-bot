@@ -549,6 +549,10 @@ def can_admin_access_chat(admin_id, user_id, match_id):
     return admin_id == get_assigned_admin_id(user_id, match_id)
 
 
+def clear_admin_active_chat(admin_id):
+    admin_active_chat.pop(admin_id, None)
+
+
 def is_admin_viewing_chat(admin_id, user_id, match_id):
     context = admin_active_chat.get(admin_id)
     if not context:
@@ -1236,6 +1240,7 @@ def build_admin_chat_list_markup(admin_id, unread_only=False):
 
 
 def send_admin_chat_list(admin_id, unread_only=False):
+    clear_admin_active_chat(admin_id)
     markup = build_admin_chat_list_markup(admin_id, unread_only=unread_only)
     if not markup:
         empty_text = "No unread messages right now." if unread_only else "No chats available right now."
@@ -1810,6 +1815,7 @@ def open_match_chat(user_id, match_id, show_history=True):
 def start_handler(message):
     user = get_user(message.chat.id)
     if is_admin(message.chat.id):
+        clear_admin_active_chat(message.chat.id)
         bot.send_message(message.chat.id, "Admin menu is ready.", reply_markup=admin_menu_keyboard())
         return
     touch_user_activity(message.chat.id)
@@ -1823,6 +1829,7 @@ def start_handler(message):
 @bot.message_handler(commands=["menu"])
 def menu_command_handler(message):
     if is_admin(message.chat.id):
+        clear_admin_active_chat(message.chat.id)
         bot.send_message(message.chat.id, "Admin menu is ready.", reply_markup=admin_menu_keyboard())
         return
     touch_user_activity(message.chat.id)
@@ -1841,6 +1848,7 @@ def matches_command_handler(message):
 @bot.message_handler(commands=["chat"])
 def chat_command_handler(message):
     if is_admin(message.chat.id):
+        clear_admin_active_chat(message.chat.id)
         bot.send_message(message.chat.id, "Use the admin buttons to open chats.", reply_markup=admin_menu_keyboard())
         return
 
@@ -1902,6 +1910,7 @@ def stats_handler(message):
     if message.chat.id not in CHAT_ADMINS:
         bot.send_message(message.chat.id, "This command is for admins only.")
         return
+    clear_admin_active_chat(message.chat.id)
     
     with state_lock:
         total_users = len(users)
@@ -1921,6 +1930,7 @@ def pending_handler(message):
     if message.chat.id not in CHAT_ADMINS:
         bot.send_message(message.chat.id, "This command is for admins only.")
         return
+    clear_admin_active_chat(message.chat.id)
     
     with state_lock:
         pending_users = [(uid, user) for uid, user in users.items() if user.get("payment_status") == "pending"]
@@ -2082,6 +2092,7 @@ def admin_menu_handler(message):
         send_admin_chat_list(message.chat.id, unread_only=True)
         return
     if text == BTN_ADMIN_PANEL:
+        clear_admin_active_chat(message.chat.id)
         bot.send_message(message.chat.id, "Choose an admin option.", reply_markup=admin_panel_keyboard())
         return
     if text == BTN_ADMIN_STATS:
@@ -2091,8 +2102,10 @@ def admin_menu_handler(message):
         pending_handler(message)
         return
     if text == BTN_ADMIN_BACK:
+        clear_admin_active_chat(message.chat.id)
         bot.send_message(message.chat.id, "Admin menu is ready.", reply_markup=admin_menu_keyboard())
         return
+    clear_admin_active_chat(message.chat.id)
     bot.send_message(message.chat.id, "Use the admin buttons to open chats.", reply_markup=admin_menu_keyboard())
 
 
