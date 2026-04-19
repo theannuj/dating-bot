@@ -18,6 +18,12 @@ ADMIN_B_ID = 5754861439
 PAYMENT_ADMINS = [MAIN_ADMIN_ID]
 CHAT_ADMINS = [MAIN_ADMIN_ID, ADMIN_A_ID, ADMIN_B_ID]
 PAYMENT_LINK = "https://midnightmatch.creatorapp.club?callback=/fan-home?tier=998255026087117578"
+VIP_PLAN_DAYS = {
+    "1m": ("1 Month", 30),
+    "3m": ("3 Months", 90),
+    "6m": ("6 Months", 180),
+    "1y": ("1 Year", 365),
+}
 
 BASE_DIR = Path(__file__).resolve().parent
 PROFILES_FILE = BASE_DIR / "profiles.json"
@@ -50,9 +56,13 @@ def init_vip_table():
     user_id BIGINT PRIMARY KEY,
     paid BOOLEAN,
     payment_status TEXT,
-    matches TEXT
+    matches TEXT,
+    vip_start_date BIGINT,
+    vip_end_date BIGINT
     )
     """)
+    cur.execute("ALTER TABLE vip_users ADD COLUMN IF NOT EXISTS vip_start_date BIGINT")
+    cur.execute("ALTER TABLE vip_users ADD COLUMN IF NOT EXISTS vip_end_date BIGINT")
     conn.commit()
     cur.close()
     conn.close()
@@ -66,13 +76,22 @@ def save_vip_to_db(user_id, user):
     try:
         cur = conn.cursor()
         cur.execute("""
-        INSERT INTO vip_users (user_id, paid, payment_status, matches)
-        VALUES (%s, %s, %s, %s)
+        INSERT INTO vip_users (user_id, paid, payment_status, matches, vip_start_date, vip_end_date)
+        VALUES (%s, %s, %s, %s, %s, %s)
         ON CONFLICT (user_id)
         DO UPDATE SET paid = EXCLUDED.paid,
         payment_status = EXCLUDED.payment_status,
-        matches = EXCLUDED.matches
-        """, (user_id, user.get("paid"), user.get("payment_status"), json.dumps(user.get("matches", []))))
+        matches = EXCLUDED.matches,
+        vip_start_date = EXCLUDED.vip_start_date,
+        vip_end_date = EXCLUDED.vip_end_date
+        """, (
+            user_id,
+            user.get("paid"),
+            user.get("payment_status"),
+            json.dumps(user.get("matches", [])),
+            user.get("vip_start_date"),
+            user.get("vip_end_date"),
+        ))
         conn.commit()
         cur.execute("SELECT COUNT(*) FROM vip_users")
         count = cur.fetchone()[0]
@@ -89,12 +108,37 @@ def load_vip_from_db():
         return {}
     try:
         cur = conn.cursor()
-        cur.execute("SELECT user_id, paid, payment_status, matches FROM vip_users")
-        rows = cur.fetchall()
+        try:
+            cur.execute("SELECT user_id, paid, payment_status, matches, vip_start_date, vip_end_date FROM vip_users")
+            rows = cur.fetchall()
+            result = {
+                row[0]: {
+                    "paid": row[1],
+                    "payment_status": row[2],
+                    "matches": json.loads(row[3]) if row[3] else [],
+                    "vip_start_date": row[4],
+                    "vip_end_date": row[5],
+                }
+                for row in rows
+            }
+        except Exception:
+            conn.rollback()
+            cur.execute("SELECT user_id, paid, payment_status, matches FROM vip_users")
+            rows = cur.fetchall()
+            result = {
+                row[0]: {
+                    "paid": row[1],
+                    "payment_status": row[2],
+                    "matches": json.loads(row[3]) if row[3] else [],
+                    "vip_start_date": None,
+                    "vip_end_date": None,
+                }
+                for row in rows
+            }
         print("Rows fetched from DB:", len(rows))
         cur.close()
         conn.close()
-        return {row[0]: {"paid": row[1], "payment_status": row[2], "matches": json.loads(row[3]) if row[3] else []} for row in rows}
+        return result
     except:
         return {}
 
@@ -367,7 +411,99 @@ def default_user():
         "total_chats_used": 0,
         "chat_limit": 1,
         "chat_started_notified": {},
+        "vip_start_date": None,
+        "vip_end_date": None,
     }
+
+
+def get_current_timestamp():
+    return int(time.time())
+
+
+def get_vip_start_timestamp(user):
+    try:
+        return int(user.get("vip_start_date") or 0)
+    except (TypeError, ValueError):
+        return 0
+
+
+def get_vip_end_timestamp(user):
+    try:
+        return int(user.get("vip_end_date") or 0)
+    except (TypeError, ValueError):
+        return 0
+
+
+def is_vip_active(user, now_ts=None):
+    if now_ts is None:
+        now_ts = get_current_timestamp()
+    return get_vip_end_timestamp(user) > now_ts
+
+
+def sync_user_vip_state(user, now_ts=None):
+    if now_ts is None:
+        now_ts = get_current_timestamp()
+    user.setdefault("vip_start_date", None)
+    user.setdefault("vip_end_date", None)
+    active = is_vip_active(user, now_ts=now_ts)
+    user["paid"] = active
+    user["chat_limit"] = 5 if active else 1
+    if active:
+        user["payment_status"] = "approved"
+    elif user.get("payment_status") == "approved" and user.get("vip_end_date"):
+        user["payment_status"] = "expired"
+    return active
+
+
+def get_vip_remaining_days(user, now_ts=None):
+    if now_ts is None:
+        now_ts = get_current_timestamp()
+    remaining_seconds = get_vip_end_timestamp(user) - now_ts
+    if remaining_seconds <= 0:
+        return 0
+    return (remaining_seconds + 86399) // 86400
+
+
+def get_vip_plan_label(user):
+    duration_seconds = get_vip_end_timestamp(user) - get_vip_start_timestamp(user)
+    duration_days = int(round(duration_seconds / 86400)) if duration_seconds > 0 else 0
+    for label, days in VIP_PLAN_DAYS.values():
+        if duration_days == days:
+            return label
+    return "Custom"
+
+
+def format_vip_expiry_date(user):
+    end_ts = get_vip_end_timestamp(user)
+    if not end_ts:
+        return "-"
+    return time.strftime("%d %b %Y", time.localtime(end_ts))
+
+
+def build_vip_status_lines(user):
+    if is_vip_active(user):
+        return [
+            "VIP: Active 💎",
+            f"\u23F3 {get_vip_remaining_days(user)} days remaining",
+        ]
+    return ["VIP: Not Active"]
+
+
+def prepare_user_record(payload):
+    base = default_user()
+    base.update(payload)
+    if "matches" not in base:
+        base["matches"] = []
+    if "total_chats_used" not in base:
+        base["total_chats_used"] = 0
+    if "chat_started_notified" not in base:
+        base["chat_started_notified"] = {}
+    if "chat_threads" in base:
+        for thread in base["chat_threads"].values():
+            if "counted_for_limit" not in thread:
+                thread["counted_for_limit"] = False
+    sync_user_vip_state(base)
+    return base
 
 
 def load_state():
@@ -376,10 +512,12 @@ def load_state():
     if db_users:
         print(f"✅ Loaded {len(db_users)} users from PostgreSQL")
         # Convert string keys back to int
-        return {int(uid): user for uid, user in db_users.items()}
+        restored = {int(uid): prepare_user_record(user) for uid, user in db_users.items()}
+    else:
+        restored = {}
     
     # Fallback to JSON if database is empty
-    if not STATE_FILE.exists():
+    if not restored and not STATE_FILE.exists():
         try:
             STATE_FILE.write_text(json.dumps({"users": {}}, ensure_ascii=False, indent=2), encoding="utf-8")
         except OSError:
@@ -389,55 +527,38 @@ def load_state():
         with STATE_FILE.open("r", encoding="utf-8") as file:
             raw = json.load(file)
     except (json.JSONDecodeError, OSError):
-        try:
-            STATE_FILE.write_text(json.dumps({"users": {}}, ensure_ascii=False, indent=2), encoding="utf-8")
-        except OSError:
-            pass
-        return {}
+        if not restored:
+            try:
+                STATE_FILE.write_text(json.dumps({"users": {}}, ensure_ascii=False, indent=2), encoding="utf-8")
+            except OSError:
+                pass
+        raw = {"users": {}}
 
-    restored = {}
-    for user_id, payload in raw.get("users", {}).items():
-        base = default_user()
-        base.update(payload)
-        # Restore VIP status properly
-        if base.get("payment_status") == "approved":
-            base["paid"] = True
-        # Ensure matches persist
-        if "matches" not in base:
-            base["matches"] = []
-        # Ensure new chat limit fields exist
-        if "total_chats_used" not in base:
-            base["total_chats_used"] = 0
-        if "chat_limit" not in base:
-            base["chat_limit"] = 5 if base["paid"] else 1
-        if "chat_started_notified" not in base:
-            base["chat_started_notified"] = {}
-        if "chat_threads" in base:
-            for thread in base["chat_threads"].values():
-                if "counted_for_limit" not in thread:
-                    thread["counted_for_limit"] = False
-        restored[int(user_id)] = base
+    if not restored:
+        for user_id, payload in raw.get("users", {}).items():
+            restored[int(user_id)] = prepare_user_record(payload)
 
     vip_data = load_vip_from_db()
     print("VIP DB loaded:", len(vip_data))
     for uid, vip in vip_data.items():
         if uid in restored:
-            restored[uid]["paid"] = vip.get("paid", False)
             restored[uid]["payment_status"] = vip.get("payment_status", "none")
-            # Only override matches from VIP DB for paid users (more reliable).
-            # Free users keep matches from JSON/users table to prevent data loss
-            if restored[uid]["paid"]:
+            if vip.get("vip_start_date") is not None:
+                restored[uid]["vip_start_date"] = vip.get("vip_start_date")
+            if vip.get("vip_end_date") is not None:
+                restored[uid]["vip_end_date"] = vip.get("vip_end_date")
+            if vip.get("matches"):
                 restored[uid]["matches"] = vip.get("matches", [])
         else:
-            restored[uid] = default_user()
-            restored[uid]["paid"] = vip.get("paid", False)
+            restored[uid] = prepare_user_record({})
             restored[uid]["payment_status"] = vip.get("payment_status", "none")
-            # Only assign matches from VIP DB for paid users
-            if vip.get("paid", False):
-                restored[uid]["matches"] = vip.get("matches", [])
+            restored[uid]["vip_start_date"] = vip.get("vip_start_date")
+            restored[uid]["vip_end_date"] = vip.get("vip_end_date")
+            restored[uid]["matches"] = vip.get("matches", [])
+        sync_user_vip_state(restored[uid])
     
     # Debug: Show loaded users count and VIP count
-    vip_count = sum(1 for u in restored.values() if u.get("paid"))
+    vip_count = sum(1 for u in restored.values() if is_vip_active(u))
     print(f"✅ Loaded {len(restored)} users | VIP users: {vip_count}")
     
     return restored
@@ -466,10 +587,23 @@ def save_state():
 
 def get_user(user_id):
     with state_lock:
+        needs_save = False
         if user_id not in users:
             users[user_id] = default_user()
+            needs_save = True
+        user = users[user_id]
+        old_paid = user.get("paid")
+        old_chat_limit = user.get("chat_limit")
+        old_payment_status = user.get("payment_status")
+        sync_user_vip_state(user)
+        if (
+            needs_save
+            or user.get("paid") != old_paid
+            or user.get("chat_limit") != old_chat_limit
+            or user.get("payment_status") != old_payment_status
+        ):
             save_state()
-        return users[user_id]
+        return user
 
 
 def reset_user(user_id):
@@ -769,6 +903,9 @@ def chat_limit_message(user_id):
 
 
 def unlock_vip_usage_message(user_id):
+    user = get_user(user_id)
+    if user["paid"]:
+        return "You've reached your chat limit.\nUpgrade or renew VIP to continue \U0001F513"
     return "You've used your free chat.\nUnlock VIP to continue \U0001F513"
 
 
@@ -832,6 +969,13 @@ def format_admin_chat_history(user_id, user_name, match_name, messages, unread_c
     user = get_user(user_id)
     tag = "🟢 VIP" if user.get("paid") else "🟡 FREE"
     lines = [f"💬 <b>{html.escape(user_name)}</b> × <b>{html.escape(match_name)}</b> {tag}"]
+    if user["paid"]:
+        lines.append("💎 VIP: Active")
+        lines.append(f"Plan: {get_vip_plan_label(user)}")
+        lines.append(f"\u23F3 {get_vip_remaining_days(user)} days remaining")
+        lines.append(f"Expires: {format_vip_expiry_date(user)}")
+    else:
+        lines.append("💎 VIP: Not Active")
     if unread_count:
         lines.append(f"Unread: {unread_count}")
     lines.append(f"State: {chat_state}")
@@ -1285,9 +1429,14 @@ def send_admin_chat_history(admin_id, user_id, match_id):
 def payment_markup(user_id):
     markup = InlineKeyboardMarkup()
     markup.row(
-        InlineKeyboardButton("Approve", callback_data=f"approve_{user_id}"),
-        InlineKeyboardButton("Reject", callback_data=f"reject_{user_id}"),
+        InlineKeyboardButton("1 Month", callback_data=f"vipapprove_1m_{user_id}"),
+        InlineKeyboardButton("3 Months", callback_data=f"vipapprove_3m_{user_id}"),
     )
+    markup.row(
+        InlineKeyboardButton("6 Months", callback_data=f"vipapprove_6m_{user_id}"),
+        InlineKeyboardButton("1 Year", callback_data=f"vipapprove_1y_{user_id}"),
+    )
+    markup.row(InlineKeyboardButton("Reject", callback_data=f"reject_{user_id}"))
     return markup
 
 
@@ -1914,7 +2063,7 @@ def stats_handler(message):
     
     with state_lock:
         total_users = len(users)
-        vip_users = sum(1 for user in users.values() if user.get("payment_status") == "approved")
+        vip_users = sum(1 for user in users.values() if is_vip_active(user))
         pending_users = sum(1 for user in users.values() if user.get("payment_status") == "pending")
     
     stats_message = f"""📊 Stats:
@@ -2154,7 +2303,7 @@ def photo_handler(message):
             return
         
         # Check if already approved
-        if user.get("payment_status") == "approved" or user["paid"]:
+        if user["paid"]:
             send_vip_already_message(user_id)
             return
         
@@ -2378,6 +2527,56 @@ def callback_handler(call):
         bot.answer_callback_query(call.id, "Invalid chat")
         return
 
+    if call.data.startswith("vipapprove_"):
+        if call.message.chat.id != MAIN_ADMIN_ID:
+            bot.answer_callback_query(call.id, "Main admin only")
+            return
+        parts = call.data.split("_")
+        if len(parts) != 3 or parts[1] not in VIP_PLAN_DAYS or not parts[2].isdigit():
+            bot.answer_callback_query(call.id, "Invalid plan")
+            return
+        plan_key = parts[1]
+        user_id = int(parts[2])
+        plan_label, duration_days = VIP_PLAN_DAYS[plan_key]
+        user = get_user(user_id)
+        now_ts = get_current_timestamp()
+        end_ts = now_ts + (duration_days * 86400)
+
+        with state_lock:
+            user["vip_start_date"] = now_ts
+            user["vip_end_date"] = end_ts
+            user["paid"] = True
+            user["chat_limit"] = 5
+            user["awaiting_payment"] = False
+            user["payment_status"] = "approved"
+            try:
+                save_vip_to_db(user_id, user)
+                print(f"VIP saved to DB: {user_id}")
+            except Exception as e:
+                print("VIP DB save error:", e)
+            for thread in user.get("chat_threads", {}).values():
+                if thread.get("state") == "locked":
+                    thread["state"] = "available"
+            save_state()
+
+        import time as time_module
+        time_module.sleep(0.1)
+        with state_lock:
+            save_state()
+
+        bot.send_message(
+            call.message.chat.id,
+            f"✅ User {user_id} approved successfully\nPlan: {plan_label}\nValid till: {time.strftime('%d %b %Y', time.localtime(end_ts))}"
+        )
+        bot.send_message(
+            user_id,
+            f"💎 VIP Activated!\n\nPlan: {plan_label}\n⏳ Valid till: {time.strftime('%d %b %Y', time.localtime(end_ts))}",
+            reply_markup=main_menu_keyboard(user_id),
+        )
+        bot.answer_callback_query(call.id, "Approved")
+        send_next_pending_to_admin(call.message.chat.id)
+        return
+
     action, _, raw_user_id = call.data.partition("_")
     if not raw_user_id.isdigit():
         bot.answer_callback_query(call.id, "Invalid action")
@@ -2387,6 +2586,8 @@ def callback_handler(call):
     user = get_user(user_id)
 
     if action == "approve":
+        bot.answer_callback_query(call.id, "Use a duration button to approve VIP")
+        return
         with state_lock:
             user["paid"] = True
             user["chat_limit"] = 5
@@ -2560,13 +2761,15 @@ def text_handler(message):
         return
 
     if text == BTN_MY_PROFILE:
-        caption = (
-            f"Profile summary\n\n"
-            f"Name: {user['name']}\n"
-            f"Gender: {user['gender']}\n"
-            f"City: {user['city']}\n"
-            f"VIP: {'Yes' if user['paid'] else 'No'}"
-        )
+        vip_lines = build_vip_status_lines(user)
+        caption = "\n".join([
+            "Profile summary",
+            "",
+            f"Name: {user['name']}",
+            f"Gender: {user['gender']}",
+            f"City: {user['city']}",
+            *vip_lines,
+        ])
         if user["photo"]:
             bot.send_photo(user_id, user["photo"], caption=caption, reply_markup=settings_keyboard())
         else:
