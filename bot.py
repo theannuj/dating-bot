@@ -12,8 +12,11 @@ import telebot
 from telebot.types import InlineKeyboardButton, InlineKeyboardMarkup, ReplyKeyboardMarkup, ReplyKeyboardRemove
 
 TOKEN = os.getenv("BOT_TOKEN")
-PAYMENT_ADMINS = [526264365]
-CHAT_ADMINS = [526264365]
+MAIN_ADMIN_ID = 526264365
+ADMIN_A_ID = 8511880633
+ADMIN_B_ID = 5754861439
+PAYMENT_ADMINS = [MAIN_ADMIN_ID]
+CHAT_ADMINS = [MAIN_ADMIN_ID, ADMIN_A_ID, ADMIN_B_ID]
 PAYMENT_LINK = "https://midnightmatch.creatorapp.club?callback=/fan-home?tier=998255026087117578"
 
 BASE_DIR = Path(__file__).resolve().parent
@@ -494,6 +497,7 @@ def ensure_chat_thread(user, match_id):
             "state": "available",
             "fomo_sent": False,
             "counted_for_limit": False,
+            "assigned_admin_id": None,
         }
     else:
         if "messages" not in threads[thread_key]:
@@ -508,7 +512,57 @@ def ensure_chat_thread(user, match_id):
             threads[thread_key]["fomo_sent"] = False
         if "counted_for_limit" not in threads[thread_key]:
             threads[thread_key]["counted_for_limit"] = False
+        if "assigned_admin_id" not in threads[thread_key]:
+            threads[thread_key]["assigned_admin_id"] = None
     return threads[thread_key]
+
+
+def default_admin_for_user(user):
+    return ADMIN_B_ID if user.get("paid") else ADMIN_A_ID
+
+
+def get_assigned_admin_id(user_id, match_id, create_if_missing=True):
+    with state_lock:
+        user = get_user(user_id)
+        thread = ensure_chat_thread(user, match_id)
+        assigned_admin_id = thread.get("assigned_admin_id")
+        if assigned_admin_id is None and create_if_missing:
+            assigned_admin_id = default_admin_for_user(user)
+            thread["assigned_admin_id"] = assigned_admin_id
+            save_state()
+        return assigned_admin_id
+
+
+def get_admin_recipients(user_id, match_id):
+    assigned_admin_id = get_assigned_admin_id(user_id, match_id)
+    recipients = []
+    if assigned_admin_id is not None:
+        recipients.append(assigned_admin_id)
+    if MAIN_ADMIN_ID not in recipients:
+        recipients.append(MAIN_ADMIN_ID)
+    return recipients
+
+
+def can_admin_access_chat(admin_id, user_id, match_id):
+    if admin_id == MAIN_ADMIN_ID:
+        return True
+    return admin_id == get_assigned_admin_id(user_id, match_id)
+
+
+def mirror_admin_reply_to_main_admin(source_admin_id, user_id, match_id, text):
+    if source_admin_id == MAIN_ADMIN_ID:
+        return
+    profile = get_profile(match_id)
+    match_name = profile["name"] if profile else "Match"
+    sent = bot.send_message(
+        MAIN_ADMIN_ID,
+        f"<b>{html.escape(match_name)}:</b> {html.escape(text)}",
+        parse_mode="HTML",
+    )
+    with state_lock:
+        chat_map[sent.message_id] = {"user_id": user_id, "match_id": match_id, "admin_id": MAIN_ADMIN_ID}
+        if len(chat_map) > 50:
+            chat_map.clear()
 
 
 def append_chat_message(user_id, match_id, sender, text):
@@ -828,7 +882,7 @@ def notify_admin_chat_status(user_id, match_id, status_text):
     match_name = profile["name"] if profile else f"Match {match_id}"
     user = get_user(user_id)
     user_name = user["name"] or f"User {user_id}"
-    for admin in CHAT_ADMINS:
+    for admin in get_admin_recipients(user_id, match_id):
         bot.send_message(admin, f"{status_text}\nUser: {user_name}\nMatch: {match_name}\nUser ID: {user_id}")
 
 
@@ -1110,7 +1164,7 @@ def build_admin_chat_controls(user_id, match_id):
     return markup
 
 
-def build_admin_chat_list_markup(unread_only=False):
+def build_admin_chat_list_markup(admin_id, unread_only=False):
     markup = InlineKeyboardMarkup()
     chat_rows = []
     with state_lock:
@@ -1121,6 +1175,9 @@ def build_admin_chat_list_markup(unread_only=False):
                 if not messages:
                     continue
                 match_id = int(match_key)
+                assigned_admin_id = get_assigned_admin_id(user_id, match_id)
+                if admin_id != MAIN_ADMIN_ID and assigned_admin_id != admin_id:
+                    continue
                 profile = get_profile(match_id)
                 match_name = profile["name"] if profile else f"Match {match_id}"
                 admin_unread = int(thread.get("admin_unread", 0))
@@ -1144,7 +1201,7 @@ def build_admin_chat_list_markup(unread_only=False):
 
 
 def send_admin_chat_list(admin_id, unread_only=False):
-    markup = build_admin_chat_list_markup(unread_only=unread_only)
+    markup = build_admin_chat_list_markup(admin_id, unread_only=unread_only)
     if not markup:
         empty_text = "No unread messages right now." if unread_only else "No chats available right now."
         bot.send_message(admin_id, empty_text, reply_markup=admin_menu_keyboard())
@@ -1154,6 +1211,9 @@ def send_admin_chat_list(admin_id, unread_only=False):
 
 
 def send_admin_chat_history(admin_id, user_id, match_id):
+    if not can_admin_access_chat(admin_id, user_id, match_id):
+        bot.send_message(admin_id, "This chat is assigned to another admin.")
+        return
     user = get_user(user_id)
     profile = get_profile(match_id)
     match_name = profile["name"] if profile else f"Match {match_id}"
@@ -1161,7 +1221,8 @@ def send_admin_chat_history(admin_id, user_id, match_id):
     history = get_recent_chat_history(user_id, match_id)
     unread_count = get_admin_unread_count(user_id, match_id)
     chat_state = get_chat_state(user_id, match_id)
-    reset_admin_unread(user_id, match_id)
+    if admin_id == get_assigned_admin_id(user_id, match_id):
+        reset_admin_unread(user_id, match_id)
     admin_active_chat[admin_id] = {
         "user_id": user_id,
         "match_id": match_id
@@ -1394,6 +1455,8 @@ def create_match(user_id, profile_id, source="system"):
         user["chat_open"] = False
         thread = ensure_chat_thread(user, profile_id)
         thread["state"] = "available"
+        if thread.get("assigned_admin_id") is None:
+            thread["assigned_admin_id"] = default_admin_for_user(user)
         paid = user["paid"]
         save_state()
     
@@ -1635,18 +1698,7 @@ def forward_user_message_to_admins(message):
     append_chat_message(user_id, match_id, "user", message_text)
     increment_admin_unread(user_id, match_id)
     user_name = user["name"] or f"User {user_id}"
-    for admin in CHAT_ADMINS:
-        with state_lock:
-            active_entries = [
-                (message_id, context)
-                for message_id, context in chat_map.items()
-                if context.get("admin_id") == admin
-            ]
-        if not active_entries:
-            continue
-        anchor_message_id, anchor_context = max(active_entries, key=lambda item: item[0])
-        if anchor_context.get("user_id") != user_id or anchor_context.get("match_id") != match_id:
-            continue
+    for admin in get_admin_recipients(user_id, match_id):
         sent = bot.send_message(
             admin,
             f"<b>{html.escape(user_name)}:</b> {html.escape(message_text)}",
@@ -1899,6 +1951,10 @@ def admin_direct_reply(message):
     user_id = context["user_id"]
     match_id = context["match_id"]
 
+    if not can_admin_access_chat(admin_id, user_id, match_id):
+        bot.send_message(admin_id, "This chat is assigned to another admin.")
+        return
+
     state = get_chat_state(user_id, match_id)
     if state != "active":
         return
@@ -1907,6 +1963,7 @@ def admin_direct_reply(message):
 
     append_chat_message(user_id, match_id, "match", text)
     increment_unread(user_id, match_id)
+    mirror_admin_reply_to_main_admin(admin_id, user_id, match_id, text)
 
     # SEND ONLY TO USER (IMPORTANT)
     try:
@@ -1941,12 +1998,16 @@ def admin_reply_handler(message):
     if chat_context:
         user_id = chat_context["user_id"]
         match_id = chat_context["match_id"]
+        if not can_admin_access_chat(message.chat.id, user_id, match_id):
+            bot.send_message(message.chat.id, "This chat is assigned to another admin.")
+            return
         state = get_chat_state(user_id, match_id)
         if state != "active":
             bot.send_message(message.chat.id, "This chat is not active anymore.")
             return
         append_chat_message(user_id, match_id, "match", message.text)
         increment_unread(user_id, match_id)
+        mirror_admin_reply_to_main_admin(message.chat.id, user_id, match_id, message.text)
         try:
             user = get_user(user_id)
             profile = get_profile(match_id)
@@ -2253,6 +2314,9 @@ def callback_handler(call):
         if len(parts) == 3 and parts[1].isdigit() and parts[2].isdigit():
             user_id = int(parts[1])
             match_id = int(parts[2])
+            if not can_admin_access_chat(call.message.chat.id, user_id, match_id):
+                bot.answer_callback_query(call.id, "This chat is assigned to another admin.")
+                return
             send_admin_chat_history(call.message.chat.id, user_id, match_id)
             bot.answer_callback_query(call.id, "Chat opened")
             return
