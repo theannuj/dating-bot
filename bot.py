@@ -904,9 +904,9 @@ def chat_limit_message(user_id):
 
 def unlock_vip_usage_message(user_id):
     user = get_user(user_id)
-    if user["paid"]:
-        return "You've reached your chat limit.\nUpgrade or renew VIP to continue \U0001F513"
-    return "You've used your free chat.\nUnlock VIP to continue \U0001F513"
+    if user.get("vip_start_date") is not None:
+        return "<b>You've reached your chat limit.\nRenew VIP to continue 🔓</b>"
+    return "<b>You've used your free chat.\nUnlock VIP to continue 🔓</b>"
 
 
 def is_visible_in_inbox(user_id, match_id):
@@ -2393,7 +2393,7 @@ def callback_handler(call):
         print(f"DEBUG: thread.state = {state}")
         if state != "active":
             if not can_start_new_chat(user_id):
-                bot.send_message(user_id, unlock_vip_usage_message(user_id), reply_markup=chat_limit_keyboard())
+                bot.send_message(user_id, unlock_vip_usage_message(user_id), reply_markup=chat_limit_keyboard(), parse_mode="HTML")
                 bot.answer_callback_query(call.id, "No chats left")
                 return
             if not can_activate_chat(user_id, match_id):
@@ -2807,7 +2807,7 @@ def text_handler(message):
             open_match_chat(user_id, match_id, show_history=True)
             return
         if not can_start_new_chat(user_id):
-            bot.send_message(user_id, unlock_vip_usage_message(user_id), reply_markup=chat_limit_keyboard())
+            bot.send_message(user_id, unlock_vip_usage_message(user_id), reply_markup=chat_limit_keyboard(), parse_mode="HTML")
             return
         if not can_activate_chat(user_id, match_id):
             reply_markup = chat_limit_keyboard() if not user["paid"] else main_menu_keyboard(user_id)
