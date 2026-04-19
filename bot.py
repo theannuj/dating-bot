@@ -352,6 +352,9 @@ def touch_user_activity(user_id):
 def send_typing_then_message(user_id, text, reply_markup=None, parse_mode=None, delay=None):
     bot.send_chat_action(user_id, "typing")
     time.sleep(delay if delay is not None else typing_delay_for_text(text))
+    if parse_mode is None:
+        text = f"<b>{text}</b>"
+        parse_mode = "HTML"
     bot.send_message(user_id, text, reply_markup=reply_markup, parse_mode=parse_mode)
 
 
@@ -898,8 +901,8 @@ def can_activate_chat(user_id, match_id):
 def chat_limit_message(user_id):
     user = get_user(user_id)
     if user["paid"]:
-        return "You can chat with 2 people at a time.\n\nEnd one chat to start a new one."
-    return "You can chat with one person at a time right now.\n\nUnlock chat to connect with more matches."
+        return "<b>You can chat with 2 people at a time.\n\nEnd one chat to start a new one.</b>"
+    return "<b>You can chat with one person at a time right now.\n\nUnlock chat to connect with more matches.</b>"
 
 
 def unlock_vip_usage_message(user_id):
@@ -944,7 +947,10 @@ def format_chat_history(match_name, messages):
             speaker = match_name
         safe_speaker = html.escape(speaker)
         safe_text = html.escape(item["text"])
-        lines.append(f"<b>{safe_speaker}:</b> {safe_text}")
+        if item["sender"] == "system":
+            lines.append(f"<b>{safe_speaker}:</b> <b>{safe_text}</b>")
+        else:
+            lines.append(f"<b>{safe_speaker}:</b> {safe_text}")
     return "\n\n".join(lines)
 
 
@@ -1008,7 +1014,7 @@ def notify_user_of_match_message(user_id, match_id, text):
         message_text = f"<b>{html.escape(match_name)}:</b> {html.escape(text)}"
     else:
         message_text = (
-            f"💬 New message from {html.escape(match_name)}\n\n"
+            f"<b>💬 New message from {html.escape(match_name)}</b>\n\n"
             f"<b>{html.escape(match_name)}:</b> {html.escape(text)}"
         )
 
@@ -1748,11 +1754,12 @@ def send_vip_already_message(user_id):
         if user.get("awaiting_payment"):
             user["awaiting_payment"] = False
             save_state()
-    bot.send_message(user_id, "✅ You already have VIP access.")
+    bot.send_message(user_id, "<b>✅ You already have VIP access.</b>", parse_mode="HTML")
 
 
 def unlock_text():
     return (
+        "<b>"
         "<b>🔒 VIP Access Required</b>\n\n"
         "Wait… don't go 😶\n"
         "We were just getting interesting…\n\n"
@@ -1764,6 +1771,7 @@ def unlock_text():
         "2. Send screenshot\n"
         "3. Get VIP access\n\n"
         "⚠️ After payment, send screenshot here to activate VIP"
+        "</b>"
     )
 
 
@@ -1862,7 +1870,7 @@ def show_prev_match(user_id):
 
 
 def inactive_chat_message():
-    return "Open the chat first to start messaging"
+    return "<b>Open the chat first to start messaging</b>"
 
 
 def text_from_message(message):
@@ -1910,11 +1918,11 @@ def open_match_chat(user_id, match_id, show_history=True):
     user = get_user(user_id)
 
     if state == "blocked":
-        bot.send_message(user_id, "This chat is no longer available.", reply_markup=main_menu_keyboard(user_id))
+        bot.send_message(user_id, "<b>This chat is no longer available.</b>", reply_markup=main_menu_keyboard(user_id), parse_mode="HTML")
         return
 
     if state == "ended":
-        bot.send_message(user_id, "This chat has ended.", reply_markup=main_menu_keyboard(user_id))
+        bot.send_message(user_id, "<b>This chat has ended.</b>", reply_markup=main_menu_keyboard(user_id), parse_mode="HTML")
         return
 
     if state == "locked" and not user["paid"]:
@@ -2282,11 +2290,8 @@ def photo_handler(message):
         match_id = user["current_match_id"]
         state = get_chat_state(user_id, match_id)
         if state != "active":
-            bot.send_message(user_id, inactive_chat_message())
+            bot.send_message(user_id, inactive_chat_message(), parse_mode="HTML")
             return
-        forward_user_message_to_admins(message)
-        return
-
     if user["awaiting_payment"]:
         # Block if already VIP
         if user["paid"]:
@@ -2375,8 +2380,9 @@ def callback_handler(call):
         remove_match_from_inbox(user_id, match_id)
         bot.send_message(
             user_id,
-            "This chat has ended.\n\nYou can start a new one anytime 🙂",
+            "<b>This chat has ended.\n\nYou can start a new one anytime 🙂</b>",
             reply_markup=main_menu_keyboard(user_id),
+            parse_mode="HTML",
         )
         bot.answer_callback_query(call.id, "Chat ended")
         return
@@ -2398,7 +2404,7 @@ def callback_handler(call):
                 return
             if not can_activate_chat(user_id, match_id):
                 reply_markup = chat_limit_keyboard() if not get_user(user_id)["paid"] else main_menu_keyboard(user_id)
-                bot.send_message(user_id, chat_limit_message(user_id), reply_markup=reply_markup)
+                bot.send_message(user_id, chat_limit_message(user_id), reply_markup=reply_markup, parse_mode="HTML")
                 bot.answer_callback_query(call.id, "Cannot start chat")
                 return
             set_chat_state(user_id, match_id, "active")
@@ -2444,8 +2450,9 @@ def callback_handler(call):
                 remove_match_from_inbox(user_id, match_id)
                 bot.send_message(
                     user_id,
-                    "This chat has ended.\n\nYou can start a new one anytime 🙂",
+                    "<b>This chat has ended.\n\nYou can start a new one anytime 🙂</b>",
                     reply_markup=main_menu_keyboard(user_id),
+                    parse_mode="HTML",
                 )
                 bot.answer_callback_query(call.id, "Chat ended")
                 return
@@ -2457,7 +2464,7 @@ def callback_handler(call):
                 set_chat_state(user_id, match_id, "blocked")
                 append_system_message(user_id, match_id, "This chat is no longer available.")
                 remove_match_from_inbox(user_id, match_id)
-                bot.send_message(user_id, "This chat is no longer available.", reply_markup=main_menu_keyboard(user_id))
+                bot.send_message(user_id, "<b>This chat is no longer available.</b>", reply_markup=main_menu_keyboard(user_id), parse_mode="HTML")
                 bot.answer_callback_query(call.id, "Chat blocked")
                 return
 
@@ -2570,8 +2577,9 @@ def callback_handler(call):
         )
         bot.send_message(
             user_id,
-            f"💎 VIP Activated!\n\nPlan: {plan_label}\n⏳ Valid till: {time.strftime('%d %b %Y', time.localtime(end_ts))}",
+            f"<b>💎 VIP Activated!\n\nPlan: {plan_label}\n⏳ Valid till: {time.strftime('%d %b %Y', time.localtime(end_ts))}</b>",
             reply_markup=main_menu_keyboard(user_id),
+            parse_mode="HTML",
         )
         bot.answer_callback_query(call.id, "Approved")
         send_next_pending_to_admin(call.message.chat.id)
@@ -2618,8 +2626,9 @@ def callback_handler(call):
         # Send activation message to user
         bot.send_message(
             user_id,
-            "VIP activated 💎\n\nYou can now start up to 5 chats in total\n(including any chats you've already used)\n\nChoose wisely 😉",
+            "<b>VIP activated 💎\n\nYou can now start up to 5 chats in total\n(including any chats you've already used)\n\nChoose wisely 😉</b>",
             reply_markup=main_menu_keyboard(user_id),
+            parse_mode="HTML",
         )
         bot.answer_callback_query(call.id, "Approved")
         
@@ -2811,7 +2820,7 @@ def text_handler(message):
             return
         if not can_activate_chat(user_id, match_id):
             reply_markup = chat_limit_keyboard() if not user["paid"] else main_menu_keyboard(user_id)
-            bot.send_message(user_id, chat_limit_message(user_id), reply_markup=reply_markup)
+            bot.send_message(user_id, chat_limit_message(user_id), reply_markup=reply_markup, parse_mode="HTML")
             return
         chats_left = get_chats_left(user_id)
         markup = InlineKeyboardMarkup()
@@ -2828,11 +2837,11 @@ def text_handler(message):
 
     if text == BTN_END_CHAT:
         if not user["current_match_id"]:
-            bot.send_message(user_id, "Open a chat first.", reply_markup=main_menu_keyboard(user_id))
+            bot.send_message(user_id, "<b>Open a chat first.</b>", reply_markup=main_menu_keyboard(user_id), parse_mode="HTML")
             return
         match_id = user["current_match_id"]
         if get_chat_state(user_id, match_id) != "active":
-            bot.send_message(user_id, inactive_chat_message())
+            bot.send_message(user_id, inactive_chat_message(), parse_mode="HTML")
             return
         chats_left = get_chats_left(user_id)
         markup = InlineKeyboardMarkup()
@@ -2932,7 +2941,7 @@ def text_handler(message):
                         user.setdefault("chat_started_notified", {})[match_id_str] = True
                         save_state()
             return
-        bot.send_message(user_id, inactive_chat_message())
+        bot.send_message(user_id, inactive_chat_message(), parse_mode="HTML")
         return
 
 
