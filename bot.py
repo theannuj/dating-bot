@@ -676,10 +676,7 @@ def chat_limit_message(user_id):
 
 
 def unlock_vip_usage_message(user_id):
-    user = get_user(user_id)
-    if user.get("payment_status") == "approved":
-        return "You've used all your chats\n\nUnlock VIP again to continue 🔓"
-    return "You've used all your chats\n\nUnlock VIP to continue 🔓"
+    return "You've used your free chat.\nUnlock VIP to continue \U0001F513"
 
 
 def is_visible_in_inbox(user_id, match_id):
@@ -1065,6 +1062,16 @@ def match_keyboard(paid):
     if paid:
         return build_keyboard([BTN_CHAT, BTN_END_CHAT], [BTN_MATCHES, BTN_MAIN_MENU])
     return build_keyboard([BTN_CHAT, BTN_NEXT_MATCH], [BTN_MAIN_MENU])
+
+
+def active_chat_keyboard():
+    return build_keyboard([BTN_CHAT, BTN_END_CHAT], [BTN_NEXT_MATCH, BTN_MAIN_MENU])
+
+
+def get_chat_keyboard(user_id, match_id):
+    if get_chat_state(user_id, match_id) == "active":
+        return active_chat_keyboard()
+    return match_keyboard(get_user(user_id)["paid"])
 
 
 def match_nav_keyboard():
@@ -1603,9 +1610,15 @@ def show_prev_match(user_id):
     send_match_card(user_id, matches[prev_cursor])
 
 
+def inactive_chat_message():
+    return "Open the chat first to start messaging"
+
+
 def text_from_message(message):
     if message.content_type == "text":
         return message.text
+    if message.content_type == "photo":
+        return "[Photo]"
     return "[non-text message]"
 
 
@@ -1672,37 +1685,32 @@ def open_match_chat(user_id, match_id, show_history=True):
         )
         return
 
-    if state == "available" and not can_activate_chat(user_id, match_id):
-        reply_markup = chat_limit_keyboard() if not user["paid"] else main_menu_keyboard(user_id)
-        bot.send_message(user_id, chat_limit_message(user_id), reply_markup=reply_markup)
-        return
-
     match_profile = get_profile(match_id)
     with state_lock:
         user = get_user(user_id)
         user["chat_open"] = True
         user["active_view"] = "chat"
         user["current_match_id"] = match_id
-        paid = user["paid"]
         save_state()
     reset_unread(user_id, match_id)
     if not show_history:
         return
+    reply_markup = get_chat_keyboard(user_id, match_id)
     name = match_profile["name"] if match_profile else "your match"
     if match_profile:
         bot.send_photo(
             user_id,
             match_profile["photo"],
             caption=f"<b>{match_profile['name']}</b>, {match_profile['age']}",
-            reply_markup=match_keyboard(paid),
+            reply_markup=reply_markup,
             parse_mode="HTML",
         )
     history = get_recent_chat_history(user_id, match_id)
-    bot.send_message(user_id, format_chat_history(name, history), reply_markup=match_keyboard(paid), parse_mode="HTML")
+    bot.send_message(user_id, format_chat_history(name, history), reply_markup=reply_markup, parse_mode="HTML")
     bot.send_message(
         user_id,
         "Say something… don't be boring 😄",
-        reply_markup=match_keyboard(paid),
+        reply_markup=reply_markup,
     )
 
 
@@ -1916,7 +1924,7 @@ def admin_direct_reply(message):
         bot.send_message(
             user_id,
             f"<b>{match_name}:</b> {text}",
-            reply_markup=match_keyboard(user["paid"]),
+            reply_markup=get_chat_keyboard(user_id, match_id),
             parse_mode="HTML"
         )
     except:
@@ -1954,7 +1962,7 @@ def admin_reply_handler(message):
             bot.send_message(
                 user_id,
                 f"<b>{match_name}:</b> {message.text}",
-                reply_markup=match_keyboard(user["paid"]),
+                reply_markup=get_chat_keyboard(user_id, match_id),
                 parse_mode="HTML"
             )
         except:
@@ -2008,24 +2016,10 @@ def photo_handler(message):
     if user["chat_open"] and user["current_match_id"]:
         match_id = user["current_match_id"]
         state = get_chat_state(user_id, match_id)
-        if state == "blocked":
-            bot.send_message(user_id, "This chat is no longer available.", reply_markup=main_menu_keyboard(user_id))
+        if state != "active":
+            bot.send_message(user_id, inactive_chat_message())
             return
-        if state == "ended":
-            bot.send_message(user_id, "This chat has ended.", reply_markup=main_menu_keyboard(user_id))
-            return
-        if state == "locked" and not user["paid"]:
-            bot.send_message(user_id, "<b>She was about to say something…</b>\n\nUnlock to continue �", reply_markup=likes_locked_keyboard(), parse_mode="HTML")
-            return
-        if state in {"available", "locked"}:
-            if not can_activate_chat(user_id, match_id):
-                reply_markup = chat_limit_keyboard() if not user["paid"] else main_menu_keyboard(user_id)
-                bot.send_message(user_id, chat_limit_message(user_id), reply_markup=reply_markup)
-                return
-            set_chat_state(user_id, match_id, "active")
-        append_chat_message(user_id, match_id, "user", "[Photo]")
-        increment_admin_unread(user_id, match_id)
-        maybe_send_fomo_message(user_id, match_id)
+        forward_user_message_to_admins(message)
         return
 
     if user["awaiting_payment"]:
@@ -2101,9 +2095,6 @@ def callback_handler(call):
     if call.data == "userend_yes":
         user_id = call.message.chat.id
         user = get_user(user_id)
-        if not user["paid"]:
-            bot.answer_callback_query(call.id, "VIP required")
-            return
         if not user["current_match_id"]:
             bot.answer_callback_query(call.id, "Open a chat first")
             return
@@ -2133,12 +2124,19 @@ def callback_handler(call):
             bot.answer_callback_query(call.id, "Invalid match")
             return
         match_id = int(match_id_str)
-        print(f"DEBUG: thread.state = {get_chat_state(user_id, match_id)}")
-        if not can_start_new_chat(user_id):
-            bot.send_message(user_id, unlock_vip_usage_message(user_id), reply_markup=main_menu_keyboard(user_id))
-            bot.answer_callback_query(call.id, "No chats left")
-            return
-        set_chat_state(user_id, match_id, "active")
+        state = get_chat_state(user_id, match_id)
+        print(f"DEBUG: thread.state = {state}")
+        if state != "active":
+            if not can_start_new_chat(user_id):
+                bot.send_message(user_id, unlock_vip_usage_message(user_id), reply_markup=chat_limit_keyboard())
+                bot.answer_callback_query(call.id, "No chats left")
+                return
+            if not can_activate_chat(user_id, match_id):
+                reply_markup = chat_limit_keyboard() if not get_user(user_id)["paid"] else main_menu_keyboard(user_id)
+                bot.send_message(user_id, chat_limit_message(user_id), reply_markup=reply_markup)
+                bot.answer_callback_query(call.id, "Cannot start chat")
+                return
+            set_chat_state(user_id, match_id, "active")
         bot.edit_message_text("Opening chat...", user_id, call.message.message_id)
         open_match_chat(user_id, match_id, show_history=True)
         bot.answer_callback_query(call.id, "Chat opened")
@@ -2487,7 +2485,11 @@ def text_handler(message):
             open_match_chat(user_id, match_id, show_history=True)
             return
         if not can_start_new_chat(user_id):
-            bot.send_message(user_id, unlock_vip_usage_message(user_id), reply_markup=main_menu_keyboard(user_id))
+            bot.send_message(user_id, unlock_vip_usage_message(user_id), reply_markup=chat_limit_keyboard())
+            return
+        if not can_activate_chat(user_id, match_id):
+            reply_markup = chat_limit_keyboard() if not user["paid"] else main_menu_keyboard(user_id)
+            bot.send_message(user_id, chat_limit_message(user_id), reply_markup=reply_markup)
             return
         chats_left = get_chats_left(user_id)
         markup = InlineKeyboardMarkup()
@@ -2503,13 +2505,13 @@ def text_handler(message):
         return
 
     if text == BTN_END_CHAT:
-        if not user["paid"]:
-            bot.send_message(user_id, "This option is available after VIP unlock.", reply_markup=main_menu_keyboard(user_id))
-            return
         if not user["current_match_id"]:
             bot.send_message(user_id, "Open a chat first.", reply_markup=main_menu_keyboard(user_id))
             return
         match_id = user["current_match_id"]
+        if get_chat_state(user_id, match_id) != "active":
+            bot.send_message(user_id, inactive_chat_message())
+            return
         chats_left = get_chats_left(user_id)
         markup = InlineKeyboardMarkup()
         markup.row(
@@ -2608,23 +2610,8 @@ def text_handler(message):
                         user.setdefault("chat_started_notified", {})[match_id_str] = True
                         save_state()
             return
-        else:
-            # Chat is not active, block message
-            if state == "available":
-                if not can_start_new_chat(user_id):
-                    bot.send_message(user_id, "You've used all your chats\n\nUnlock VIP to continue 🔓", reply_markup=main_menu_keyboard(user_id))
-                else:
-                    bot.send_message(user_id, "Open the chat first to start messaging", reply_markup=main_menu_keyboard(user_id))
-            elif state == "blocked":
-                bot.send_message(user_id, "This chat is no longer available.", reply_markup=main_menu_keyboard(user_id))
-            elif state == "ended":
-                bot.send_message(user_id, "This chat has ended.", reply_markup=main_menu_keyboard(user_id))
-            elif state == "locked":
-                if user["paid"]:
-                    bot.send_message(user_id, "This chat is locked.", reply_markup=main_menu_keyboard(user_id))
-                else:
-                    bot.send_message(user_id, "<b>She was about to say something…</b>\n\nUnlock to continue 🔑", reply_markup=likes_locked_keyboard(), parse_mode="HTML")
-            return
+        bot.send_message(user_id, inactive_chat_message())
+        return
 
 
 def periodic_state_save():
