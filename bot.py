@@ -17,7 +17,7 @@ ADMIN_A_ID = 8511880633
 ADMIN_B_ID = 5754861439
 PAYMENT_ADMINS = [MAIN_ADMIN_ID]
 CHAT_ADMINS = [MAIN_ADMIN_ID, ADMIN_A_ID, ADMIN_B_ID]
-PAYMENT_LINK = "https://midnightmatch.creatorapp.club?callback=/fan-home?tier=998255026087117578"
+PAYMENT_LINK = "https://tinyurl.com/SwipeSecretChats"
 VIP_PLAN_DAYS = {
     "1m": ("1 Month", 30),
     "3m": ("3 Months", 90),
