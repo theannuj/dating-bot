@@ -206,7 +206,7 @@ BTN_BUY = "🔑 Unlock Chat"
 BTN_VIEW_PROFILE = "View profile"
 BTN_LIKE = "💚"
 BTN_SKIP = "❌"
-BTN_MAIN_MENU = "Main menu"
+BTN_MAIN_MENU = "🏠 Main Menu"
 BTN_SEND_GIFT = "🎁 Send gift"
 BTN_SEE_LIKES = "See who likes you"
 BTN_GET_VIP = "🔒 Get VIP"
@@ -216,10 +216,10 @@ BTN_BOOST = "🚀 Boost"
 BTN_VIP = "🔑 Unlock Chat"
 BTN_CHAT = "💬 Chat"
 BTN_SEND_PAYMENT = "Send payment screenshot"
-BTN_NEXT_MATCH = "Next match"
+BTN_NEXT_MATCH = "➡️ Next Match"
 BTN_PREV_MATCH = "⬅️ Prev"
 BTN_MATCH_NEXT = "➡️ Next"
-BTN_END_CHAT = "End Chat"
+BTN_END_CHAT = "❌ End Chat"
 BTN_ADMIN_CHATS = "💬 Admin Chats"
 BTN_ADMIN_REFRESH = "🔄 Refresh"
 BTN_ADMIN_UNREAD = "📩 Unread Only"
@@ -1298,11 +1298,11 @@ def settings_keyboard():
 def match_keyboard(paid):
     if paid:
         return build_keyboard([BTN_CHAT, BTN_END_CHAT], [BTN_MATCHES, BTN_MAIN_MENU])
-    return build_keyboard([BTN_CHAT, BTN_NEXT_MATCH], [BTN_MAIN_MENU])
+    return build_keyboard([BTN_CHAT, BTN_NEXT_MATCH], [BTN_MAIN_MENU, BTN_END_CHAT])
 
 
 def active_chat_keyboard():
-    return build_keyboard([BTN_CHAT, BTN_END_CHAT], [BTN_NEXT_MATCH, BTN_MAIN_MENU])
+    return build_keyboard([BTN_CHAT, BTN_NEXT_MATCH], [BTN_MAIN_MENU, BTN_END_CHAT])
 
 
 def get_chat_keyboard(user_id, match_id):
