@@ -576,16 +576,9 @@ def save_state():
         try:
             with STATE_FILE.open("w", encoding="utf-8") as file:
                 json.dump(payload, file, ensure_ascii=False, indent=2)
-                file.flush()  # Force flush to disk
-                os.fsync(file.fileno())  # Ensure write to physical disk
-            print(f"💾 State saved: {len(users)} users")
         except Exception as e:
             print(f"❌ Error saving state: {e}")
             pass
-        
-        # Also save full user data to PostgreSQL for persistence
-        for uid, user in users.items():
-            save_user_to_db(uid, user)
 
 
 def get_user(user_id):
@@ -605,7 +598,6 @@ def get_user(user_id):
             or user.get("chat_limit") != old_chat_limit
             or user.get("payment_status") != old_payment_status
         ):
-            save_state()
         return user
 
 
@@ -735,7 +727,6 @@ def append_chat_message(user_id, match_id, sender, text):
         thread = ensure_chat_thread(user, match_id)
         thread["messages"].append({"sender": sender, "text": text, "ts": int(time.time())})
         thread["messages"] = thread["messages"][-MAX_CHAT_MESSAGES:]
-        save_state()
 
 
 def increment_unread(user_id, match_id):
@@ -743,7 +734,6 @@ def increment_unread(user_id, match_id):
         user = get_user(user_id)
         thread = ensure_chat_thread(user, match_id)
         thread["user_unread"] += 1
-        save_state()
 
 
 def reset_unread(user_id, match_id):
@@ -751,7 +741,6 @@ def reset_unread(user_id, match_id):
         user = get_user(user_id)
         thread = ensure_chat_thread(user, match_id)
         thread["user_unread"] = 0
-        save_state()
 
 
 def get_unread_count(user_id, match_id):
@@ -838,7 +827,6 @@ def remove_match_from_inbox(user_id, match_id):
             if user.get("active_view") in {"match", "chat", "inbox"}:
                 user["active_view"] = "menu"
         
-        save_state()
     
     # Only sync paid users to vip_users table to prevent free user data loss
     # Free users rely on the full users table for match persistence
@@ -1979,7 +1967,6 @@ def start_handler(message):
     with state_lock:
         user["chat_open"] = False
         user["active_view"] = "start"
-        save_state()
     send_welcome_screen(message.chat.id)
 
 
