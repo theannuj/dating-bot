@@ -598,7 +598,7 @@ def get_user(user_id):
             or user.get("chat_limit") != old_chat_limit
             or user.get("payment_status") != old_payment_status
         ):
-        pass
+            pass
         return user
 
 
