@@ -48,36 +48,94 @@ def get_db_connection():
         return None
     try:
         print("Connecting to DB...")
-        conn = psycopg2.connect(database_url)
+        conn = psycopg2.connect(database_url, connect_timeout=60)
+        conn.set_client_encoding("UTF8")
         cur = conn.cursor()
         cur.execute("SELECT current_database()")
         print("Connected DB:", cur.fetchone())
         cur.close()
         return conn
-    except:
+    except Exception as e:
+        print(f"DB connection error: {e}", flush=True)
         return None
+
+
+def normalize_storage_value(value):
+    return repair_mojibake_data(value)
+
+
+def parse_matches_payload(value):
+    if isinstance(value, list):
+        return normalize_storage_value(value)
+    if not value:
+        return []
+    try:
+        return normalize_storage_value(json.loads(value))
+    except Exception:
+        return []
+
+
+def user_record_score(record):
+    if not isinstance(record, dict):
+        return 0
+
+    score = 0
+    for key in ("name", "city", "photo", "gender", "step", "payment_status"):
+        if record.get(key):
+            score += 1
+
+    if record.get("agreed"):
+        score += 1
+    if record.get("paid"):
+        score += 2
+
+    for key in ("matches", "shown", "liked", "skipped", "incoming_likes", "used_openers", "pending_events"):
+        value = record.get(key)
+        if isinstance(value, list):
+            score += len(value)
+
+    chat_threads = record.get("chat_threads", {})
+    if isinstance(chat_threads, dict):
+        score += len(chat_threads) * 5
+        for thread in chat_threads.values():
+            if isinstance(thread, dict):
+                score += len(thread.get("messages", []))
+
+    profile_cache = record.get("profile_cache", {})
+    if isinstance(profile_cache, dict):
+        score += len(profile_cache)
+
+    return score
 
 
 def init_vip_table():
     conn = get_db_connection()
     if not conn:
         return
-    cur = conn.cursor()
-    cur.execute("""
-    CREATE TABLE IF NOT EXISTS vip_users (
-    user_id BIGINT PRIMARY KEY,
-    paid BOOLEAN,
-    payment_status TEXT,
-    matches TEXT,
-    vip_start_date BIGINT,
-    vip_end_date BIGINT
-    )
-    """)
-    cur.execute("ALTER TABLE vip_users ADD COLUMN IF NOT EXISTS vip_start_date BIGINT")
-    cur.execute("ALTER TABLE vip_users ADD COLUMN IF NOT EXISTS vip_end_date BIGINT")
-    conn.commit()
-    cur.close()
-    conn.close()
+    try:
+        cur = conn.cursor()
+        cur.execute("""
+        CREATE TABLE IF NOT EXISTS vip_users (
+        user_id BIGINT PRIMARY KEY,
+        paid BOOLEAN,
+        payment_status TEXT,
+        matches TEXT,
+        vip_start_date BIGINT,
+        vip_end_date BIGINT
+        )
+        """)
+        cur.execute("ALTER TABLE vip_users ADD COLUMN IF NOT EXISTS paid BOOLEAN")
+        cur.execute("ALTER TABLE vip_users ADD COLUMN IF NOT EXISTS payment_status TEXT")
+        cur.execute("ALTER TABLE vip_users ADD COLUMN IF NOT EXISTS matches TEXT")
+        cur.execute("ALTER TABLE vip_users ADD COLUMN IF NOT EXISTS vip_start_date BIGINT")
+        cur.execute("ALTER TABLE vip_users ADD COLUMN IF NOT EXISTS vip_end_date BIGINT")
+        conn.commit()
+        cur.close()
+    except Exception as e:
+        conn.rollback()
+        print(f"VIP table init error: {e}", flush=True)
+    finally:
+        conn.close()
 
 
 def save_vip_to_db(user_id, user):
@@ -86,6 +144,7 @@ def save_vip_to_db(user_id, user):
         print("DB not connected")
         return
     try:
+        normalized_user = normalize_storage_value(user)
         cur = conn.cursor()
         cur.execute("""
         INSERT INTO vip_users (user_id, paid, payment_status, matches, vip_start_date, vip_end_date)
@@ -98,20 +157,22 @@ def save_vip_to_db(user_id, user):
         vip_end_date = EXCLUDED.vip_end_date
         """, (
             user_id,
-            user.get("paid"),
-            user.get("payment_status"),
-            json.dumps(user.get("matches", [])),
-            user.get("vip_start_date"),
-            user.get("vip_end_date"),
+            normalized_user.get("paid"),
+            normalized_user.get("payment_status"),
+            json.dumps(normalized_user.get("matches", []), ensure_ascii=False),
+            normalized_user.get("vip_start_date"),
+            normalized_user.get("vip_end_date"),
         ))
         conn.commit()
         cur.execute("SELECT COUNT(*) FROM vip_users")
         count = cur.fetchone()[0]
         print("VIP rows after insert:", count)
         cur.close()
-        conn.close()
     except Exception as e:
-        print("DB error:", e)
+        conn.rollback()
+        print("DB error:", e, flush=True)
+    finally:
+        conn.close()
 
 
 def load_vip_from_db():
@@ -120,55 +181,48 @@ def load_vip_from_db():
         return {}
     try:
         cur = conn.cursor()
-        try:
-            cur.execute("SELECT user_id, paid, payment_status, matches, vip_start_date, vip_end_date FROM vip_users")
-            rows = cur.fetchall()
-            result = {
-                row[0]: {
-                    "paid": row[1],
-                    "payment_status": row[2],
-                    "matches": json.loads(row[3]) if row[3] else [],
-                    "vip_start_date": row[4],
-                    "vip_end_date": row[5],
-                }
-                for row in rows
+        cur.execute("SELECT user_id, paid, payment_status, matches, vip_start_date, vip_end_date FROM vip_users")
+        rows = cur.fetchall()
+        result = {
+            row[0]: {
+                "paid": row[1],
+                "payment_status": normalize_storage_value(row[2]),
+                "matches": parse_matches_payload(row[3]),
+                "vip_start_date": row[4],
+                "vip_end_date": row[5],
             }
-        except Exception:
-            conn.rollback()
-            cur.execute("SELECT user_id, paid, payment_status, matches FROM vip_users")
-            rows = cur.fetchall()
-            result = {
-                row[0]: {
-                    "paid": row[1],
-                    "payment_status": row[2],
-                    "matches": json.loads(row[3]) if row[3] else [],
-                    "vip_start_date": None,
-                    "vip_end_date": None,
-                }
-                for row in rows
-            }
+            for row in rows
+        }
         print("Rows fetched from DB:", len(rows))
         cur.close()
-        conn.close()
         return result
-    except:
+    except Exception as e:
+        print(f"VIP load error: {e}", flush=True)
         return {}
+    finally:
+        conn.close()
 
 
 def init_users_table():
     conn = get_db_connection()
     if not conn:
         return
-    cur = conn.cursor()
-    cur.execute("""
-    CREATE TABLE IF NOT EXISTS users (
-    user_id BIGINT PRIMARY KEY,
-    data TEXT
-    )
-    """)
-    conn.commit()
-    cur.close()
-    conn.close()
+    try:
+        cur = conn.cursor()
+        cur.execute("""
+        CREATE TABLE IF NOT EXISTS users (
+        user_id BIGINT PRIMARY KEY,
+        data TEXT
+        )
+        """)
+        cur.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS data TEXT")
+        conn.commit()
+        cur.close()
+    except Exception as e:
+        conn.rollback()
+        print(f"Users table init error: {e}", flush=True)
+    finally:
+        conn.close()
 
 
 def save_user_to_db(user_id, user):
@@ -176,18 +230,47 @@ def save_user_to_db(user_id, user):
     if not conn:
         return
     try:
+        normalized_user = normalize_storage_value(user)
         cur = conn.cursor()
         cur.execute("""
         INSERT INTO users (user_id, data)
         VALUES (%s, %s)
         ON CONFLICT (user_id)
         DO UPDATE SET data = EXCLUDED.data
-        """, (user_id, json.dumps(user)))
+        """, (user_id, json.dumps(normalized_user, ensure_ascii=False)))
         conn.commit()
         cur.close()
-        conn.close()
     except Exception as e:
-        print(f"DB save error: {e}")
+        conn.rollback()
+        print(f"DB save error: {e}", flush=True)
+    finally:
+        conn.close()
+
+
+def save_all_users_to_db(users_map):
+    conn = get_db_connection()
+    if not conn:
+        return
+    try:
+        cur = conn.cursor()
+        rows = [
+            (user_id, json.dumps(normalize_storage_value(user), ensure_ascii=False))
+            for user_id, user in users_map.items()
+        ]
+        if rows:
+            cur.executemany("""
+            INSERT INTO users (user_id, data)
+            VALUES (%s, %s)
+            ON CONFLICT (user_id)
+            DO UPDATE SET data = EXCLUDED.data
+            """, rows)
+            conn.commit()
+        cur.close()
+    except Exception as e:
+        conn.rollback()
+        print(f"Bulk DB save error: {e}", flush=True)
+    finally:
+        conn.close()
 
 
 def load_users_from_db():
@@ -199,10 +282,18 @@ def load_users_from_db():
         cur.execute("SELECT user_id, data FROM users")
         rows = cur.fetchall()
         cur.close()
-        conn.close()
-        return {str(row[0]): json.loads(row[1]) for row in rows}
-    except:
+        result = {}
+        for row in rows:
+            try:
+                result[int(row[0])] = normalize_storage_value(json.loads(row[1]))
+            except Exception as row_error:
+                print(f"Skipping bad user row {row[0]}: {row_error}", flush=True)
+        return result
+    except Exception as e:
+        print(f"Users load error: {e}", flush=True)
         return {}
+    finally:
+        conn.close()
 
 BTN_CONTINUE = "Continue"
 BTN_18_YES = "Yes, I am 18+ Ã¢Å“â€Ã¯Â¸Â"
@@ -414,10 +505,12 @@ admin_active_chat = {}
 LAST_ACTION_TIME = {}
 LAST_ACTIVITY_TIME = {}
 LAST_ENGAGEMENT_PING = {}
+LAST_DB_SYNC_TIME = 0
 COOLDOWN_SECONDS = 2.5
 INACTIVITY_MIN_SECONDS = 10 * 60
 INACTIVITY_MAX_SECONDS = 15 * 60
 INACTIVITY_CHECK_SECONDS = 60
+DB_SYNC_INTERVAL_SECONDS = 30
 
 
 def safe_send_message(bot, *args, **kwargs):
@@ -497,7 +590,7 @@ def load_profiles():
 
     try:
         with PROFILES_FILE.open("r", encoding="utf-8") as file:
-            data = json.load(file)
+            data = normalize_storage_value(json.load(file))
     except (json.JSONDecodeError, OSError):
         try:
             PROFILES_FILE.write_text("[]", encoding="utf-8")
@@ -623,6 +716,7 @@ def build_vip_status_lines(user):
 
 
 def prepare_user_record(payload):
+    payload = normalize_storage_value(payload)
     base = default_user()
     base.update(payload)
     if "matches" not in base:
@@ -640,36 +734,33 @@ def prepare_user_record(payload):
 
 
 def load_state():
-    # Try to load from PostgreSQL first (most reliable after restart)
-    db_users = load_users_from_db()
-    if db_users:
-        print(f"Ã¢Å“â€¦ Loaded {len(db_users)} users from PostgreSQL")
-        # Convert string keys back to int
-        restored = {int(uid): prepare_user_record(user) for uid, user in db_users.items()}
-    else:
-        restored = {}
-    
-    # Fallback to JSON if database is empty
-    if not restored and not STATE_FILE.exists():
+    file_users = {}
+    if not STATE_FILE.exists():
         try:
             STATE_FILE.write_text(json.dumps({"users": {}}, ensure_ascii=False, indent=2), encoding="utf-8")
         except OSError:
-            return {}
+            pass
 
     try:
         with STATE_FILE.open("r", encoding="utf-8") as file:
-            raw = json.load(file)
-    except (json.JSONDecodeError, OSError):
-        if not restored:
-            try:
-                STATE_FILE.write_text(json.dumps({"users": {}}, ensure_ascii=False, indent=2), encoding="utf-8")
-            except OSError:
-                pass
-        raw = {"users": {}}
+            raw = normalize_storage_value(json.load(file))
+            for user_id, payload in raw.get("users", {}).items():
+                file_users[int(user_id)] = prepare_user_record(payload)
+    except (json.JSONDecodeError, OSError) as e:
+        print(f"State file load error: {e}", flush=True)
+        file_users = {}
 
-    if not restored:
-        for user_id, payload in raw.get("users", {}).items():
-            restored[int(user_id)] = prepare_user_record(payload)
+    db_users = load_users_from_db()
+    restored = dict(file_users)
+
+    if db_users:
+        print(f"Loaded {len(db_users)} users from PostgreSQL")
+        for uid, payload in db_users.items():
+            prepared = prepare_user_record(payload)
+            if uid not in restored or user_record_score(prepared) >= user_record_score(restored[uid]):
+                restored[uid] = prepared
+
+    print(f"Loaded {len(file_users)} users from JSON backup")
 
     vip_data = load_vip_from_db()
     print("VIP DB loaded:", len(vip_data))
@@ -689,26 +780,42 @@ def load_state():
             restored[uid]["vip_end_date"] = vip.get("vip_end_date")
             restored[uid]["matches"] = vip.get("matches", [])
         sync_user_vip_state(restored[uid])
-    
-    # Debug: Show loaded users count and VIP count
+
     vip_count = sum(1 for u in restored.values() if is_vip_active(u))
-    print(f"Ã¢Å“â€¦ Loaded {len(restored)} users | VIP users: {vip_count}")
-    
+    print(f"Loaded {len(restored)} merged users | VIP users: {vip_count}")
+
     return restored
 
 
+init_vip_table()
+init_users_table()
 users = load_state()
+save_all_users_to_db(users)
+LAST_DB_SYNC_TIME = time.time()
+
+
+def maybe_sync_users_to_db(snapshot, force=False):
+    global LAST_DB_SYNC_TIME
+    now = time.time()
+    if not force and now - LAST_DB_SYNC_TIME < DB_SYNC_INTERVAL_SECONDS:
+        return
+    save_all_users_to_db(snapshot)
+    LAST_DB_SYNC_TIME = now
 
 
 def save_state():
     with state_lock:
-        payload = {"users": {str(user_id): data for user_id, data in users.items()}}
+        normalized_users = {str(user_id): normalize_storage_value(data) for user_id, data in users.items()}
+        payload = {"users": normalized_users}
         try:
             with STATE_FILE.open("w", encoding="utf-8") as file:
                 json.dump(payload, file, ensure_ascii=False, indent=2)
         except Exception as e:
-            print(f"Ã¢ÂÅ’ Error saving state: {e}")
-            pass
+            print(f"Error saving state: {e}", flush=True)
+        try:
+            maybe_sync_users_to_db({int(user_id): data for user_id, data in normalized_users.items()})
+        except Exception as e:
+            print(f"Error syncing users to DB: {e}", flush=True)
 
 
 def get_user(user_id):
@@ -3133,9 +3240,7 @@ def healthcheck():
 threading.Thread(target=inactivity_engagement_worker, daemon=True).start()
 threading.Thread(target=periodic_state_save, daemon=True).start()
 print("DATABASE_URL:", os.getenv("DATABASE_URL"))
-init_vip_table()
-init_users_table()
-print("VIP DB ready")
+print("DB schema ready")
 
 if __name__ == "__main__":
     configure_webhook()
