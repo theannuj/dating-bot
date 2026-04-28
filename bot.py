@@ -534,16 +534,12 @@ def safe_send_message(bot, *args, **kwargs):
     print(f"send_message failed after 3 attempts (chat_id={target})", flush=True)
 
 
-def safe_send_photo(bot, *args, **kwargs):
-    target = args[0] if args else kwargs.get("chat_id")
-    for attempt in range(1, 4):
-        try:
-            return bot.send_photo(*args, **kwargs)
-        except Exception as e:
-            print(f"send_photo error (attempt {attempt}/3, chat_id={target}): {e}", flush=True)
-            traceback.print_exc()
-            time.sleep(1.5)
-    print(f"send_photo failed after 3 attempts (chat_id={target})", flush=True)
+def safe_send_photo(bot, chat_id, photo, **kwargs):
+    try:
+        return bot.send_photo(chat_id, photo, **kwargs)
+    except Exception as e:
+        print(f"❌ Bad photo skipped (chat_id={chat_id}):", photo, flush=True)
+        return bot.send_message(chat_id, "Profile loaded")
 
 
 def safe_send_chat_action(bot, *args, **kwargs):
@@ -3268,7 +3264,7 @@ print("DB schema ready")
 
 if __name__ == "__main__":
     configure_webhook()
-    
+
     port = int(os.environ["PORT"])
 
     app.run(
