@@ -523,15 +523,11 @@ DB_USER_CACHE = {}
 
 
 def safe_send_message(bot, *args, **kwargs):
-    target = args[0] if args else kwargs.get("chat_id")
-    for attempt in range(1, 4):
-        try:
-            return bot.send_message(*args, **kwargs)
-        except Exception as e:
-            print(f"send_message error (attempt {attempt}/3, chat_id={target}): {e}", flush=True)
-            traceback.print_exc()
-            time.sleep(1.5)
-    print(f"send_message failed after 3 attempts (chat_id={target})", flush=True)
+    try:
+        return bot.send_message(*args, **kwargs)
+    except Exception as e:
+        print(f"send_message error: {e}", flush=True)
+        return None
 
 
 def safe_send_photo(bot, chat_id, photo, **kwargs):
@@ -1796,7 +1792,7 @@ def choose_next_profile(user):
 
 
 def profile_caption_from_view(profile, profile_view, detailed=False):
-    lines = [f"❤️ <b>{profile['name']}</b>, {profile['age']}", f"🟢 {profile_view['activity']}"]
+    lines = [f"♀️ <b>{profile['name']}</b>, {profile['age']}", f"🟢 {profile_view['activity']}"]
     return "\n".join(lines)
 
 
