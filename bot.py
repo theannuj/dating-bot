@@ -1,4 +1,4 @@
-import html
+﻿import html
 import json
 import os
 import random
@@ -9,7 +9,11 @@ from pathlib import Path
 
 import psycopg2
 import telebot
+from telebot import apihelper
 from telebot.types import InlineKeyboardButton, InlineKeyboardMarkup, ReplyKeyboardMarkup, ReplyKeyboardRemove
+
+apihelper.CONNECT_TIMEOUT = 60
+apihelper.READ_TIMEOUT = 60
 
 TOKEN = os.getenv("BOT_TOKEN")
 MAIN_ADMIN_ID = 526264365
@@ -193,42 +197,42 @@ def load_users_from_db():
         return {}
 
 BTN_CONTINUE = "Continue"
-BTN_18_YES = "Yes, I am 18+ ✔️"
-BTN_GENDER_MALE = "👨 Male"
-BTN_GENDER_FEMALE = "👩 Female"
+BTN_18_YES = "Yes, I am 18+ âœ”ï¸"
+BTN_GENDER_MALE = "ðŸ‘¨ Male"
+BTN_GENDER_FEMALE = "ðŸ‘© Female"
 BTN_READ_AGREEMENT = "Read agreement"
 BTN_AGREE_CONTINUE = "Agree & Continue"
-BTN_START = "🔥 Start"
-BTN_MATCHES = "💖 Matches"
-BTN_LIKES = "👀 Likes"
-BTN_SETTINGS = "⚙️ Settings"
-BTN_BUY = "🔑 Unlock Chat"
+BTN_START = "ðŸ”¥ Start"
+BTN_MATCHES = "ðŸ’– Matches"
+BTN_LIKES = "ðŸ‘€ Likes"
+BTN_SETTINGS = "âš™ï¸ Settings"
+BTN_BUY = "ðŸ”‘ Unlock Chat"
 BTN_VIEW_PROFILE = "View profile"
-BTN_LIKE = "💚"
-BTN_SKIP = "❌"
-BTN_MAIN_MENU = "🏠 Main Menu"
-BTN_SEND_GIFT = "🎁 Send gift"
+BTN_LIKE = "ðŸ’š"
+BTN_SKIP = "âŒ"
+BTN_MAIN_MENU = "ðŸ  Main Menu"
+BTN_SEND_GIFT = "ðŸŽ Send gift"
 BTN_SEE_LIKES = "See who likes you"
-BTN_GET_VIP = "🔒 Get VIP"
-BTN_MY_PROFILE = "👤 My profile"
-BTN_SEARCH_SETTINGS = "🔎 Search settings"
-BTN_BOOST = "🚀 Boost"
-BTN_VIP = "🔑 Unlock Chat"
-BTN_CHAT = "💬 Chat"
+BTN_GET_VIP = "ðŸ”’ Get VIP"
+BTN_MY_PROFILE = "ðŸ‘¤ My profile"
+BTN_SEARCH_SETTINGS = "ðŸ”Ž Search settings"
+BTN_BOOST = "ðŸš€ Boost"
+BTN_VIP = "ðŸ”‘ Unlock Chat"
+BTN_CHAT = "ðŸ’¬ Chat"
 BTN_SEND_PAYMENT = "Send payment screenshot"
-BTN_NEXT_MATCH = "➡️ Next Match"
-BTN_PREV_MATCH = "⬅️ Prev"
-BTN_MATCH_NEXT = "➡️ Next"
-BTN_END_CHAT = "❌ End Chat"
-BTN_ADMIN_CHATS = "💬 Admin Chats"
-BTN_ADMIN_REFRESH = "🔄 Refresh"
-BTN_ADMIN_UNREAD = "📩 Unread Only"
-BTN_ADMIN_PANEL = "📊 Admin Panel"
-BTN_ADMIN_STATS = "📊 Stats"
-BTN_ADMIN_PENDING = "⏳ Pending"
-BTN_ADMIN_BACK = "🔙 Back"
-BTN_CONFIRM_END_CHAT = "✅ Yes, End Chat"
-BTN_CANCEL_END_CHAT = "❌ Cancel"
+BTN_NEXT_MATCH = "âž¡ï¸ Next Match"
+BTN_PREV_MATCH = "â¬…ï¸ Prev"
+BTN_MATCH_NEXT = "âž¡ï¸ Next"
+BTN_END_CHAT = "âŒ End Chat"
+BTN_ADMIN_CHATS = "ðŸ’¬ Admin Chats"
+BTN_ADMIN_REFRESH = "ðŸ”„ Refresh"
+BTN_ADMIN_UNREAD = "ðŸ“© Unread Only"
+BTN_ADMIN_PANEL = "ðŸ“Š Admin Panel"
+BTN_ADMIN_STATS = "ðŸ“Š Stats"
+BTN_ADMIN_PENDING = "â³ Pending"
+BTN_ADMIN_BACK = "ðŸ”™ Back"
+BTN_CONFIRM_END_CHAT = "âœ… Yes, End Chat"
+BTN_CANCEL_END_CHAT = "âŒ Cancel"
 BTN_START_OVER = "Start Over"
 MAX_CHAT_MESSAGES = 30
 CHAT_PREVIEW_MESSAGES = 8
@@ -251,7 +255,7 @@ BIOS = [
     "A little shy at first, but warm once comfortable.",
     "Here for good vibes and better conversations.",
     "Not always online, but worth the wait.",
-    "A bit naughty, a bit sweet 😉",
+    "A bit naughty, a bit sweet ðŸ˜‰",
     "More into chemistry than small talk.",
     "Soft heart, sharp mind, easy smile.",
     "Coffee first, feelings later.",
@@ -271,47 +275,47 @@ BIOS = [
 
 OPENERS = [
     # --- Short & natural ---
-    "hey…",
+    "heyâ€¦",
     "hmm hi",
     "hey you",
     "hi :)",
-    "hmm…",
-    "hello… maybe 😄",
+    "hmmâ€¦",
+    "helloâ€¦ maybe ðŸ˜„",
     
     # --- Curious ---
-    "you seem interesting 👀",
-    "hmm… not sure why I texted",
-    "idk… just felt like texting",
-    "you don't look boring 😄",
-    "something about you…",
-    "okay… I'm curious now",
+    "you seem interesting ðŸ‘€",
+    "hmmâ€¦ not sure why I texted",
+    "idkâ€¦ just felt like texting",
+    "you don't look boring ðŸ˜„",
+    "something about youâ€¦",
+    "okayâ€¦ I'm curious now",
     
     # --- Soft human feel ---
-    "wasn't going to text… but okay",
-    "I usually don't text first 😅",
-    "this feels random 😄",
+    "wasn't going to textâ€¦ but okay",
+    "I usually don't text first ðŸ˜…",
+    "this feels random ðŸ˜„",
     "hmm this is a bit weird",
-    "not sure if I should say hi…",
+    "not sure if I should say hiâ€¦",
     
     # --- Playful doubt (trust builder) ---
-    "you're real right? 😅",
+    "you're real right? ðŸ˜…",
     "tum real ho na?",
-    "btw you're not a bot… right?",
-    "don't tell me you're a bot 😄",
-    "idk thoda suspicious lag raha 😄",
+    "btw you're not a botâ€¦ right?",
+    "don't tell me you're a bot ðŸ˜„",
+    "idk thoda suspicious lag raha ðŸ˜„",
     
     # --- Light tease ---
-    "you look like trouble 😄",
-    "I think you reply late…",
-    "don't be boring please 😄",
+    "you look like trouble ðŸ˜„",
+    "I think you reply lateâ€¦",
+    "don't be boring please ðŸ˜„",
     "let's see how this goes",
-    "try not to be dry 😏",
+    "try not to be dry ðŸ˜",
     
     # --- Light question (limited use) ---
-    "btw where are you from? 😄",
+    "btw where are you from? ðŸ˜„",
     "tum kaha se ho?",
-    "random… where are you from?",
-    "I feel you're not from here 😄",
+    "randomâ€¦ where are you from?",
+    "I feel you're not from here ðŸ˜„",
     "waise tum kaha ke ho?",
 ]
 
@@ -335,6 +339,31 @@ INACTIVITY_MAX_SECONDS = 15 * 60
 INACTIVITY_CHECK_SECONDS = 60
 
 
+def safe_send_message(bot, *args, **kwargs):
+    for _ in range(3):
+        try:
+            return bot.send_message(*args, **kwargs)
+        except Exception as e:
+            print(f"send_message error: {e}")
+            time.sleep(1.5)
+
+
+def safe_send_photo(bot, *args, **kwargs):
+    for _ in range(3):
+        try:
+            return bot.send_photo(*args, **kwargs)
+        except Exception as e:
+            print(f"send_photo error: {e}")
+            time.sleep(1.5)
+
+
+def safe_send_chat_action(bot, *args, **kwargs):
+    try:
+        return bot.send_chat_action(*args, **kwargs)
+    except Exception as e:
+        print(f"chat_action error: {e}")
+
+
 def is_on_cooldown(user_id):
     now = time.time()
     last = LAST_ACTION_TIME.get(user_id, 0)
@@ -350,12 +379,12 @@ def touch_user_activity(user_id):
 
 
 def send_typing_then_message(user_id, text, reply_markup=None, parse_mode=None, delay=None):
-    bot.send_chat_action(user_id, "typing")
+    safe_send_chat_action(bot, user_id, "typing")
     time.sleep(delay if delay is not None else typing_delay_for_text(text))
     if parse_mode is None:
         text = f"<b>{text}</b>"
         parse_mode = "HTML"
-    bot.send_message(user_id, text, reply_markup=reply_markup, parse_mode=parse_mode)
+    safe_send_message(bot, user_id, text, reply_markup=reply_markup, parse_mode=parse_mode)
 
 
 def load_profiles():
@@ -486,7 +515,7 @@ def format_vip_expiry_date(user):
 def build_vip_status_lines(user):
     if is_vip_active(user):
         return [
-            "VIP: Active 💎",
+            "VIP: Active ðŸ’Ž",
             f"\u23F3 {get_vip_remaining_days(user)} days remaining",
         ]
     return ["VIP: Not Active"]
@@ -513,7 +542,7 @@ def load_state():
     # Try to load from PostgreSQL first (most reliable after restart)
     db_users = load_users_from_db()
     if db_users:
-        print(f"✅ Loaded {len(db_users)} users from PostgreSQL")
+        print(f"âœ… Loaded {len(db_users)} users from PostgreSQL")
         # Convert string keys back to int
         restored = {int(uid): prepare_user_record(user) for uid, user in db_users.items()}
     else:
@@ -562,7 +591,7 @@ def load_state():
     
     # Debug: Show loaded users count and VIP count
     vip_count = sum(1 for u in restored.values() if is_vip_active(u))
-    print(f"✅ Loaded {len(restored)} users | VIP users: {vip_count}")
+    print(f"âœ… Loaded {len(restored)} users | VIP users: {vip_count}")
     
     return restored
 
@@ -577,7 +606,7 @@ def save_state():
             with STATE_FILE.open("w", encoding="utf-8") as file:
                 json.dump(payload, file, ensure_ascii=False, indent=2)
         except Exception as e:
-            print(f"❌ Error saving state: {e}")
+            print(f"âŒ Error saving state: {e}")
             pass
 
 
@@ -711,7 +740,7 @@ def mirror_admin_reply_to_main_admin(source_admin_id, user_id, match_id, text):
         return
     profile = get_profile(match_id)
     match_name = profile["name"] if profile else "Match"
-    sent = bot.send_message(
+    sent = safe_send_message(bot, 
         MAIN_ADMIN_ID,
         f"<b>{html.escape(match_name)}:</b> {html.escape(text)}",
         parse_mode="HTML",
@@ -897,8 +926,8 @@ def chat_limit_message(user_id):
 def unlock_vip_usage_message(user_id):
     user = get_user(user_id)
     if user.get("vip_start_date") is not None:
-        return "<b>You've reached your chat limit.\nRenew VIP to continue 🔓</b>"
-    return "<b>You've used your free chat.\nUnlock VIP to continue 🔓</b>"
+        return "<b>You've reached your chat limit.\nRenew VIP to continue ðŸ”“</b>"
+    return "<b>You've used your free chat.\nUnlock VIP to continue ðŸ”“</b>"
 
 
 def is_visible_in_inbox(user_id, match_id):
@@ -962,15 +991,15 @@ def get_last_message_preview(user_id, match_id, limit=40):
 
 def format_admin_chat_history(user_id, user_name, match_name, messages, unread_count, chat_state):
     user = get_user(user_id)
-    tag = "🟢 VIP" if user.get("paid") else "🟡 FREE"
-    lines = [f"💬 <b>{html.escape(user_name)}</b> × <b>{html.escape(match_name)}</b> {tag}"]
+    tag = "ðŸŸ¢ VIP" if user.get("paid") else "ðŸŸ¡ FREE"
+    lines = [f"ðŸ’¬ <b>{html.escape(user_name)}</b> Ã— <b>{html.escape(match_name)}</b> {tag}"]
     if user["paid"]:
-        lines.append("💎 VIP: Active")
+        lines.append("ðŸ’Ž VIP: Active")
         lines.append(f"Plan: {get_vip_plan_label(user)}")
         lines.append(f"\u23F3 {get_vip_remaining_days(user)} days remaining")
         lines.append(f"Expires: {format_vip_expiry_date(user)}")
     else:
-        lines.append("💎 VIP: Not Active")
+        lines.append("ðŸ’Ž VIP: Not Active")
     if unread_count:
         lines.append(f"Unread: {unread_count}")
     lines.append(f"State: {chat_state}")
@@ -1003,11 +1032,11 @@ def notify_user_of_match_message(user_id, match_id, text):
         message_text = f"<b>{html.escape(match_name)}:</b> {html.escape(text)}"
     else:
         message_text = (
-            f"<b>💬 New message from {html.escape(match_name)}</b>\n\n"
+            f"<b>ðŸ’¬ New message from {html.escape(match_name)}</b>\n\n"
             f"<b>{html.escape(match_name)}:</b> {html.escape(text)}"
         )
 
-    bot.send_message(user_id, message_text, reply_markup=match_keyboard(bool(user["paid"])), parse_mode="HTML")
+    safe_send_message(bot, user_id, message_text, reply_markup=match_keyboard(bool(user["paid"])), parse_mode="HTML")
 
 
 def typing_delay_for_text(text):
@@ -1020,7 +1049,7 @@ def typing_delay_for_text(text):
 
 
 def send_typing_then_match_message(user_id, match_id, text, delay=None):
-    bot.send_chat_action(user_id, 'typing')
+    safe_send_chat_action(bot, user_id, 'typing')
     time.sleep(delay if delay is not None else typing_delay_for_text(text))
     notify_user_of_match_message(user_id, match_id, text)
 
@@ -1061,7 +1090,7 @@ def notify_admin_chat_status(user_id, match_id, status_text):
     user = get_user(user_id)
     user_name = user["name"] or f"User {user_id}"
     for admin in get_admin_recipients(user_id, match_id):
-        bot.send_message(admin, f"{status_text}\nUser: {user_name}\nMatch: {match_name}\nUser ID: {user_id}")
+        safe_send_message(bot, admin, f"{status_text}\nUser: {user_name}\nMatch: {match_name}\nUser ID: {user_id}")
 
 
 def get_sorted_matches(user_id):
@@ -1100,28 +1129,28 @@ def send_matches_inbox(user_id):
         save_state()
 
     if not matches:
-        bot.send_message(user_id, "Hmm… no one caught your vibe yet 😏\nTry again…", reply_markup=main_menu_keyboard(user_id))
+        safe_send_message(bot, user_id, "Hmmâ€¦ no one caught your vibe yet ðŸ˜\nTry againâ€¦", reply_markup=main_menu_keyboard(user_id))
         return
 
-    bot.send_message(user_id, "<b>💖 Your chats</b>", reply_markup=build_user_inbox_markup(user_id, matches), parse_mode="HTML")
+    safe_send_message(bot, user_id, "<b>ðŸ’– Your chats</b>", reply_markup=build_user_inbox_markup(user_id, matches), parse_mode="HTML")
 
 
 def send_match_card(user_id, match_id):
     user = get_user(user_id)
     profile = get_profile(match_id)
     if not profile:
-        bot.send_message(user_id, "This match is not available right now.", reply_markup=main_menu_keyboard(user_id))
+        safe_send_message(bot, user_id, "This match is not available right now.", reply_markup=main_menu_keyboard(user_id))
         return
 
     state = get_chat_state(user_id, match_id)
     unread = get_unread_count(user_id, match_id)
     preview = get_last_message_preview(user_id, match_id, limit=80)
-    lines = [f"<b>{profile['name']}</b>, {profile['age']} 🙂"]
+    lines = [f"<b>{profile['name']}</b>, {profile['age']} ðŸ™‚"]
     if unread:
         lines.append(f"Unread: {unread}")
     lines.append(preview)
     if state == "locked":
-        lines.extend(["", "Upgrade to reply and unlock full chats �"])
+        lines.extend(["", "Upgrade to reply and unlock full chats ï¿½"])
 
     with state_lock:
         user["current_match_id"] = match_id
@@ -1129,7 +1158,7 @@ def send_match_card(user_id, match_id):
         user["chat_open"] = False
         save_state()
 
-    bot.send_photo(
+    safe_send_photo(bot, 
         user_id,
         profile["photo"],
         caption="\n".join(lines),
@@ -1206,7 +1235,7 @@ def inactivity_engagement_worker():
             try:
                 send_typing_then_message(
                     user_id,
-                    "💬 Someone is waiting for your reply 😉",
+                    "ðŸ’¬ Someone is waiting for your reply ðŸ˜‰",
                     reply_markup=main_menu_keyboard(user_id),
                     delay=random.uniform(1.0, 2.0),
                 )
@@ -1221,9 +1250,9 @@ def welcome_keyboard():
 
 
 def send_welcome_screen(user_id):
-    bot.send_message(
+    safe_send_message(bot, 
         user_id,
-        "<b>Hey 😉 Welcome!</b>\n\nExplore profiles, find your matches,\nand start chatting with someone new 💫\n\nLet’s see how this goes…\n\nTap Continue 👇",
+        "<b>Hey ðŸ˜‰ Welcome!</b>\n\nExplore profiles, find your matches,\nand start chatting with someone new ðŸ’«\n\nLetâ€™s see how this goesâ€¦\n\nTap Continue ðŸ‘‡",
         reply_markup=welcome_keyboard(),
         parse_mode="HTML",
     )
@@ -1261,7 +1290,7 @@ def get_total_unread(user):
 def matches_button_text(user):
     unread_total = get_total_unread(user)
     if unread_total:
-        return f"💖 Matches ({unread_total})"
+        return f"ðŸ’– Matches ({unread_total})"
     return BTN_MATCHES
 
 
@@ -1316,7 +1345,7 @@ def buy_keyboard():
 
 
 def chat_limit_keyboard():
-    return build_keyboard([BTN_BUY], ["🔙 Main Menu"])
+    return build_keyboard([BTN_BUY], ["ðŸ”™ Main Menu"])
 
 
 def build_admin_chat_controls(user_id, match_id):
@@ -1363,8 +1392,8 @@ def build_admin_chat_list_markup(admin_id, unread_only=False):
                     continue
                 last_ts = int(messages[-1].get("ts", 0)) if messages else 0
                 user = get_user(user_id)
-                tag = "🟢 VIP" if user.get("paid") else "🟡 FREE"
-                label = f"{tag} • {user_name} × {match_name}"
+                tag = "ðŸŸ¢ VIP" if user.get("paid") else "ðŸŸ¡ FREE"
+                label = f"{tag} â€¢ {user_name} Ã— {match_name}"
                 if admin_unread:
                     label += f" ({admin_unread})"
                 preview = get_last_message_preview(user_id, match_id, limit=26)
@@ -1383,15 +1412,15 @@ def send_admin_chat_list(admin_id, unread_only=False):
     markup = build_admin_chat_list_markup(admin_id, unread_only=unread_only)
     if not markup:
         empty_text = "No unread messages right now." if unread_only else "No chats available right now."
-        bot.send_message(admin_id, empty_text, reply_markup=admin_menu_keyboard())
+        safe_send_message(bot, admin_id, empty_text, reply_markup=admin_menu_keyboard())
         return
     title = "Unread chats" if unread_only else "Recent chats"
-    bot.send_message(admin_id, f"{title}\nSelect a chat to view recent history.", reply_markup=markup)
+    safe_send_message(bot, admin_id, f"{title}\nSelect a chat to view recent history.", reply_markup=markup)
 
 
 def send_admin_chat_history(admin_id, user_id, match_id):
     if not can_admin_access_chat(admin_id, user_id, match_id):
-        bot.send_message(admin_id, "This chat is assigned to another admin.")
+        safe_send_message(bot, admin_id, "This chat is assigned to another admin.")
         return
     user = get_user(user_id)
     profile = get_profile(match_id)
@@ -1405,12 +1434,12 @@ def send_admin_chat_history(admin_id, user_id, match_id):
         "user_id": user_id,
         "match_id": match_id
     }
-    bot.send_message(
+    safe_send_message(bot, 
         admin_id,
         "Choose action:",
         reply_markup=build_admin_chat_controls(user_id, match_id),
     )
-    sent = bot.send_message(
+    sent = safe_send_message(bot, 
         admin_id,
         format_admin_chat_history(user_id, user_name, match_name, history, unread_count, chat_state),
         parse_mode="HTML",
@@ -1440,7 +1469,7 @@ def send_main_menu(user_id):
         user = get_user(user_id)
         user["active_view"] = "menu"
         save_state()
-    bot.send_message(
+    safe_send_message(bot, 
         user_id,
         "You can browse profiles, check matches, or adjust your settings here.",
         reply_markup=main_menu_keyboard(user_id),
@@ -1448,16 +1477,16 @@ def send_main_menu(user_id):
 
 
 def send_agreement(user_id):
-    bot.send_message(
+    safe_send_message(bot, 
         user_id,
-        "📜 <b>Please read and accept the agreement to continue</b>",
+        "ðŸ“œ <b>Please read and accept the agreement to continue</b>",
         reply_markup=agreement_keyboard(),
         parse_mode="HTML",
     )
 
 
 def send_agreement_details(user_id):
-    bot.send_message(
+    safe_send_message(bot, 
         user_id,
         "Before you continue, please agree to the following:\n\n"
         "- You are 18+\n"
@@ -1473,28 +1502,28 @@ def send_current_step_prompt(user_id):
     step = user["step"]
 
     if step == "start":
-        bot.send_message(
+        safe_send_message(bot, 
             user_id,
-            "<b>Hey 😉 Welcome!</b>\n\nExplore profiles, find your matches,\nand start chatting with someone new 💫\n\nLet’s see how this goes…\n\nTap Continue 👇",
+            "<b>Hey ðŸ˜‰ Welcome!</b>\n\nExplore profiles, find your matches,\nand start chatting with someone new ðŸ’«\n\nLetâ€™s see how this goesâ€¦\n\nTap Continue ðŸ‘‡",
             reply_markup=welcome_keyboard(),
             parse_mode="HTML",
         )
         return
 
     if step == "gender":
-        bot.send_message(user_id, "👤 Tell us about yourself\n\nSelect your gender:", reply_markup=gender_keyboard())
+        safe_send_message(bot, user_id, "ðŸ‘¤ Tell us about yourself\n\nSelect your gender:", reply_markup=gender_keyboard())
         return
 
     if step == "city":
-        bot.send_message(user_id, "📍 Where are you from?\n\nEnter your city:", reply_markup=ReplyKeyboardRemove())
+        safe_send_message(bot, user_id, "ðŸ“ Where are you from?\n\nEnter your city:", reply_markup=ReplyKeyboardRemove())
         return
 
     if step == "photo":
-        bot.send_message(user_id, "📸 Send your photo")
+        safe_send_message(bot, user_id, "ðŸ“¸ Send your photo")
         return
 
     if step == "moderation":
-        bot.send_message(user_id, "📸 Photo received!\n\nPlease wait a moment... ⏳\nYour photo is being reviewed")
+        safe_send_message(bot, user_id, "ðŸ“¸ Photo received!\n\nPlease wait a moment... â³\nYour photo is being reviewed")
         return
 
     if step == "agreement":
@@ -1520,7 +1549,7 @@ def choose_next_profile(user):
 
 
 def profile_caption_from_view(profile, profile_view, detailed=False):
-    lines = [f"♀️ <b>{profile['name']}</b>, {profile['age']}", f"🟢 {profile_view['activity']}"]
+    lines = [f"â™€ï¸ <b>{profile['name']}</b>, {profile['age']}", f"ðŸŸ¢ {profile_view['activity']}"]
     return "\n".join(lines)
 
 
@@ -1530,7 +1559,7 @@ def send_profile_card(user_id, detailed=False, profile_id=None):
         if profile_id is None:
             profile_id = choose_next_profile(user)
         if profile_id is None:
-            bot.send_message(user_id, "Hmm… no one caught your vibe yet 😏\nTry again…", reply_markup=main_menu_keyboard(user_id))
+            safe_send_message(bot, user_id, "Hmmâ€¦ no one caught your vibe yet ðŸ˜\nTry againâ€¦", reply_markup=main_menu_keyboard(user_id))
             return
         if profile_id not in user["shown"]:
             user["shown"].append(profile_id)
@@ -1542,10 +1571,10 @@ def send_profile_card(user_id, detailed=False, profile_id=None):
 
     profile = get_profile(profile_id)
     if not profile:
-        bot.send_message(user_id, "This profile is not available right now.", reply_markup=main_menu_keyboard(user_id))
+        safe_send_message(bot, user_id, "This profile is not available right now.", reply_markup=main_menu_keyboard(user_id))
         return
 
-    bot.send_photo(
+    safe_send_photo(bot, 
         user_id,
         profile["photo"],
         caption=profile_caption_from_view(profile, profile_view, detailed=detailed),
@@ -1602,9 +1631,9 @@ def schedule_reaction_after_like(user, profile_id):
 
 
 def send_like_feedback(user_id, profile):
-    bot.send_message(
+    safe_send_message(bot, 
         user_id,
-        f"<b>You liked {profile['name']} 😉</b>\n\nLet’s see if it’s a match…",
+        f"<b>You liked {profile['name']} ðŸ˜‰</b>\n\nLetâ€™s see if itâ€™s a matchâ€¦",
         reply_markup=build_keyboard([BTN_MAIN_MENU]),
         parse_mode="HTML",
     )
@@ -1614,9 +1643,9 @@ def announce_incoming_like(user_id, profile_id):
     profile = get_profile(profile_id)
     if not profile:
         return
-    bot.send_message(user_id, "Someone liked your profile 😉\n\nCheck it now")
+    safe_send_message(bot, user_id, "Someone liked your profile ðŸ˜‰\n\nCheck it now")
     time.sleep(random.uniform(1.0, 2.0))
-    bot.send_photo(
+    safe_send_photo(bot, 
         user_id,
         profile["photo"],
         caption=f"<b>{profile['name']}</b> liked your profile.\nYou can check it in Likes You.",
@@ -1652,8 +1681,8 @@ def create_match(user_id, profile_id, source="system"):
     if not profile:
         return
 
-    match_line = "🔥 <b>It’s a match!</b>\n\nYou both liked each other 😉\n\nSay something… let’s see where this goes 💬"
-    bot.send_message(user_id, match_line, parse_mode="HTML")
+    match_line = "ðŸ”¥ <b>Itâ€™s a match!</b>\n\nYou both liked each other ðŸ˜‰\n\nSay somethingâ€¦ letâ€™s see where this goes ðŸ’¬"
+    safe_send_message(bot, user_id, match_line, parse_mode="HTML")
     
     # Non-repeating opener logic
     used = user.get("used_openers", [])
@@ -1722,9 +1751,9 @@ def process_pending_events(user_id):
 
 
 def delayed_moderation_success(user_id):
-    bot.send_message(user_id, "📸 Photo received!\n\nPlease wait a moment... ⏳\nYour photo is being reviewed")
+    safe_send_message(bot, user_id, "ðŸ“¸ Photo received!\n\nPlease wait a moment... â³\nYour photo is being reviewed")
     time.sleep(random.uniform(2.0, 3.0))
-    bot.send_message(user_id, "✨ Almost done...")
+    safe_send_message(bot, user_id, "âœ¨ Almost done...")
     time.sleep(random.uniform(2.0, 3.0))
 
     user = get_user(user_id)
@@ -1733,7 +1762,7 @@ def delayed_moderation_success(user_id):
         user["step"] = "agreement"
         save_state()
 
-    bot.send_message(user_id, "✅ Photo approved!")
+    safe_send_message(bot, user_id, "âœ… Photo approved!")
     send_agreement(user_id)
 
  
@@ -1743,23 +1772,23 @@ def send_vip_already_message(user_id):
         if user.get("awaiting_payment"):
             user["awaiting_payment"] = False
             save_state()
-    bot.send_message(user_id, "<b>✅ You already have VIP access.</b>", parse_mode="HTML")
+    safe_send_message(bot, user_id, "<b>âœ… You already have VIP access.</b>", parse_mode="HTML")
 
 
 def unlock_text():
     return (
         "<b>"
-        "<b>🔒 VIP Access Required</b>\n\n"
-        "Wait… don't go 😶\n"
-        "We were just getting interesting…\n\n"
-        "To continue this chat, unlock chat 👇\n\n"
-        "<b>💳 Secure Payment Link:</b>\n"
+        "<b>ðŸ”’ VIP Access Required</b>\n\n"
+        "Waitâ€¦ don't go ðŸ˜¶\n"
+        "We were just getting interestingâ€¦\n\n"
+        "To continue this chat, unlock chat ðŸ‘‡\n\n"
+        "<b>ðŸ’³ Secure Payment Link:</b>\n"
         f"{PAYMENT_LINK}\n\n"
-        "<b>📌 Steps:</b>\n"
+        "<b>ðŸ“Œ Steps:</b>\n"
         "1. Make payment\n"
         "2. Send screenshot\n"
         "3. Get VIP access\n\n"
-        "⚠️ After payment, send screenshot here to activate VIP"
+        "âš ï¸ After payment, send screenshot here to activate VIP"
         "</b>"
     )
 
@@ -1771,7 +1800,7 @@ def open_likes_you(user_id):
         paid = user["paid"]
 
     if not incoming:
-        bot.send_message(user_id, "No new likes right now…\n\nCheck back later 😉", reply_markup=main_menu_keyboard(user_id))
+        safe_send_message(bot, user_id, "No new likes right nowâ€¦\n\nCheck back later ðŸ˜‰", reply_markup=main_menu_keyboard(user_id))
         return
 
     profile_id = incoming[0]
@@ -1784,7 +1813,7 @@ def open_likes_you(user_id):
             user["current_profile_id"] = profile_id
             get_profile_view(user, profile_id)
             save_state()
-        bot.send_photo(
+        safe_send_photo(bot, 
             user_id,
             profile["photo"],
             caption=(
@@ -1797,7 +1826,7 @@ def open_likes_you(user_id):
         with state_lock:
             get_profile_view(user, profile_id)
             save_state()
-        bot.send_photo(
+        safe_send_photo(bot, 
             user_id,
             profile["photo"],
             caption=(
@@ -1812,7 +1841,7 @@ def show_matches(user_id):
     user = get_user(user_id)
     matches = get_visible_match_ids(user_id)
     if not matches:
-        bot.send_message(user_id, "Hmm… no one caught your vibe yet 😏\nTry again…", reply_markup=main_menu_keyboard(user_id))
+        safe_send_message(bot, user_id, "Hmmâ€¦ no one caught your vibe yet ðŸ˜\nTry againâ€¦", reply_markup=main_menu_keyboard(user_id))
         return
 
     current_match_id = user.get("current_match_id")
@@ -1832,7 +1861,7 @@ def show_next_match(user_id):
     user = get_user(user_id)
     matches = get_visible_match_ids(user_id)
     if not matches:
-        bot.send_message(user_id, "Hmm… no one caught your vibe yet 😏\nTry again…", reply_markup=main_menu_keyboard(user_id))
+        safe_send_message(bot, user_id, "Hmmâ€¦ no one caught your vibe yet ðŸ˜\nTry againâ€¦", reply_markup=main_menu_keyboard(user_id))
         return
 
     current_cursor = int(user.get("match_cursor", 0))
@@ -1847,7 +1876,7 @@ def show_prev_match(user_id):
     user = get_user(user_id)
     matches = get_visible_match_ids(user_id)
     if not matches:
-        bot.send_message(user_id, "Hmm… no one caught your vibe yet 😏\nTry again…", reply_markup=main_menu_keyboard(user_id))
+        safe_send_message(bot, user_id, "Hmmâ€¦ no one caught your vibe yet ðŸ˜\nTry againâ€¦", reply_markup=main_menu_keyboard(user_id))
         return
 
     current_cursor = int(user.get("match_cursor", 0))
@@ -1888,7 +1917,7 @@ def forward_user_message_to_admins(message):
             unread_admins.append(admin)
             continue
         reset_admin_unread(user_id, match_id, admin)
-        sent = bot.send_message(
+        sent = safe_send_message(bot, 
             admin,
             f"<b>{html.escape(user_name)}:</b> {html.escape(message_text)}",
             parse_mode="HTML",
@@ -1907,11 +1936,11 @@ def open_match_chat(user_id, match_id, show_history=True):
     user = get_user(user_id)
 
     if state == "blocked":
-        bot.send_message(user_id, "<b>This chat is no longer available.</b>", reply_markup=main_menu_keyboard(user_id), parse_mode="HTML")
+        safe_send_message(bot, user_id, "<b>This chat is no longer available.</b>", reply_markup=main_menu_keyboard(user_id), parse_mode="HTML")
         return
 
     if state == "ended":
-        bot.send_message(user_id, "<b>This chat has ended.</b>", reply_markup=main_menu_keyboard(user_id), parse_mode="HTML")
+        safe_send_message(bot, user_id, "<b>This chat has ended.</b>", reply_markup=main_menu_keyboard(user_id), parse_mode="HTML")
         return
 
     if state == "locked" and not user["paid"]:
@@ -1919,10 +1948,10 @@ def open_match_chat(user_id, match_id, show_history=True):
         if history:
             profile = get_profile(match_id)
             name = profile["name"] if profile else "your match"
-            bot.send_message(user_id, format_chat_history(name, history), parse_mode="HTML")
-        bot.send_message(
+            safe_send_message(bot, user_id, format_chat_history(name, history), parse_mode="HTML")
+        safe_send_message(bot, 
             user_id,
-            "<b>She was about to say something…</b>\n\nUnlock to continue �",
+            "<b>She was about to say somethingâ€¦</b>\n\nUnlock to continue ï¿½",
             reply_markup=likes_locked_keyboard(),
             parse_mode="HTML",
         )
@@ -1941,7 +1970,7 @@ def open_match_chat(user_id, match_id, show_history=True):
     reply_markup = get_chat_keyboard(user_id, match_id)
     name = match_profile["name"] if match_profile else "your match"
     if match_profile:
-        bot.send_photo(
+        safe_send_photo(bot, 
             user_id,
             match_profile["photo"],
             caption=f"<b>{match_profile['name']}</b>, {match_profile['age']}",
@@ -1949,10 +1978,10 @@ def open_match_chat(user_id, match_id, show_history=True):
             parse_mode="HTML",
         )
     history = get_recent_chat_history(user_id, match_id)
-    bot.send_message(user_id, format_chat_history(name, history), reply_markup=reply_markup, parse_mode="HTML")
-    bot.send_message(
+    safe_send_message(bot, user_id, format_chat_history(name, history), reply_markup=reply_markup, parse_mode="HTML")
+    safe_send_message(bot, 
         user_id,
-        "Say something… don't be boring 😄",
+        "Say somethingâ€¦ don't be boring ðŸ˜„",
         reply_markup=reply_markup,
     )
 
@@ -1962,7 +1991,7 @@ def start_handler(message):
     user = get_user(message.chat.id)
     if is_admin(message.chat.id):
         clear_admin_active_chat(message.chat.id)
-        bot.send_message(message.chat.id, "Admin menu is ready.", reply_markup=admin_menu_keyboard())
+        safe_send_message(bot, message.chat.id, "Admin menu is ready.", reply_markup=admin_menu_keyboard())
         return
     touch_user_activity(message.chat.id)
     with state_lock:
@@ -1975,7 +2004,7 @@ def start_handler(message):
 def menu_command_handler(message):
     if is_admin(message.chat.id):
         clear_admin_active_chat(message.chat.id)
-        bot.send_message(message.chat.id, "Admin menu is ready.", reply_markup=admin_menu_keyboard())
+        safe_send_message(bot, message.chat.id, "Admin menu is ready.", reply_markup=admin_menu_keyboard())
         return
     touch_user_activity(message.chat.id)
     send_main_menu(message.chat.id)
@@ -1994,14 +2023,14 @@ def matches_command_handler(message):
 def chat_command_handler(message):
     if is_admin(message.chat.id):
         clear_admin_active_chat(message.chat.id)
-        bot.send_message(message.chat.id, "Use the admin buttons to open chats.", reply_markup=admin_menu_keyboard())
+        safe_send_message(bot, message.chat.id, "Use the admin buttons to open chats.", reply_markup=admin_menu_keyboard())
         return
 
     user_id = message.chat.id
     touch_user_activity(user_id)
     user = get_user(user_id)
     if not user["current_match_id"]:
-        bot.send_message(user_id, "Open one of your matches first.", reply_markup=main_menu_keyboard(user_id))
+        safe_send_message(bot, user_id, "Open one of your matches first.", reply_markup=main_menu_keyboard(user_id))
         return
     open_match_chat(user_id, user["current_match_id"], show_history=True)
 
@@ -2014,16 +2043,16 @@ def vip_command_handler(message):
     if user["paid"]:
         send_vip_already_message(user_id)
         return
-    bot.send_message(user_id, unlock_text(), reply_markup=buy_keyboard(), parse_mode="HTML")
+    safe_send_message(bot, user_id, unlock_text(), reply_markup=buy_keyboard(), parse_mode="HTML")
 
 
 @bot.message_handler(commands=["help"])
 def help_command_handler(message):
     if not is_admin(message.chat.id):
         touch_user_activity(message.chat.id)
-    bot.send_message(
+    safe_send_message(bot, 
         message.chat.id,
-        "🤖 Commands:\n/menu - Main menu\n/matches - View matches\n/chat - Open chat\n/vip - VIP access",
+        "ðŸ¤– Commands:\n/menu - Main menu\n/matches - View matches\n/chat - Open chat\n/vip - VIP access",
     )
 
 
@@ -2032,9 +2061,9 @@ def reset_command(message):
     user_id = message.chat.id
     touch_user_activity(user_id)
 
-    bot.send_message(
+    safe_send_message(bot, 
         user_id,
-        "⚠️ This will reset your profile and remove all data (including VIP).\n\nType CONFIRM to continue or anything else to cancel."
+        "âš ï¸ This will reset your profile and remove all data (including VIP).\n\nType CONFIRM to continue or anything else to cancel."
     )
 
     def confirm_reset(m):
@@ -2042,9 +2071,9 @@ def reset_command(message):
             return
         if m.text == "CONFIRM":
             reset_user(user_id)
-            bot.send_message(user_id, "Your profile has been reset ✅")
+            safe_send_message(bot, user_id, "Your profile has been reset âœ…")
         else:
-            bot.send_message(user_id, "Reset cancelled")
+            safe_send_message(bot, user_id, "Reset cancelled")
         bot.clear_step_handler_by_chat_id(user_id)
 
     bot.register_next_step_handler(message, confirm_reset)
@@ -2053,7 +2082,7 @@ def reset_command(message):
 @bot.message_handler(commands=["stats"])
 def stats_handler(message):
     if message.chat.id not in CHAT_ADMINS:
-        bot.send_message(message.chat.id, "This command is for admins only.")
+        safe_send_message(bot, message.chat.id, "This command is for admins only.")
         return
     clear_admin_active_chat(message.chat.id)
     
@@ -2062,18 +2091,18 @@ def stats_handler(message):
         vip_users = sum(1 for user in users.values() if is_vip_active(user))
         pending_users = sum(1 for user in users.values() if user.get("payment_status") == "pending")
     
-    stats_message = f"""📊 Stats:
+    stats_message = f"""ðŸ“Š Stats:
 Total Users: {total_users}
 VIP Users: {vip_users}
 Pending Payments: {pending_users}"""
     
-    bot.send_message(message.chat.id, stats_message)
+    safe_send_message(bot, message.chat.id, stats_message)
 
 
 @bot.message_handler(commands=["pending"])
 def pending_handler(message):
     if message.chat.id not in CHAT_ADMINS:
-        bot.send_message(message.chat.id, "This command is for admins only.")
+        safe_send_message(bot, message.chat.id, "This command is for admins only.")
         return
     clear_admin_active_chat(message.chat.id)
     
@@ -2081,15 +2110,15 @@ def pending_handler(message):
         pending_users = [(uid, user) for uid, user in users.items() if user.get("payment_status") == "pending"]
     
     if not pending_users:
-        bot.send_message(message.chat.id, "✅ No pending payments right now.")
+        safe_send_message(bot, message.chat.id, "âœ… No pending payments right now.")
         return
     
-    lines = [f"⏳ Pending Payments ({len(pending_users)}):"]
+    lines = [f"â³ Pending Payments ({len(pending_users)}):"]
     for uid, user in pending_users:
         name = user.get("name") or f"User {uid}"
-        lines.append(f"• {name} (ID: {uid})")
+        lines.append(f"â€¢ {name} (ID: {uid})")
     
-    bot.send_message(message.chat.id, "\n".join(lines))
+    safe_send_message(bot, message.chat.id, "\n".join(lines))
 
 
 def get_next_pending_user_id():
@@ -2105,7 +2134,7 @@ def send_next_pending_to_admin(admin_id):
     """Send next pending user's payment proof to admin or notify if none"""
     next_uid = get_next_pending_user_id()
     if not next_uid:
-        bot.send_message(admin_id, "✅ No more pending payments")
+        safe_send_message(bot, admin_id, "âœ… No more pending payments")
         return
     
     next_user = get_user(next_uid)
@@ -2113,21 +2142,21 @@ def send_next_pending_to_admin(admin_id):
     
     if not photo_id:
         name = next_user.get("name") or f"User {next_uid}"
-        bot.send_message(admin_id, f"📥 Next pending: {name} (ID: {next_uid})")
+        safe_send_message(bot, admin_id, f"ðŸ“¥ Next pending: {name} (ID: {next_uid})")
         return
     
     first_name = next_user.get("name") or "User"
     username = next_user.get("payment_username", "N/A")
     
-    caption = f"""📥 Payment Proof Received
+    caption = f"""ðŸ“¥ Payment Proof Received
 
 User ID: {next_uid}
 Name: {first_name}
 Username: @{username}
 
-Status: 🟡 Pending"""
+Status: ðŸŸ¡ Pending"""
     
-    bot.send_photo(
+    safe_send_photo(bot, 
         admin_id,
         photo_id,
         caption=caption,
@@ -2147,7 +2176,7 @@ def admin_direct_reply(message):
     match_id = context["match_id"]
 
     if not can_admin_access_chat(admin_id, user_id, match_id):
-        bot.send_message(admin_id, "This chat is assigned to another admin.")
+        safe_send_message(bot, admin_id, "This chat is assigned to another admin.")
         return
 
     state = get_chat_state(user_id, match_id)
@@ -2169,12 +2198,12 @@ def admin_direct_reply(message):
 
         # Show typing indicator
         try:
-            bot.send_chat_action(user_id, "typing")
+            safe_send_chat_action(bot, user_id, "typing")
             time.sleep(2)
         except:
             pass
 
-        bot.send_message(
+        safe_send_message(bot, 
             user_id,
             f"<b>{match_name}:</b> {text}",
             reply_markup=get_chat_keyboard(user_id, match_id),
@@ -2195,11 +2224,11 @@ def admin_reply_handler(message):
         user_id = chat_context["user_id"]
         match_id = chat_context["match_id"]
         if not can_admin_access_chat(message.chat.id, user_id, match_id):
-            bot.send_message(message.chat.id, "This chat is assigned to another admin.")
+            safe_send_message(bot, message.chat.id, "This chat is assigned to another admin.")
             return
         state = get_chat_state(user_id, match_id)
         if state != "active":
-            bot.send_message(message.chat.id, "This chat is not active anymore.")
+            safe_send_message(bot, message.chat.id, "This chat is not active anymore.")
             return
         append_chat_message(user_id, match_id, "match", message.text)
         increment_unread(user_id, match_id)
@@ -2212,12 +2241,12 @@ def admin_reply_handler(message):
 
             # Show typing indicator
             try:
-                bot.send_chat_action(user_id, "typing")
+                safe_send_chat_action(bot, user_id, "typing")
                 time.sleep(2)
             except:
                 pass
 
-            bot.send_message(
+            safe_send_message(bot, 
                 user_id,
                 f"<b>{match_name}:</b> {message.text}",
                 reply_markup=get_chat_keyboard(user_id, match_id),
@@ -2238,7 +2267,7 @@ def admin_menu_handler(message):
         return
     if text == BTN_ADMIN_PANEL:
         clear_admin_active_chat(message.chat.id)
-        bot.send_message(message.chat.id, "Choose an admin option.", reply_markup=admin_panel_keyboard())
+        safe_send_message(bot, message.chat.id, "Choose an admin option.", reply_markup=admin_panel_keyboard())
         return
     if text == BTN_ADMIN_STATS:
         stats_handler(message)
@@ -2248,10 +2277,10 @@ def admin_menu_handler(message):
         return
     if text == BTN_ADMIN_BACK:
         clear_admin_active_chat(message.chat.id)
-        bot.send_message(message.chat.id, "Admin menu is ready.", reply_markup=admin_menu_keyboard())
+        safe_send_message(bot, message.chat.id, "Admin menu is ready.", reply_markup=admin_menu_keyboard())
         return
     clear_admin_active_chat(message.chat.id)
-    bot.send_message(message.chat.id, "Use the admin buttons to open chats.", reply_markup=admin_menu_keyboard())
+    safe_send_message(bot, message.chat.id, "Use the admin buttons to open chats.", reply_markup=admin_menu_keyboard())
 
 
 @bot.message_handler(content_types=["photo"])
@@ -2260,7 +2289,7 @@ def photo_handler(message):
     if not is_admin(user_id):
         touch_user_activity(user_id)
     if is_on_cooldown(user_id):
-        bot.send_message(user_id, "Please wait a moment ⏳")
+        safe_send_message(bot, user_id, "Please wait a moment â³")
         return
     user = get_user(user_id)
     file_id = message.photo[-1].file_id
@@ -2278,7 +2307,7 @@ def photo_handler(message):
         match_id = user["current_match_id"]
         state = get_chat_state(user_id, match_id)
         if state != "active":
-            bot.send_message(user_id, inactive_chat_message(), parse_mode="HTML")
+            safe_send_message(bot, user_id, inactive_chat_message(), parse_mode="HTML")
             return
     if user["awaiting_payment"]:
         # Block if already VIP
@@ -2292,7 +2321,7 @@ def photo_handler(message):
         
         # Check if already under review
         if user.get("payment_status") == "pending":
-            bot.send_message(user_id, "⏳ Your payment is already under review. Please wait.")
+            safe_send_message(bot, user_id, "â³ Your payment is already under review. Please wait.")
             return
         
         # Check if already approved
@@ -2305,16 +2334,16 @@ def photo_handler(message):
         username = message.from_user.username or "N/A"
         
         # Enhanced caption with user info and status
-        caption = f"""📥 Payment Proof Received
+        caption = f"""ðŸ“¥ Payment Proof Received
 
 User ID: {user_id}
 Name: {first_name}
 Username: @{username}
 
-Status: 🟡 Pending"""
+Status: ðŸŸ¡ Pending"""
         
         for admin in PAYMENT_ADMINS:
-            bot.send_photo(
+            safe_send_photo(bot, 
                 admin,
                 file_id,
                 caption=caption,
@@ -2328,7 +2357,7 @@ Status: 🟡 Pending"""
             user["payment_username"] = username
             save_state()
         
-        bot.send_message(user_id, "Screenshot received ✅\n\nWe’re verifying it… please wait a moment", reply_markup=main_menu_keyboard(user_id))
+        safe_send_message(bot, user_id, "Screenshot received âœ…\n\nWeâ€™re verifying itâ€¦ please wait a moment", reply_markup=main_menu_keyboard(user_id))
         return
     
     # Block if user is already VIP and sends photo without being in payment flow
@@ -2336,7 +2365,7 @@ Status: 🟡 Pending"""
         send_vip_already_message(user_id)
         return
 
-    bot.send_message(user_id, "Something went wrong…\n\nPlease try again")
+    safe_send_message(bot, user_id, "Something went wrongâ€¦\n\nPlease try again")
 
 
 
@@ -2363,12 +2392,12 @@ def callback_handler(call):
             return
         set_chat_state(user_id, match_id, "ended")
         print("DEBUG: CHAT ENDED")
-        append_system_message(user_id, match_id, "This chat has ended.\n\nYou can start a new one anytime 🙂")
+        append_system_message(user_id, match_id, "This chat has ended.\n\nYou can start a new one anytime ðŸ™‚")
         notify_admin_chat_status(user_id, match_id, "User ended chat")
         remove_match_from_inbox(user_id, match_id)
-        bot.send_message(
+        safe_send_message(bot, 
             user_id,
-            "<b>This chat has ended.\n\nYou can start a new one anytime 🙂</b>",
+            "<b>This chat has ended.\n\nYou can start a new one anytime ðŸ™‚</b>",
             reply_markup=main_menu_keyboard(user_id),
             parse_mode="HTML",
         )
@@ -2387,12 +2416,12 @@ def callback_handler(call):
         print(f"DEBUG: thread.state = {state}")
         if state != "active":
             if not can_start_new_chat(user_id):
-                bot.send_message(user_id, unlock_vip_usage_message(user_id), reply_markup=chat_limit_keyboard(), parse_mode="HTML")
+                safe_send_message(bot, user_id, unlock_vip_usage_message(user_id), reply_markup=chat_limit_keyboard(), parse_mode="HTML")
                 bot.answer_callback_query(call.id, "No chats left")
                 return
             if not can_activate_chat(user_id, match_id):
                 reply_markup = chat_limit_keyboard() if not get_user(user_id)["paid"] else main_menu_keyboard(user_id)
-                bot.send_message(user_id, chat_limit_message(user_id), reply_markup=reply_markup, parse_mode="HTML")
+                safe_send_message(bot, user_id, chat_limit_message(user_id), reply_markup=reply_markup, parse_mode="HTML")
                 bot.answer_callback_query(call.id, "Cannot start chat")
                 return
             set_chat_state(user_id, match_id, "active")
@@ -2424,8 +2453,8 @@ def callback_handler(call):
                     bot.answer_callback_query(call.id, "Chat is not active")
                     return
                 set_chat_state(user_id, match_id, "locked")
-                append_system_message(user_id, match_id, "She was about to say something…\n\nUnlock to continue �")
-                bot.send_message(user_id, "<b>She was about to say something…</b>\n\nUnlock to continue �", reply_markup=likes_locked_keyboard(), parse_mode="HTML")
+                append_system_message(user_id, match_id, "She was about to say somethingâ€¦\n\nUnlock to continue ï¿½")
+                safe_send_message(bot, user_id, "<b>She was about to say somethingâ€¦</b>\n\nUnlock to continue ï¿½", reply_markup=likes_locked_keyboard(), parse_mode="HTML")
                 bot.answer_callback_query(call.id, "Chat locked")
                 return
 
@@ -2434,11 +2463,11 @@ def callback_handler(call):
                     bot.answer_callback_query(call.id, "Chat already closed")
                     return
                 set_chat_state(user_id, match_id, "ended")
-                append_system_message(user_id, match_id, "This chat has ended.\n\nYou can start a new one anytime 🙂")
+                append_system_message(user_id, match_id, "This chat has ended.\n\nYou can start a new one anytime ðŸ™‚")
                 remove_match_from_inbox(user_id, match_id)
-                bot.send_message(
+                safe_send_message(bot, 
                     user_id,
-                    "<b>This chat has ended.\n\nYou can start a new one anytime 🙂</b>",
+                    "<b>This chat has ended.\n\nYou can start a new one anytime ðŸ™‚</b>",
                     reply_markup=main_menu_keyboard(user_id),
                     parse_mode="HTML",
                 )
@@ -2452,7 +2481,7 @@ def callback_handler(call):
                 set_chat_state(user_id, match_id, "blocked")
                 append_system_message(user_id, match_id, "This chat is no longer available.")
                 remove_match_from_inbox(user_id, match_id)
-                bot.send_message(user_id, "<b>This chat is no longer available.</b>", reply_markup=main_menu_keyboard(user_id), parse_mode="HTML")
+                safe_send_message(bot, user_id, "<b>This chat is no longer available.</b>", reply_markup=main_menu_keyboard(user_id), parse_mode="HTML")
                 bot.answer_callback_query(call.id, "Chat blocked")
                 return
 
@@ -2474,7 +2503,7 @@ def callback_handler(call):
                 InlineKeyboardButton("Yes", callback_data=f"chatctlyes_{action}_{user_id}_{match_id}"),
                 InlineKeyboardButton("Cancel", callback_data="chatctlcancel"),
             )
-            bot.send_message(call.message.chat.id, "Are you sure?", reply_markup=markup)
+            safe_send_message(bot, call.message.chat.id, "Are you sure?", reply_markup=markup)
             bot.answer_callback_query(call.id)
             return
         bot.answer_callback_query(call.id, "Invalid action")
@@ -2559,13 +2588,13 @@ def callback_handler(call):
         with state_lock:
             save_state()
 
-        bot.send_message(
+        safe_send_message(bot, 
             call.message.chat.id,
-            f"✅ User {user_id} approved successfully\nPlan: {plan_label}\nValid till: {time.strftime('%d %b %Y', time.localtime(end_ts))}"
+            f"âœ… User {user_id} approved successfully\nPlan: {plan_label}\nValid till: {time.strftime('%d %b %Y', time.localtime(end_ts))}"
         )
-        bot.send_message(
+        safe_send_message(bot, 
             user_id,
-            f"<b>💎 VIP Activated!\n\nPlan: {plan_label}\n⏳ Valid till: {time.strftime('%d %b %Y', time.localtime(end_ts))}</b>",
+            f"<b>ðŸ’Ž VIP Activated!\n\nPlan: {plan_label}\nâ³ Valid till: {time.strftime('%d %b %Y', time.localtime(end_ts))}</b>",
             reply_markup=main_menu_keyboard(user_id),
             parse_mode="HTML",
         )
@@ -2606,15 +2635,15 @@ def callback_handler(call):
             save_state()
         
         # Send confirmation to admin
-        bot.send_message(
+        safe_send_message(bot, 
             call.message.chat.id,
-            f"✅ User {user_id} approved successfully"
+            f"âœ… User {user_id} approved successfully"
         )
         
         # Send activation message to user
-        bot.send_message(
+        safe_send_message(bot, 
             user_id,
-            "<b>VIP activated 💎\n\nYou can now start up to 5 chats in total\n(including any chats you've already used)\n\nChoose wisely 😉</b>",
+            "<b>VIP activated ðŸ’Ž\n\nYou can now start up to 5 chats in total\n(including any chats you've already used)\n\nChoose wisely ðŸ˜‰</b>",
             reply_markup=main_menu_keyboard(user_id),
             parse_mode="HTML",
         )
@@ -2633,7 +2662,7 @@ def callback_handler(call):
         if user["paid"]:
             send_vip_already_message(user_id)
         else:
-            bot.send_message(user_id, "Payment wasn't approved. Please send a clear screenshot again.", reply_markup=buy_keyboard())
+            safe_send_message(bot, user_id, "Payment wasn't approved. Please send a clear screenshot again.", reply_markup=buy_keyboard())
         bot.answer_callback_query(call.id, "Rejected")
         
         # Auto-open next pending user
@@ -2652,7 +2681,7 @@ def text_handler(message):
 
     if text == BTN_CONTINUE:
         if user["step"] == "start":
-            bot.send_message(user_id, "🔞 Are you 18 or older?\n\nYou must be 18+ to continue.", reply_markup=age_keyboard())
+            safe_send_message(bot, user_id, "ðŸ”ž Are you 18 or older?\n\nYou must be 18+ to continue.", reply_markup=age_keyboard())
         else:
             send_current_step_prompt(user_id)
         return
@@ -2662,20 +2691,20 @@ def text_handler(message):
             with state_lock:
                 user["step"] = "gender"
                 save_state()
-            bot.send_message(user_id, "Tell us your gender.", reply_markup=gender_keyboard())
+            safe_send_message(bot, user_id, "Tell us your gender.", reply_markup=gender_keyboard())
         else:
-            bot.send_message(user_id, "Tap Continue to begin.", reply_markup=welcome_keyboard())
+            safe_send_message(bot, user_id, "Tap Continue to begin.", reply_markup=welcome_keyboard())
         return
 
     if user["step"] == "gender":
         if text not in {BTN_GENDER_MALE, BTN_GENDER_FEMALE}:
-            bot.send_message(user_id, "Choose one of the gender buttons.", reply_markup=gender_keyboard())
+            safe_send_message(bot, user_id, "Choose one of the gender buttons.", reply_markup=gender_keyboard())
             return
         with state_lock:
             user["gender"] = text
             user["step"] = "city"
             save_state()
-        bot.send_message(user_id, "Enter your city.", reply_markup=ReplyKeyboardRemove())
+        safe_send_message(bot, user_id, "Enter your city.", reply_markup=ReplyKeyboardRemove())
         return
 
     if user["step"] == "city":
@@ -2684,15 +2713,15 @@ def text_handler(message):
             user["name"] = message.from_user.first_name or "User"
             user["step"] = "photo"
             save_state()
-        bot.send_message(user_id, "Send your best photo.")
+        safe_send_message(bot, user_id, "Send your best photo.")
         return
 
     if user["step"] == "photo":
-        bot.send_message(user_id, "Please send a photo to continue.")
+        safe_send_message(bot, user_id, "Please send a photo to continue.")
         return
 
     if user["step"] == "moderation":
-        bot.send_message(user_id, "Your photo is still being reviewed. Please wait a moment.")
+        safe_send_message(bot, user_id, "Your photo is still being reviewed. Please wait a moment.")
         return
 
     if user["step"] == "agreement":
@@ -2717,7 +2746,7 @@ def text_handler(message):
         open_likes_you(user_id)
         return
 
-    if text == BTN_MATCHES or text.startswith("💖 Matches"):
+    if text == BTN_MATCHES or text.startswith("ðŸ’– Matches"):
         show_matches(user_id)
         return
 
@@ -2730,18 +2759,18 @@ def text_handler(message):
         return
 
     if text in {"/settings", BTN_SETTINGS}:
-        bot.send_message(user_id, "Choose a section.", reply_markup=settings_keyboard())
+        safe_send_message(bot, user_id, "Choose a section.", reply_markup=settings_keyboard())
         return
 
     print(f"DEBUG VIP: text='{text}' | BTN_BUY='{BTN_BUY}' | BTN_VIP='{BTN_VIP}' | Checking for match...")
-    if text in {"/buy", BTN_BUY, BTN_GET_VIP, BTN_VIP} or text == "� Unlock Chat":
+    if text in {"/buy", BTN_BUY, BTN_GET_VIP, BTN_VIP} or text == "ï¿½ Unlock Chat":
         # Check if user is already VIP
         if user["paid"]:
             send_vip_already_message(user_id)
             return
         
         print(f"DEBUG: VIP button TRIGGERED for user_id={user_id}")
-        bot.send_message(user_id, unlock_text(), reply_markup=buy_keyboard(), parse_mode="HTML")
+        safe_send_message(bot, user_id, unlock_text(), reply_markup=buy_keyboard(), parse_mode="HTML")
         return
 
     if text == BTN_SEND_PAYMENT:
@@ -2749,12 +2778,12 @@ def text_handler(message):
             send_vip_already_message(user_id)
             return
         if is_on_cooldown(user_id):
-            bot.send_message(user_id, "Please wait a moment ⏳")
+            safe_send_message(bot, user_id, "Please wait a moment â³")
             return
         with state_lock:
             user["awaiting_payment"] = True
             save_state()
-        bot.send_message(user_id, "Send the payment screenshot now.")
+        safe_send_message(bot, user_id, "Send the payment screenshot now.")
         return
 
     if text == BTN_MY_PROFILE:
@@ -2768,13 +2797,13 @@ def text_handler(message):
             *vip_lines,
         ])
         if user["photo"]:
-            bot.send_photo(user_id, user["photo"], caption=caption, reply_markup=settings_keyboard())
+            safe_send_photo(bot, user_id, user["photo"], caption=caption, reply_markup=settings_keyboard())
         else:
-            bot.send_message(user_id, caption, reply_markup=settings_keyboard())
+            safe_send_message(bot, user_id, caption, reply_markup=settings_keyboard())
         return
 
     if text == BTN_SEARCH_SETTINGS:
-        bot.send_message(
+        safe_send_message(bot, 
             user_id,
             "Search settings can be expanded later.\nRight now matching stays broad and natural.",
             reply_markup=settings_keyboard(),
@@ -2782,21 +2811,21 @@ def text_handler(message):
         return
 
     if text == BTN_BOOST:
-        bot.send_message(user_id, "Boost can be connected to coins later.", reply_markup=settings_keyboard())
+        safe_send_message(bot, user_id, "Boost can be connected to coins later.", reply_markup=settings_keyboard())
         return
 
-    if text == BTN_MAIN_MENU or text == "🔙 Main Menu":
+    if text == BTN_MAIN_MENU or text == "ðŸ”™ Main Menu":
         send_main_menu(user_id)
         return
 
     if text == BTN_SEND_GIFT:
         reply_markup = main_menu_keyboard(user_id) if user["paid"] else buy_keyboard()
-        bot.send_message(user_id, "Gifts can be enabled later with coins or VIP.", reply_markup=reply_markup)
+        safe_send_message(bot, user_id, "Gifts can be enabled later with coins or VIP.", reply_markup=reply_markup)
         return
 
     if text == BTN_CHAT:
         if not user["current_match_id"]:
-            bot.send_message(user_id, "Open one of your matches first.", reply_markup=main_menu_keyboard(user_id))
+            safe_send_message(bot, user_id, "Open one of your matches first.", reply_markup=main_menu_keyboard(user_id))
             return
         match_id = user["current_match_id"]
         current_state = get_chat_state(user_id, match_id)
@@ -2804,11 +2833,11 @@ def text_handler(message):
             open_match_chat(user_id, match_id, show_history=True)
             return
         if not can_start_new_chat(user_id):
-            bot.send_message(user_id, unlock_vip_usage_message(user_id), reply_markup=chat_limit_keyboard(), parse_mode="HTML")
+            safe_send_message(bot, user_id, unlock_vip_usage_message(user_id), reply_markup=chat_limit_keyboard(), parse_mode="HTML")
             return
         if not can_activate_chat(user_id, match_id):
             reply_markup = chat_limit_keyboard() if not user["paid"] else main_menu_keyboard(user_id)
-            bot.send_message(user_id, chat_limit_message(user_id), reply_markup=reply_markup, parse_mode="HTML")
+            safe_send_message(bot, user_id, chat_limit_message(user_id), reply_markup=reply_markup, parse_mode="HTML")
             return
         chats_left = get_chats_left(user_id)
         markup = InlineKeyboardMarkup()
@@ -2816,7 +2845,7 @@ def text_handler(message):
             InlineKeyboardButton("Start Chat", callback_data=f"start_chat:{match_id}"),
             InlineKeyboardButton("Cancel", callback_data="cancel_start_chat")
         )
-        bot.send_message(
+        safe_send_message(bot, 
             user_id,
             f"Start a new chat?\n\nChats left: {chats_left} / {user['chat_limit']}\nThis will use 1 chat.\n\nContinue?",
             reply_markup=markup
@@ -2825,11 +2854,11 @@ def text_handler(message):
 
     if text == BTN_END_CHAT:
         if not user["current_match_id"]:
-            bot.send_message(user_id, "<b>Open a chat first.</b>", reply_markup=main_menu_keyboard(user_id), parse_mode="HTML")
+            safe_send_message(bot, user_id, "<b>Open a chat first.</b>", reply_markup=main_menu_keyboard(user_id), parse_mode="HTML")
             return
         match_id = user["current_match_id"]
         if get_chat_state(user_id, match_id) != "active":
-            bot.send_message(user_id, inactive_chat_message(), parse_mode="HTML")
+            safe_send_message(bot, user_id, inactive_chat_message(), parse_mode="HTML")
             return
         chats_left = get_chats_left(user_id)
         markup = InlineKeyboardMarkup()
@@ -2837,7 +2866,7 @@ def text_handler(message):
             InlineKeyboardButton(BTN_CONFIRM_END_CHAT, callback_data="userend_yes"),
             InlineKeyboardButton(BTN_CANCEL_END_CHAT, callback_data="userend_cancel"),
         )
-        bot.send_message(
+        safe_send_message(bot, 
             user_id,
             f"End this chat?\n\nThis chat will be lost and your chat limit will not increase.\nChats left: {chats_left} / {user['chat_limit']}\n\nAre you sure?",
             reply_markup=markup,
@@ -2846,7 +2875,7 @@ def text_handler(message):
 
     if text == BTN_LIKE:
         if is_on_cooldown(user_id):
-            bot.send_message(user_id, "Please wait a moment ⏳")
+            safe_send_message(bot, user_id, "Please wait a moment â³")
             return
         profile_id = user["current_profile_id"]
         if profile_id is None:
@@ -2870,7 +2899,7 @@ def text_handler(message):
             save_state()
 
         if already_liked:
-            bot.send_message(
+            safe_send_message(bot, 
                 user_id,
                 "You already reacted to this profile. Let's keep moving.",
                 reply_markup=build_keyboard([BTN_MAIN_MENU]),
@@ -2893,7 +2922,7 @@ def text_handler(message):
 
     if text == BTN_SKIP:
         if is_on_cooldown(user_id):
-            bot.send_message(user_id, "Please wait a moment ⏳")
+            safe_send_message(bot, user_id, "Please wait a moment â³")
             return
         with state_lock:
             profile_id = user["current_profile_id"]
@@ -2923,13 +2952,13 @@ def text_handler(message):
                 match_id_str = str(match_id)
                 if match_id_str not in chat_started_notified:
                     chats_left = get_chats_left(user_id)
-                    bot.send_message(user_id, f"<b>Chat started ✅</b>\nChats left: {chats_left} / {user['chat_limit']}", parse_mode="HTML")
+                    safe_send_message(bot, user_id, f"<b>Chat started âœ…</b>\nChats left: {chats_left} / {user['chat_limit']}", parse_mode="HTML")
                     with state_lock:
                         user = get_user(user_id)
                         user.setdefault("chat_started_notified", {})[match_id_str] = True
                         save_state()
             return
-        bot.send_message(user_id, inactive_chat_message(), parse_mode="HTML")
+        safe_send_message(bot, user_id, inactive_chat_message(), parse_mode="HTML")
         return
 
 
@@ -2952,9 +2981,9 @@ try:
     webhook_url = f"https://api.telegram.org/bot{TOKEN}/deleteWebhook"
     response = urllib.request.urlopen(webhook_url)
     result = json.loads(response.read().decode('utf-8'))
-    print(f"✅ Webhook deleted: {result}")
+    print(f"âœ… Webhook deleted: {result}")
 except Exception as e:
-    print(f"⚠️ Webhook deletion attempt: {e}")
+    print(f"âš ï¸ Webhook deletion attempt: {e}")
 
 bot.remove_webhook()
 time.sleep(10)
@@ -2965,3 +2994,5 @@ while True:
     except Exception as e:
         print(f"Polling error: {e}")
         time.sleep(10)
+
+
