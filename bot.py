@@ -19,10 +19,8 @@ apihelper.READ_TIMEOUT = 60
 
 TOKEN = os.getenv("BOT_TOKEN")
 MAIN_ADMIN_ID = 526264365
-ADMIN_A_ID = 8511880633
-ADMIN_B_ID = 5754861439
 PAYMENT_ADMINS = [MAIN_ADMIN_ID]
-CHAT_ADMINS = [MAIN_ADMIN_ID, ADMIN_A_ID, ADMIN_B_ID]
+CHAT_ADMINS = [MAIN_ADMIN_ID]
 PAYMENT_LINK = "https://tinyurl.com/SwipeSecretChats"
 VIP_PLAN_DAYS = {
     "1m": ("1 Month", 30),
@@ -893,7 +891,7 @@ def ensure_chat_thread(user, match_id):
             "state": "available",
             "fomo_sent": False,
             "counted_for_limit": False,
-            "assigned_admin_id": None,
+            "assigned_admin_id": MAIN_ADMIN_ID,
         }
     else:
         if "messages" not in threads[thread_key]:
@@ -909,12 +907,18 @@ def ensure_chat_thread(user, match_id):
         if "counted_for_limit" not in threads[thread_key]:
             threads[thread_key]["counted_for_limit"] = False
         if "assigned_admin_id" not in threads[thread_key]:
-            threads[thread_key]["assigned_admin_id"] = None
-    return threads[thread_key]
+            threads[thread_key]["assigned_admin_id"] = MAIN_ADMIN_ID
+    thread = threads[thread_key]
+
+    # 🔥 FORCE FIX (MOST IMPORTANT)
+    if thread.get("assigned_admin_id") != MAIN_ADMIN_ID:
+        thread["assigned_admin_id"] = MAIN_ADMIN_ID
+
+    return thread
 
 
 def default_admin_for_user(user):
-    return ADMIN_B_ID if user.get("paid") else ADMIN_A_ID
+    return MAIN_ADMIN_ID
 
 
 def get_assigned_admin_id(user_id, match_id, create_if_missing=True):
