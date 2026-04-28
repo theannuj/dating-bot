@@ -5,6 +5,7 @@ import os
 import random
 import threading
 import time
+import traceback
 from pathlib import Path
 
 from flask import Flask, request
@@ -29,6 +30,7 @@ VIP_PLAN_DAYS = {
     "6m": ("6 Months", 180),
     "1y": ("1 Year", 365),
 }
+MOJIBAKE_MARKERS = ("Ã", "â", "ð", "Å", "Â", "ï", "Ë", "€", "™", "œ", "�")
 
 BASE_DIR = Path(__file__).resolve().parent
 PROFILES_FILE = BASE_DIR / "profiles.json"
@@ -332,6 +334,78 @@ FOMO_MESSAGES = [
     "This conversation is getting interesting...",
 ]
 
+
+def _mojibake_score(text):
+    return sum(text.count(marker) for marker in MOJIBAKE_MARKERS)
+
+
+def repair_mojibake_text(value):
+    if not isinstance(value, str) or not value:
+        return value
+
+    repaired = value
+    for _ in range(3):
+        if not any(marker in repaired for marker in MOJIBAKE_MARKERS):
+            break
+
+        best = repaired
+        best_score = _mojibake_score(repaired)
+        for encoding in ("cp1252", "latin1"):
+            try:
+                candidate = repaired.encode(encoding).decode("utf-8")
+            except Exception:
+                continue
+            candidate_score = _mojibake_score(candidate)
+            if candidate_score < best_score:
+                best = candidate
+                best_score = candidate_score
+
+        if best == repaired:
+            break
+        repaired = best
+
+    return repaired
+
+
+def repair_mojibake_data(value):
+    if isinstance(value, str):
+        return repair_mojibake_text(value)
+    if isinstance(value, list):
+        return [repair_mojibake_data(item) for item in value]
+    if isinstance(value, tuple):
+        return tuple(repair_mojibake_data(item) for item in value)
+    if isinstance(value, dict):
+        return {key: repair_mojibake_data(item) for key, item in value.items()}
+    return value
+
+
+def normalize_reply_markup_text(reply_markup):
+    if reply_markup is None:
+        return None
+
+    for attr in ("keyboard", "inline_keyboard"):
+        rows = getattr(reply_markup, attr, None)
+        if not rows:
+            continue
+        for row in rows:
+            for button in row:
+                if hasattr(button, "text") and isinstance(button.text, str):
+                    button.text = repair_mojibake_text(button.text)
+                elif isinstance(button, dict) and isinstance(button.get("text"), str):
+                    button["text"] = repair_mojibake_text(button["text"])
+    return reply_markup
+
+
+def repair_runtime_ui_strings():
+    target_names = [name for name in globals() if name.startswith("BTN_")]
+    target_names.extend(["ACTIVITY_TEXTS", "BIOS", "OPENERS", "FOMO_MESSAGES"])
+    for name in target_names:
+        globals()[name] = repair_mojibake_data(globals()[name])
+
+
+repair_runtime_ui_strings()
+
+
 bot = telebot.TeleBot(TOKEN)
 app = Flask(__name__)
 state_lock = threading.RLock()
@@ -347,28 +421,48 @@ INACTIVITY_CHECK_SECONDS = 60
 
 
 def safe_send_message(bot, *args, **kwargs):
-    for _ in range(3):
+    args = list(args)
+    if len(args) > 1:
+        args[1] = repair_mojibake_text(args[1])
+    if "text" in kwargs:
+        kwargs["text"] = repair_mojibake_text(kwargs["text"])
+    if "reply_markup" in kwargs:
+        kwargs["reply_markup"] = normalize_reply_markup_text(kwargs["reply_markup"])
+    target = args[0] if args else kwargs.get("chat_id")
+    for attempt in range(1, 4):
         try:
             return bot.send_message(*args, **kwargs)
         except Exception as e:
-            print(f"send_message error: {e}")
+            print(f"send_message error (attempt {attempt}/3, chat_id={target}): {e}", flush=True)
+            traceback.print_exc()
             time.sleep(1.5)
+    print(f"send_message failed after 3 attempts (chat_id={target})", flush=True)
 
 
 def safe_send_photo(bot, *args, **kwargs):
-    for _ in range(3):
+    args = list(args)
+    if "caption" in kwargs:
+        kwargs["caption"] = repair_mojibake_text(kwargs["caption"])
+    if "reply_markup" in kwargs:
+        kwargs["reply_markup"] = normalize_reply_markup_text(kwargs["reply_markup"])
+    target = args[0] if args else kwargs.get("chat_id")
+    for attempt in range(1, 4):
         try:
             return bot.send_photo(*args, **kwargs)
         except Exception as e:
-            print(f"send_photo error: {e}")
+            print(f"send_photo error (attempt {attempt}/3, chat_id={target}): {e}", flush=True)
+            traceback.print_exc()
             time.sleep(1.5)
+    print(f"send_photo failed after 3 attempts (chat_id={target})", flush=True)
 
 
 def safe_send_chat_action(bot, *args, **kwargs):
+    target = args[0] if args else kwargs.get("chat_id")
     try:
         return bot.send_chat_action(*args, **kwargs)
     except Exception as e:
-        print(f"chat_action error: {e}")
+        print(f"chat_action error (chat_id={target}): {e}", flush=True)
+        traceback.print_exc()
 
 
 def is_on_cooldown(user_id):
@@ -752,6 +846,12 @@ def mirror_admin_reply_to_main_admin(source_admin_id, user_id, match_id, text):
         f"<b>{html.escape(match_name)}:</b> {html.escape(text)}",
         parse_mode="HTML",
     )
+    if not sent:
+        print(
+            f"mirror_admin_reply_to_main_admin failed to deliver (source_admin_id={source_admin_id}, user_id={user_id}, match_id={match_id})",
+            flush=True,
+        )
+        return
     with state_lock:
         chat_map[sent.message_id] = {"user_id": user_id, "match_id": match_id, "admin_id": MAIN_ADMIN_ID}
         if len(chat_map) > 50:
@@ -1451,6 +1551,12 @@ def send_admin_chat_history(admin_id, user_id, match_id):
         format_admin_chat_history(user_id, user_name, match_name, history, unread_count, chat_state),
         parse_mode="HTML",
     )
+    if not sent:
+        print(
+            f"open_admin_chat failed to deliver history (admin_id={admin_id}, user_id={user_id}, match_id={match_id})",
+            flush=True,
+        )
+        return
     with state_lock:
         chat_map[sent.message_id] = {"user_id": user_id, "match_id": match_id, "admin_id": admin_id}
         if len(chat_map) > 50:
@@ -1929,6 +2035,13 @@ def forward_user_message_to_admins(message):
             f"<b>{html.escape(user_name)}:</b> {html.escape(message_text)}",
             parse_mode="HTML",
         )
+        if not sent:
+            print(
+                f"forward_user_message_to_admins failed to deliver (admin_id={admin}, user_id={user_id}, match_id={match_id})",
+                flush=True,
+            )
+            unread_admins.append(admin)
+            continue
         with state_lock:
             chat_map[sent.message_id] = {"user_id": user_id, "match_id": match_id, "admin_id": admin}
             if len(chat_map) > 50:
@@ -3003,11 +3116,12 @@ def configure_webhook():
 @app.route(f"/{TOKEN}", methods=["POST"])
 def webhook():
     try:
-        json_str = request.get_data().decode("UTF-8")
+        json_str = request.get_data(cache=False, as_text=False).decode("utf-8")
         update = telebot.types.Update.de_json(json_str)
         bot.process_new_updates([update])
     except Exception as e:
-        print(f"webhook error: {e}")
+        print(f"webhook error: {e}", flush=True)
+        traceback.print_exc()
     return "OK", 200
 
 
