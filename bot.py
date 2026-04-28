@@ -30,7 +30,6 @@ VIP_PLAN_DAYS = {
     "6m": ("6 Months", 180),
     "1y": ("1 Year", 365),
 }
-MOJIBAKE_MARKERS = ("Ã", "â", "ð", "Å", "Â", "ï", "Ë", "€", "™", "œ", "�")
 
 BASE_DIR = Path(__file__).resolve().parent
 PROFILES_FILE = BASE_DIR / "profiles.json"
@@ -47,21 +46,123 @@ def get_db_connection():
     if not database_url:
         return None
     try:
-        print("Connecting to DB...")
         conn = psycopg2.connect(database_url, connect_timeout=60)
         conn.set_client_encoding("UTF8")
-        cur = conn.cursor()
-        cur.execute("SELECT current_database()")
-        print("Connected DB:", cur.fetchone())
-        cur.close()
         return conn
     except Exception as e:
         print(f"DB connection error: {e}", flush=True)
         return None
 
 
+CP1252_REVERSE_MAP = {
+    0x20AC: 0x80,
+    0x201A: 0x82,
+    0x0192: 0x83,
+    0x201E: 0x84,
+    0x2026: 0x85,
+    0x2020: 0x86,
+    0x2021: 0x87,
+    0x02C6: 0x88,
+    0x2030: 0x89,
+    0x0160: 0x8A,
+    0x2039: 0x8B,
+    0x0152: 0x8C,
+    0x017D: 0x8E,
+    0x2018: 0x91,
+    0x2019: 0x92,
+    0x201C: 0x93,
+    0x201D: 0x94,
+    0x2022: 0x95,
+    0x2013: 0x96,
+    0x2014: 0x97,
+    0x02DC: 0x98,
+    0x2122: 0x99,
+    0x0161: 0x9A,
+    0x203A: 0x9B,
+    0x0153: 0x9C,
+    0x017E: 0x9E,
+    0x0178: 0x9F,
+}
+LEGACY_CORRUPT_TEXT_ORDS = set(range(0xC0, 0x100)) | {
+    0x0192,
+    0x0152,
+    0x0153,
+    0x0160,
+    0x0161,
+    0x0178,
+    0x017D,
+    0x017E,
+    0x20AC,
+    0x2013,
+    0x2014,
+    0x2018,
+    0x2019,
+    0x201C,
+    0x201D,
+    0x2020,
+    0x2021,
+    0x2022,
+    0x2026,
+    0x2030,
+    0x2039,
+    0x203A,
+    0x02C6,
+    0x02DC,
+    0x2122,
+    0x0081,
+    0x008D,
+    0x008F,
+    0x0090,
+    0x009D,
+    0x009F,
+}
+
+
+def looks_like_legacy_corrupt_text(value):
+    return isinstance(value, str) and any(ord(ch) in LEGACY_CORRUPT_TEXT_ORDS for ch in value)
+
+
+def decode_legacy_corrupt_text(value):
+    if not looks_like_legacy_corrupt_text(value):
+        return value
+
+    repaired = value
+    for _ in range(6):
+        if not looks_like_legacy_corrupt_text(repaired):
+            break
+        try:
+            raw_bytes = bytearray()
+            for ch in repaired:
+                codepoint = ord(ch)
+                if codepoint <= 0xFF:
+                    raw_bytes.append(codepoint)
+                elif codepoint in CP1252_REVERSE_MAP:
+                    raw_bytes.append(CP1252_REVERSE_MAP[codepoint])
+                else:
+                    return repaired
+            decoded = bytes(raw_bytes).decode("utf-8")
+        except Exception:
+            break
+        if decoded == repaired:
+            break
+        repaired = decoded
+    return repaired
+
+
+def normalize_legacy_payload(value):
+    if isinstance(value, str):
+        return decode_legacy_corrupt_text(value)
+    if isinstance(value, list):
+        return [normalize_legacy_payload(item) for item in value]
+    if isinstance(value, tuple):
+        return tuple(normalize_legacy_payload(item) for item in value)
+    if isinstance(value, dict):
+        return {key: normalize_legacy_payload(item) for key, item in value.items()}
+    return value
+
+
 def normalize_storage_value(value):
-    return repair_mojibake_data(value)
+    return normalize_legacy_payload(value)
 
 
 def parse_matches_payload(value):
@@ -141,7 +242,6 @@ def init_vip_table():
 def save_vip_to_db(user_id, user):
     conn = get_db_connection()
     if not conn:
-        print("DB not connected")
         return
     try:
         normalized_user = normalize_storage_value(user)
@@ -225,50 +325,34 @@ def init_users_table():
         conn.close()
 
 
+def run_schema_migrations():
+    init_users_table()
+    init_vip_table()
+
+
+def serialize_user_record(user):
+    return json.dumps(normalize_storage_value(user), ensure_ascii=False)
+
+
 def save_user_to_db(user_id, user):
     conn = get_db_connection()
     if not conn:
         return
     try:
-        normalized_user = normalize_storage_value(user)
+        serialized_user = serialize_user_record(user)
         cur = conn.cursor()
         cur.execute("""
         INSERT INTO users (user_id, data)
         VALUES (%s, %s)
         ON CONFLICT (user_id)
         DO UPDATE SET data = EXCLUDED.data
-        """, (user_id, json.dumps(normalized_user, ensure_ascii=False)))
+        """, (user_id, serialized_user))
         conn.commit()
         cur.close()
+        DB_USER_CACHE[int(user_id)] = serialized_user
     except Exception as e:
         conn.rollback()
         print(f"DB save error: {e}", flush=True)
-    finally:
-        conn.close()
-
-
-def save_all_users_to_db(users_map):
-    conn = get_db_connection()
-    if not conn:
-        return
-    try:
-        cur = conn.cursor()
-        rows = [
-            (user_id, json.dumps(normalize_storage_value(user), ensure_ascii=False))
-            for user_id, user in users_map.items()
-        ]
-        if rows:
-            cur.executemany("""
-            INSERT INTO users (user_id, data)
-            VALUES (%s, %s)
-            ON CONFLICT (user_id)
-            DO UPDATE SET data = EXCLUDED.data
-            """, rows)
-            conn.commit()
-        cur.close()
-    except Exception as e:
-        conn.rollback()
-        print(f"Bulk DB save error: {e}", flush=True)
     finally:
         conn.close()
 
@@ -296,42 +380,42 @@ def load_users_from_db():
         conn.close()
 
 BTN_CONTINUE = "Continue"
-BTN_18_YES = "Yes, I am 18+ Ã¢Å“â€Ã¯Â¸Â"
-BTN_GENDER_MALE = "Ã°Å¸â€˜Â¨ Male"
-BTN_GENDER_FEMALE = "Ã°Å¸â€˜Â© Female"
+BTN_18_YES = "Yes, I am 18+ ✔️"
+BTN_GENDER_MALE = "👨 Male"
+BTN_GENDER_FEMALE = "👩 Female"
 BTN_READ_AGREEMENT = "Read agreement"
 BTN_AGREE_CONTINUE = "Agree & Continue"
-BTN_START = "Ã°Å¸â€Â¥ Start"
-BTN_MATCHES = "Ã°Å¸â€™â€“ Matches"
-BTN_LIKES = "Ã°Å¸â€˜â‚¬ Likes"
-BTN_SETTINGS = "Ã¢Å¡â„¢Ã¯Â¸Â Settings"
-BTN_BUY = "Ã°Å¸â€â€˜ Unlock Chat"
+BTN_START = "🔥 Start"
+BTN_MATCHES = "💖 Matches"
+BTN_LIKES = "👀 Likes"
+BTN_SETTINGS = "⚙️ Settings"
+BTN_BUY = "🔓 Unlock Chat"
 BTN_VIEW_PROFILE = "View profile"
-BTN_LIKE = "Ã°Å¸â€™Å¡"
-BTN_SKIP = "Ã¢ÂÅ’"
-BTN_MAIN_MENU = "Ã°Å¸ÂÂ  Main Menu"
-BTN_SEND_GIFT = "Ã°Å¸Å½Â Send gift"
+BTN_LIKE = "💚"
+BTN_SKIP = "❌"
+BTN_MAIN_MENU = "🏠 Main Menu"
+BTN_SEND_GIFT = "🎁 Send gift"
 BTN_SEE_LIKES = "See who likes you"
-BTN_GET_VIP = "Ã°Å¸â€â€™ Get VIP"
-BTN_MY_PROFILE = "Ã°Å¸â€˜Â¤ My profile"
-BTN_SEARCH_SETTINGS = "Ã°Å¸â€Å½ Search settings"
-BTN_BOOST = "Ã°Å¸Å¡â‚¬ Boost"
-BTN_VIP = "Ã°Å¸â€â€˜ Unlock Chat"
-BTN_CHAT = "Ã°Å¸â€™Â¬ Chat"
+BTN_GET_VIP = "💎 Get VIP"
+BTN_MY_PROFILE = "👤 My profile"
+BTN_SEARCH_SETTINGS = "🔎 Search settings"
+BTN_BOOST = "🚀 Boost"
+BTN_VIP = "🔓 Unlock Chat"
+BTN_CHAT = "💬 Chat"
 BTN_SEND_PAYMENT = "Send payment screenshot"
-BTN_NEXT_MATCH = "Ã¢Å¾Â¡Ã¯Â¸Â Next Match"
-BTN_PREV_MATCH = "Ã¢Â¬â€¦Ã¯Â¸Â Prev"
-BTN_MATCH_NEXT = "Ã¢Å¾Â¡Ã¯Â¸Â Next"
-BTN_END_CHAT = "Ã¢ÂÅ’ End Chat"
-BTN_ADMIN_CHATS = "Ã°Å¸â€™Â¬ Admin Chats"
-BTN_ADMIN_REFRESH = "Ã°Å¸â€â€ž Refresh"
-BTN_ADMIN_UNREAD = "Ã°Å¸â€œÂ© Unread Only"
-BTN_ADMIN_PANEL = "Ã°Å¸â€œÅ  Admin Panel"
-BTN_ADMIN_STATS = "Ã°Å¸â€œÅ  Stats"
-BTN_ADMIN_PENDING = "Ã¢ÂÂ³ Pending"
-BTN_ADMIN_BACK = "Ã°Å¸â€â„¢ Back"
-BTN_CONFIRM_END_CHAT = "Ã¢Å“â€¦ Yes, End Chat"
-BTN_CANCEL_END_CHAT = "Ã¢ÂÅ’ Cancel"
+BTN_NEXT_MATCH = "➡️ Next Match"
+BTN_PREV_MATCH = "⬅️ Prev"
+BTN_MATCH_NEXT = "➡️ Next"
+BTN_END_CHAT = "❌ End Chat"
+BTN_ADMIN_CHATS = "💬 Admin Chats"
+BTN_ADMIN_REFRESH = "🔄 Refresh"
+BTN_ADMIN_UNREAD = "📩 Unread Only"
+BTN_ADMIN_PANEL = "📊 Admin Panel"
+BTN_ADMIN_STATS = "📊 Stats"
+BTN_ADMIN_PENDING = "⏳ Pending"
+BTN_ADMIN_BACK = "🔙 Back"
+BTN_CONFIRM_END_CHAT = "✅ Yes, End Chat"
+BTN_CANCEL_END_CHAT = "❌ Cancel"
 BTN_START_OVER = "Start Over"
 MAX_CHAT_MESSAGES = 30
 CHAT_PREVIEW_MESSAGES = 8
@@ -354,7 +438,7 @@ BIOS = [
     "A little shy at first, but warm once comfortable.",
     "Here for good vibes and better conversations.",
     "Not always online, but worth the wait.",
-    "A bit naughty, a bit sweet Ã°Å¸Ëœâ€°",
+    "A bit naughty, a bit sweet 😉",
     "More into chemistry than small talk.",
     "Soft heart, sharp mind, easy smile.",
     "Coffee first, feelings later.",
@@ -374,47 +458,47 @@ BIOS = [
 
 OPENERS = [
     # --- Short & natural ---
-    "heyÃ¢â‚¬Â¦",
+    "hey…",
     "hmm hi",
     "hey you",
     "hi :)",
-    "hmmÃ¢â‚¬Â¦",
-    "helloÃ¢â‚¬Â¦ maybe Ã°Å¸Ëœâ€ž",
+    "hmm…",
+    "hello… maybe 😄",
     
     # --- Curious ---
-    "you seem interesting Ã°Å¸â€˜â‚¬",
-    "hmmÃ¢â‚¬Â¦ not sure why I texted",
-    "idkÃ¢â‚¬Â¦ just felt like texting",
-    "you don't look boring Ã°Å¸Ëœâ€ž",
-    "something about youÃ¢â‚¬Â¦",
-    "okayÃ¢â‚¬Â¦ I'm curious now",
+    "you seem interesting 👀",
+    "hmm… not sure why I texted",
+    "idk… just felt like texting",
+    "you don't look boring 😄",
+    "something about you…",
+    "okay… I'm curious now",
     
     # --- Soft human feel ---
-    "wasn't going to textÃ¢â‚¬Â¦ but okay",
-    "I usually don't text first Ã°Å¸Ëœâ€¦",
-    "this feels random Ã°Å¸Ëœâ€ž",
+    "wasn't going to text… but okay",
+    "I usually don't text first 😅",
+    "this feels random 😄",
     "hmm this is a bit weird",
-    "not sure if I should say hiÃ¢â‚¬Â¦",
+    "not sure if I should say hi…",
     
     # --- Playful doubt (trust builder) ---
-    "you're real right? Ã°Å¸Ëœâ€¦",
+    "you're real right? 😅",
     "tum real ho na?",
-    "btw you're not a botÃ¢â‚¬Â¦ right?",
-    "don't tell me you're a bot Ã°Å¸Ëœâ€ž",
-    "idk thoda suspicious lag raha Ã°Å¸Ëœâ€ž",
+    "btw you're not a bot… right?",
+    "don't tell me you're a bot 😄",
+    "idk thoda suspicious lag raha 😄",
     
     # --- Light tease ---
-    "you look like trouble Ã°Å¸Ëœâ€ž",
-    "I think you reply lateÃ¢â‚¬Â¦",
-    "don't be boring please Ã°Å¸Ëœâ€ž",
+    "you look like trouble 😄",
+    "I think you reply late…",
+    "don't be boring please 😄",
     "let's see how this goes",
-    "try not to be dry Ã°Å¸ËœÂ",
+    "try not to be dry 😏",
     
     # --- Light question (limited use) ---
-    "btw where are you from? Ã°Å¸Ëœâ€ž",
+    "btw where are you from? 😄",
     "tum kaha se ho?",
-    "randomÃ¢â‚¬Â¦ where are you from?",
-    "I feel you're not from here Ã°Å¸Ëœâ€ž",
+    "random… where are you from?",
+    "I feel you're not from here 😄",
     "waise tum kaha ke ho?",
 ]
 
@@ -425,78 +509,6 @@ FOMO_MESSAGES = [
     "This conversation is getting interesting...",
 ]
 
-
-def _mojibake_score(text):
-    return sum(text.count(marker) for marker in MOJIBAKE_MARKERS)
-
-
-def repair_mojibake_text(value):
-    if not isinstance(value, str) or not value:
-        return value
-
-    repaired = value
-    for _ in range(3):
-        if not any(marker in repaired for marker in MOJIBAKE_MARKERS):
-            break
-
-        best = repaired
-        best_score = _mojibake_score(repaired)
-        for encoding in ("cp1252", "latin1"):
-            try:
-                candidate = repaired.encode(encoding).decode("utf-8")
-            except Exception:
-                continue
-            candidate_score = _mojibake_score(candidate)
-            if candidate_score < best_score:
-                best = candidate
-                best_score = candidate_score
-
-        if best == repaired:
-            break
-        repaired = best
-
-    return repaired
-
-
-def repair_mojibake_data(value):
-    if isinstance(value, str):
-        return repair_mojibake_text(value)
-    if isinstance(value, list):
-        return [repair_mojibake_data(item) for item in value]
-    if isinstance(value, tuple):
-        return tuple(repair_mojibake_data(item) for item in value)
-    if isinstance(value, dict):
-        return {key: repair_mojibake_data(item) for key, item in value.items()}
-    return value
-
-
-def normalize_reply_markup_text(reply_markup):
-    if reply_markup is None:
-        return None
-
-    for attr in ("keyboard", "inline_keyboard"):
-        rows = getattr(reply_markup, attr, None)
-        if not rows:
-            continue
-        for row in rows:
-            for button in row:
-                if hasattr(button, "text") and isinstance(button.text, str):
-                    button.text = repair_mojibake_text(button.text)
-                elif isinstance(button, dict) and isinstance(button.get("text"), str):
-                    button["text"] = repair_mojibake_text(button["text"])
-    return reply_markup
-
-
-def repair_runtime_ui_strings():
-    target_names = [name for name in globals() if name.startswith("BTN_")]
-    target_names.extend(["ACTIVITY_TEXTS", "BIOS", "OPENERS", "FOMO_MESSAGES"])
-    for name in target_names:
-        globals()[name] = repair_mojibake_data(globals()[name])
-
-
-repair_runtime_ui_strings()
-
-
 bot = telebot.TeleBot(TOKEN)
 app = Flask(__name__)
 state_lock = threading.RLock()
@@ -505,22 +517,14 @@ admin_active_chat = {}
 LAST_ACTION_TIME = {}
 LAST_ACTIVITY_TIME = {}
 LAST_ENGAGEMENT_PING = {}
-LAST_DB_SYNC_TIME = 0
 COOLDOWN_SECONDS = 2.5
 INACTIVITY_MIN_SECONDS = 10 * 60
 INACTIVITY_MAX_SECONDS = 15 * 60
 INACTIVITY_CHECK_SECONDS = 60
-DB_SYNC_INTERVAL_SECONDS = 30
+DB_USER_CACHE = {}
 
 
 def safe_send_message(bot, *args, **kwargs):
-    args = list(args)
-    if len(args) > 1:
-        args[1] = repair_mojibake_text(args[1])
-    if "text" in kwargs:
-        kwargs["text"] = repair_mojibake_text(kwargs["text"])
-    if "reply_markup" in kwargs:
-        kwargs["reply_markup"] = normalize_reply_markup_text(kwargs["reply_markup"])
     target = args[0] if args else kwargs.get("chat_id")
     for attempt in range(1, 4):
         try:
@@ -533,11 +537,6 @@ def safe_send_message(bot, *args, **kwargs):
 
 
 def safe_send_photo(bot, *args, **kwargs):
-    args = list(args)
-    if "caption" in kwargs:
-        kwargs["caption"] = repair_mojibake_text(kwargs["caption"])
-    if "reply_markup" in kwargs:
-        kwargs["reply_markup"] = normalize_reply_markup_text(kwargs["reply_markup"])
     target = args[0] if args else kwargs.get("chat_id")
     for attempt in range(1, 4):
         try:
@@ -709,7 +708,7 @@ def format_vip_expiry_date(user):
 def build_vip_status_lines(user):
     if is_vip_active(user):
         return [
-            "VIP: Active Ã°Å¸â€™Å½",
+            "VIP: Active 💎",
             f"\u23F3 {get_vip_remaining_days(user)} days remaining",
         ]
     return ["VIP: Not Active"]
@@ -751,19 +750,21 @@ def load_state():
         file_users = {}
 
     db_users = load_users_from_db()
-    restored = dict(file_users)
-
     if db_users:
-        print(f"Loaded {len(db_users)} users from PostgreSQL")
-        for uid, payload in db_users.items():
+        restored = {uid: prepare_user_record(payload) for uid, payload in db_users.items()}
+        for uid, payload in file_users.items():
             prepared = prepare_user_record(payload)
-            if uid not in restored or user_record_score(prepared) >= user_record_score(restored[uid]):
+            if uid not in restored or user_record_score(prepared) > user_record_score(restored[uid]):
                 restored[uid] = prepared
-
-    print(f"Loaded {len(file_users)} users from JSON backup")
+        print(f"Loaded {len(db_users)} users from PostgreSQL")
+        print(f"Loaded {len(file_users)} users from JSON fallback")
+    else:
+        restored = dict(file_users)
+        print("Loaded 0 users from PostgreSQL")
+        print(f"Loaded {len(file_users)} users from JSON fallback")
 
     vip_data = load_vip_from_db()
-    print("VIP DB loaded:", len(vip_data))
+    print(f"Loaded {len(vip_data)} VIP records from PostgreSQL")
     for uid, vip in vip_data.items():
         if uid in restored:
             restored[uid]["payment_status"] = vip.get("payment_status", "none")
@@ -787,20 +788,48 @@ def load_state():
     return restored
 
 
-init_vip_table()
-init_users_table()
-users = load_state()
-save_all_users_to_db(users)
-LAST_DB_SYNC_TIME = time.time()
+def initialize_db_user_cache(users_map):
+    DB_USER_CACHE.clear()
+    for user_id, user in users_map.items():
+        DB_USER_CACHE[int(user_id)] = serialize_user_record(user)
 
 
-def maybe_sync_users_to_db(snapshot, force=False):
-    global LAST_DB_SYNC_TIME
-    now = time.time()
-    if not force and now - LAST_DB_SYNC_TIME < DB_SYNC_INTERVAL_SECONDS:
+def sync_changed_users_to_db(users_map):
+    changed_rows = []
+    for user_id, user in users_map.items():
+        serialized = serialize_user_record(user)
+        if DB_USER_CACHE.get(int(user_id)) != serialized:
+            changed_rows.append((int(user_id), serialized))
+
+    if not changed_rows:
         return
-    save_all_users_to_db(snapshot)
-    LAST_DB_SYNC_TIME = now
+
+    conn = get_db_connection()
+    if not conn:
+        return
+
+    try:
+        cur = conn.cursor()
+        cur.executemany("""
+        INSERT INTO users (user_id, data)
+        VALUES (%s, %s)
+        ON CONFLICT (user_id)
+        DO UPDATE SET data = EXCLUDED.data
+        """, changed_rows)
+        conn.commit()
+        cur.close()
+        for user_id, serialized in changed_rows:
+            DB_USER_CACHE[user_id] = serialized
+    except Exception as e:
+        conn.rollback()
+        print(f"DB sync error: {e}", flush=True)
+    finally:
+        conn.close()
+
+
+run_schema_migrations()
+users = load_state()
+initialize_db_user_cache(users)
 
 
 def save_state():
@@ -813,7 +842,7 @@ def save_state():
         except Exception as e:
             print(f"Error saving state: {e}", flush=True)
         try:
-            maybe_sync_users_to_db({int(user_id): data for user_id, data in normalized_users.items()})
+            sync_changed_users_to_db({int(user_id): data for user_id, data in normalized_users.items()})
         except Exception as e:
             print(f"Error syncing users to DB: {e}", flush=True)
 
@@ -1042,7 +1071,6 @@ def set_chat_state(user_id, match_id, state):
         thread = ensure_chat_thread(user, match_id)
         old_state = thread.get("state", "available")
         if state == "active" and old_state == "available":
-            print(f"DEBUG: CHAT ACTIVATED for match_id={match_id}")
             chat_started_notified = user.get("chat_started_notified", {})
             match_id_str = str(match_id)
             if not thread.get("counted_for_limit", False) and match_id_str not in chat_started_notified:
@@ -1111,7 +1139,6 @@ def can_start_new_chat(user_id):
     user = get_user(user_id)
     total_used = user.get("total_chats_used", 0)
     chat_limit = user.get("chat_limit", 1)
-    print(f"DEBUG LIMIT: total_chats_used={total_used}, chat_limit={chat_limit}")
     return total_used < chat_limit
 
 
@@ -1140,8 +1167,8 @@ def chat_limit_message(user_id):
 def unlock_vip_usage_message(user_id):
     user = get_user(user_id)
     if user.get("vip_start_date") is not None:
-        return "<b>You've reached your chat limit.\nRenew VIP to continue Ã°Å¸â€â€œ</b>"
-    return "<b>You've used your free chat.\nUnlock VIP to continue Ã°Å¸â€â€œ</b>"
+        return "<b>You've reached your chat limit.\nRenew VIP to continue 🔓</b>"
+    return "<b>You've used your free chat.\nUnlock VIP to continue 🔓</b>"
 
 
 def is_visible_in_inbox(user_id, match_id):
@@ -1205,15 +1232,15 @@ def get_last_message_preview(user_id, match_id, limit=40):
 
 def format_admin_chat_history(user_id, user_name, match_name, messages, unread_count, chat_state):
     user = get_user(user_id)
-    tag = "Ã°Å¸Å¸Â¢ VIP" if user.get("paid") else "Ã°Å¸Å¸Â¡ FREE"
-    lines = [f"Ã°Å¸â€™Â¬ <b>{html.escape(user_name)}</b> Ãƒâ€” <b>{html.escape(match_name)}</b> {tag}"]
+    tag = "🟢 VIP" if user.get("paid") else "🟡 FREE"
+    lines = [f"💬 <b>{html.escape(user_name)}</b> × <b>{html.escape(match_name)}</b> {tag}"]
     if user["paid"]:
-        lines.append("Ã°Å¸â€™Å½ VIP: Active")
+        lines.append("💎 VIP: Active")
         lines.append(f"Plan: {get_vip_plan_label(user)}")
         lines.append(f"\u23F3 {get_vip_remaining_days(user)} days remaining")
         lines.append(f"Expires: {format_vip_expiry_date(user)}")
     else:
-        lines.append("Ã°Å¸â€™Å½ VIP: Not Active")
+        lines.append("💎 VIP: Not Active")
     if unread_count:
         lines.append(f"Unread: {unread_count}")
     lines.append(f"State: {chat_state}")
@@ -1246,7 +1273,7 @@ def notify_user_of_match_message(user_id, match_id, text):
         message_text = f"<b>{html.escape(match_name)}:</b> {html.escape(text)}"
     else:
         message_text = (
-            f"<b>Ã°Å¸â€™Â¬ New message from {html.escape(match_name)}</b>\n\n"
+            f"<b>💬 New message from {html.escape(match_name)}</b>\n\n"
             f"<b>{html.escape(match_name)}:</b> {html.escape(text)}"
         )
 
@@ -1343,10 +1370,10 @@ def send_matches_inbox(user_id):
         save_state()
 
     if not matches:
-        safe_send_message(bot, user_id, "HmmÃ¢â‚¬Â¦ no one caught your vibe yet Ã°Å¸ËœÂ\nTry againÃ¢â‚¬Â¦", reply_markup=main_menu_keyboard(user_id))
+        safe_send_message(bot, user_id, "Hmm… no one caught your vibe yet 😏\nTry again…", reply_markup=main_menu_keyboard(user_id))
         return
 
-    safe_send_message(bot, user_id, "<b>Ã°Å¸â€™â€“ Your chats</b>", reply_markup=build_user_inbox_markup(user_id, matches), parse_mode="HTML")
+    safe_send_message(bot, user_id, "<b>💖 Your chats</b>", reply_markup=build_user_inbox_markup(user_id, matches), parse_mode="HTML")
 
 
 def send_match_card(user_id, match_id):
@@ -1359,12 +1386,12 @@ def send_match_card(user_id, match_id):
     state = get_chat_state(user_id, match_id)
     unread = get_unread_count(user_id, match_id)
     preview = get_last_message_preview(user_id, match_id, limit=80)
-    lines = [f"<b>{profile['name']}</b>, {profile['age']} Ã°Å¸â„¢â€š"]
+    lines = [f"<b>{profile['name']}</b>, {profile['age']} 🙂"]
     if unread:
         lines.append(f"Unread: {unread}")
     lines.append(preview)
     if state == "locked":
-        lines.extend(["", "Upgrade to reply and unlock full chats Ã¯Â¿Â½"])
+        lines.extend(["", "Upgrade to reply and unlock full chats 🔓"])
 
     with state_lock:
         user["current_match_id"] = match_id
@@ -1449,7 +1476,7 @@ def inactivity_engagement_worker():
             try:
                 send_typing_then_message(
                     user_id,
-                    "Ã°Å¸â€™Â¬ Someone is waiting for your reply Ã°Å¸Ëœâ€°",
+                    "💬 Someone is waiting for your reply 😉",
                     reply_markup=main_menu_keyboard(user_id),
                     delay=random.uniform(1.0, 2.0),
                 )
@@ -1466,7 +1493,7 @@ def welcome_keyboard():
 def send_welcome_screen(user_id):
     safe_send_message(bot, 
         user_id,
-        "<b>Hey Ã°Å¸Ëœâ€° Welcome!</b>\n\nExplore profiles, find your matches,\nand start chatting with someone new Ã°Å¸â€™Â«\n\nLetÃ¢â‚¬â„¢s see how this goesÃ¢â‚¬Â¦\n\nTap Continue Ã°Å¸â€˜â€¡",
+        "<b>Hey 😉 Welcome!</b>\n\nExplore profiles, find your matches,\nand start chatting with someone new 💫\n\nLet’s see how this goes…\n\nTap Continue 👇",
         reply_markup=welcome_keyboard(),
         parse_mode="HTML",
     )
@@ -1504,7 +1531,7 @@ def get_total_unread(user):
 def matches_button_text(user):
     unread_total = get_total_unread(user)
     if unread_total:
-        return f"Ã°Å¸â€™â€“ Matches ({unread_total})"
+        return f"💖 Matches ({unread_total})"
     return BTN_MATCHES
 
 
@@ -1559,7 +1586,7 @@ def buy_keyboard():
 
 
 def chat_limit_keyboard():
-    return build_keyboard([BTN_BUY], ["Ã°Å¸â€â„¢ Main Menu"])
+    return build_keyboard([BTN_BUY], [BTN_MAIN_MENU])
 
 
 def build_admin_chat_controls(user_id, match_id):
@@ -1606,8 +1633,8 @@ def build_admin_chat_list_markup(admin_id, unread_only=False):
                     continue
                 last_ts = int(messages[-1].get("ts", 0)) if messages else 0
                 user = get_user(user_id)
-                tag = "Ã°Å¸Å¸Â¢ VIP" if user.get("paid") else "Ã°Å¸Å¸Â¡ FREE"
-                label = f"{tag} Ã¢â‚¬Â¢ {user_name} Ãƒâ€” {match_name}"
+                tag = "🟢 VIP" if user.get("paid") else "🟡 FREE"
+                label = f"{tag} • {user_name} × {match_name}"
                 if admin_unread:
                     label += f" ({admin_unread})"
                 preview = get_last_message_preview(user_id, match_id, limit=26)
@@ -1699,7 +1726,7 @@ def send_main_menu(user_id):
 def send_agreement(user_id):
     safe_send_message(bot, 
         user_id,
-        "Ã°Å¸â€œÅ“ <b>Please read and accept the agreement to continue</b>",
+        "📜 <b>Please read and accept the agreement to continue</b>",
         reply_markup=agreement_keyboard(),
         parse_mode="HTML",
     )
@@ -1724,26 +1751,26 @@ def send_current_step_prompt(user_id):
     if step == "start":
         safe_send_message(bot, 
             user_id,
-            "<b>Hey Ã°Å¸Ëœâ€° Welcome!</b>\n\nExplore profiles, find your matches,\nand start chatting with someone new Ã°Å¸â€™Â«\n\nLetÃ¢â‚¬â„¢s see how this goesÃ¢â‚¬Â¦\n\nTap Continue Ã°Å¸â€˜â€¡",
+            "<b>Hey 😉 Welcome!</b>\n\nExplore profiles, find your matches,\nand start chatting with someone new 💫\n\nLet’s see how this goes…\n\nTap Continue 👇",
             reply_markup=welcome_keyboard(),
             parse_mode="HTML",
         )
         return
 
     if step == "gender":
-        safe_send_message(bot, user_id, "Ã°Å¸â€˜Â¤ Tell us about yourself\n\nSelect your gender:", reply_markup=gender_keyboard())
+        safe_send_message(bot, user_id, "👤 Tell us about yourself\n\nSelect your gender:", reply_markup=gender_keyboard())
         return
 
     if step == "city":
-        safe_send_message(bot, user_id, "Ã°Å¸â€œÂ Where are you from?\n\nEnter your city:", reply_markup=ReplyKeyboardRemove())
+        safe_send_message(bot, user_id, "📍 Where are you from?\n\nEnter your city:", reply_markup=ReplyKeyboardRemove())
         return
 
     if step == "photo":
-        safe_send_message(bot, user_id, "Ã°Å¸â€œÂ¸ Send your photo")
+        safe_send_message(bot, user_id, "📸 Send your photo")
         return
 
     if step == "moderation":
-        safe_send_message(bot, user_id, "Ã°Å¸â€œÂ¸ Photo received!\n\nPlease wait a moment... Ã¢ÂÂ³\nYour photo is being reviewed")
+        safe_send_message(bot, user_id, "📸 Photo received!\n\nPlease wait a moment... ⏳\nYour photo is being reviewed")
         return
 
     if step == "agreement":
@@ -1769,7 +1796,7 @@ def choose_next_profile(user):
 
 
 def profile_caption_from_view(profile, profile_view, detailed=False):
-    lines = [f"Ã¢â„¢â‚¬Ã¯Â¸Â <b>{profile['name']}</b>, {profile['age']}", f"Ã°Å¸Å¸Â¢ {profile_view['activity']}"]
+    lines = [f"❤️ <b>{profile['name']}</b>, {profile['age']}", f"🟢 {profile_view['activity']}"]
     return "\n".join(lines)
 
 
@@ -1779,7 +1806,7 @@ def send_profile_card(user_id, detailed=False, profile_id=None):
         if profile_id is None:
             profile_id = choose_next_profile(user)
         if profile_id is None:
-            safe_send_message(bot, user_id, "HmmÃ¢â‚¬Â¦ no one caught your vibe yet Ã°Å¸ËœÂ\nTry againÃ¢â‚¬Â¦", reply_markup=main_menu_keyboard(user_id))
+            safe_send_message(bot, user_id, "Hmm… no one caught your vibe yet 😏\nTry again…", reply_markup=main_menu_keyboard(user_id))
             return
         if profile_id not in user["shown"]:
             user["shown"].append(profile_id)
@@ -1853,7 +1880,7 @@ def schedule_reaction_after_like(user, profile_id):
 def send_like_feedback(user_id, profile):
     safe_send_message(bot, 
         user_id,
-        f"<b>You liked {profile['name']} Ã°Å¸Ëœâ€°</b>\n\nLetÃ¢â‚¬â„¢s see if itÃ¢â‚¬â„¢s a matchÃ¢â‚¬Â¦",
+        f"<b>You liked {profile['name']} 😉</b>\n\nLet's see if it's a match…",
         reply_markup=build_keyboard([BTN_MAIN_MENU]),
         parse_mode="HTML",
     )
@@ -1863,7 +1890,7 @@ def announce_incoming_like(user_id, profile_id):
     profile = get_profile(profile_id)
     if not profile:
         return
-    safe_send_message(bot, user_id, "Someone liked your profile Ã°Å¸Ëœâ€°\n\nCheck it now")
+    safe_send_message(bot, user_id, "Someone liked your profile 😉\n\nCheck it now")
     time.sleep(random.uniform(1.0, 2.0))
     safe_send_photo(bot, 
         user_id,
@@ -1901,7 +1928,7 @@ def create_match(user_id, profile_id, source="system"):
     if not profile:
         return
 
-    match_line = "Ã°Å¸â€Â¥ <b>ItÃ¢â‚¬â„¢s a match!</b>\n\nYou both liked each other Ã°Å¸Ëœâ€°\n\nSay somethingÃ¢â‚¬Â¦ letÃ¢â‚¬â„¢s see where this goes Ã°Å¸â€™Â¬"
+    match_line = "🔥 <b>It’s a match!</b>\n\nYou both liked each other 😉\n\nSay something… let’s see where this goes 💬"
     safe_send_message(bot, user_id, match_line, parse_mode="HTML")
     
     # Non-repeating opener logic
@@ -1971,9 +1998,9 @@ def process_pending_events(user_id):
 
 
 def delayed_moderation_success(user_id):
-    safe_send_message(bot, user_id, "Ã°Å¸â€œÂ¸ Photo received!\n\nPlease wait a moment... Ã¢ÂÂ³\nYour photo is being reviewed")
+    safe_send_message(bot, user_id, "📸 Photo received!\n\nPlease wait a moment... ⏳\nYour photo is being reviewed")
     time.sleep(random.uniform(2.0, 3.0))
-    safe_send_message(bot, user_id, "Ã¢Å“Â¨ Almost done...")
+    safe_send_message(bot, user_id, "✨ Almost done...")
     time.sleep(random.uniform(2.0, 3.0))
 
     user = get_user(user_id)
@@ -1982,7 +2009,7 @@ def delayed_moderation_success(user_id):
         user["step"] = "agreement"
         save_state()
 
-    safe_send_message(bot, user_id, "Ã¢Å“â€¦ Photo approved!")
+    safe_send_message(bot, user_id, "✅ Photo approved!")
     send_agreement(user_id)
 
  
@@ -1992,23 +2019,23 @@ def send_vip_already_message(user_id):
         if user.get("awaiting_payment"):
             user["awaiting_payment"] = False
             save_state()
-    safe_send_message(bot, user_id, "<b>Ã¢Å“â€¦ You already have VIP access.</b>", parse_mode="HTML")
+    safe_send_message(bot, user_id, "<b>✅ You already have VIP access.</b>", parse_mode="HTML")
 
 
 def unlock_text():
     return (
         "<b>"
-        "<b>Ã°Å¸â€â€™ VIP Access Required</b>\n\n"
-        "WaitÃ¢â‚¬Â¦ don't go Ã°Å¸ËœÂ¶\n"
-        "We were just getting interestingÃ¢â‚¬Â¦\n\n"
-        "To continue this chat, unlock chat Ã°Å¸â€˜â€¡\n\n"
-        "<b>Ã°Å¸â€™Â³ Secure Payment Link:</b>\n"
+        "<b>🔒 VIP Access Required</b>\n\n"
+        "Wait… don't go 😶\n"
+        "We were just getting interesting…\n\n"
+        "To continue this chat, unlock chat 👇\n\n"
+        "<b>💳 Secure Payment Link:</b>\n"
         f"{PAYMENT_LINK}\n\n"
-        "<b>Ã°Å¸â€œÅ’ Steps:</b>\n"
+        "<b>📌 Steps:</b>\n"
         "1. Make payment\n"
         "2. Send screenshot\n"
         "3. Get VIP access\n\n"
-        "Ã¢Å¡Â Ã¯Â¸Â After payment, send screenshot here to activate VIP"
+        "⚠️ After payment, send screenshot here to activate VIP"
         "</b>"
     )
 
@@ -2020,7 +2047,7 @@ def open_likes_you(user_id):
         paid = user["paid"]
 
     if not incoming:
-        safe_send_message(bot, user_id, "No new likes right nowÃ¢â‚¬Â¦\n\nCheck back later Ã°Å¸Ëœâ€°", reply_markup=main_menu_keyboard(user_id))
+        safe_send_message(bot, user_id, "No new likes right now…\n\nCheck back later 😉", reply_markup=main_menu_keyboard(user_id))
         return
 
     profile_id = incoming[0]
@@ -2061,7 +2088,7 @@ def show_matches(user_id):
     user = get_user(user_id)
     matches = get_visible_match_ids(user_id)
     if not matches:
-        safe_send_message(bot, user_id, "HmmÃ¢â‚¬Â¦ no one caught your vibe yet Ã°Å¸ËœÂ\nTry againÃ¢â‚¬Â¦", reply_markup=main_menu_keyboard(user_id))
+        safe_send_message(bot, user_id, "Hmm… no one caught your vibe yet 😏\nTry again…", reply_markup=main_menu_keyboard(user_id))
         return
 
     current_match_id = user.get("current_match_id")
@@ -2081,7 +2108,7 @@ def show_next_match(user_id):
     user = get_user(user_id)
     matches = get_visible_match_ids(user_id)
     if not matches:
-        safe_send_message(bot, user_id, "HmmÃ¢â‚¬Â¦ no one caught your vibe yet Ã°Å¸ËœÂ\nTry againÃ¢â‚¬Â¦", reply_markup=main_menu_keyboard(user_id))
+        safe_send_message(bot, user_id, "Hmm… no one caught your vibe yet 😏\nTry again…", reply_markup=main_menu_keyboard(user_id))
         return
 
     current_cursor = int(user.get("match_cursor", 0))
@@ -2096,7 +2123,7 @@ def show_prev_match(user_id):
     user = get_user(user_id)
     matches = get_visible_match_ids(user_id)
     if not matches:
-        safe_send_message(bot, user_id, "HmmÃ¢â‚¬Â¦ no one caught your vibe yet Ã°Å¸ËœÂ\nTry againÃ¢â‚¬Â¦", reply_markup=main_menu_keyboard(user_id))
+        safe_send_message(bot, user_id, "Hmm… no one caught your vibe yet 😏\nTry again…", reply_markup=main_menu_keyboard(user_id))
         return
 
     current_cursor = int(user.get("match_cursor", 0))
@@ -2178,7 +2205,7 @@ def open_match_chat(user_id, match_id, show_history=True):
             safe_send_message(bot, user_id, format_chat_history(name, history), parse_mode="HTML")
         safe_send_message(bot, 
             user_id,
-            "<b>She was about to say somethingÃ¢â‚¬Â¦</b>\n\nUnlock to continue Ã¯Â¿Â½",
+            "<b>She was about to say something…</b>\n\nUnlock to continue 🔓",
             reply_markup=likes_locked_keyboard(),
             parse_mode="HTML",
         )
@@ -2208,7 +2235,7 @@ def open_match_chat(user_id, match_id, show_history=True):
     safe_send_message(bot, user_id, format_chat_history(name, history), reply_markup=reply_markup, parse_mode="HTML")
     safe_send_message(bot, 
         user_id,
-        "Say somethingÃ¢â‚¬Â¦ don't be boring Ã°Å¸Ëœâ€ž",
+        "Say something… don't be boring 😄",
         reply_markup=reply_markup,
     )
 
@@ -2279,7 +2306,7 @@ def help_command_handler(message):
         touch_user_activity(message.chat.id)
     safe_send_message(bot, 
         message.chat.id,
-        "Ã°Å¸Â¤â€“ Commands:\n/menu - Main menu\n/matches - View matches\n/chat - Open chat\n/vip - VIP access",
+        "🤖 Commands:\n/menu - Main menu\n/matches - View matches\n/chat - Open chat\n/vip - VIP access",
     )
 
 
@@ -2290,7 +2317,7 @@ def reset_command(message):
 
     safe_send_message(bot, 
         user_id,
-        "Ã¢Å¡Â Ã¯Â¸Â This will reset your profile and remove all data (including VIP).\n\nType CONFIRM to continue or anything else to cancel."
+        "⚠️ This will reset your profile and remove all data (including VIP).\n\nType CONFIRM to continue or anything else to cancel."
     )
 
     def confirm_reset(m):
@@ -2298,7 +2325,7 @@ def reset_command(message):
             return
         if m.text == "CONFIRM":
             reset_user(user_id)
-            safe_send_message(bot, user_id, "Your profile has been reset Ã¢Å“â€¦")
+            safe_send_message(bot, user_id, "Your profile has been reset ✅")
         else:
             safe_send_message(bot, user_id, "Reset cancelled")
         bot.clear_step_handler_by_chat_id(user_id)
@@ -2318,7 +2345,7 @@ def stats_handler(message):
         vip_users = sum(1 for user in users.values() if is_vip_active(user))
         pending_users = sum(1 for user in users.values() if user.get("payment_status") == "pending")
     
-    stats_message = f"""Ã°Å¸â€œÅ  Stats:
+    stats_message = f"""📊 Stats:
 Total Users: {total_users}
 VIP Users: {vip_users}
 Pending Payments: {pending_users}"""
@@ -2337,13 +2364,13 @@ def pending_handler(message):
         pending_users = [(uid, user) for uid, user in users.items() if user.get("payment_status") == "pending"]
     
     if not pending_users:
-        safe_send_message(bot, message.chat.id, "Ã¢Å“â€¦ No pending payments right now.")
+        safe_send_message(bot, message.chat.id, "✅ No pending payments right now.")
         return
     
-    lines = [f"Ã¢ÂÂ³ Pending Payments ({len(pending_users)}):"]
+    lines = [f"⏳ Pending Payments ({len(pending_users)}):"]
     for uid, user in pending_users:
         name = user.get("name") or f"User {uid}"
-        lines.append(f"Ã¢â‚¬Â¢ {name} (ID: {uid})")
+        lines.append(f"• {name} (ID: {uid})")
     
     safe_send_message(bot, message.chat.id, "\n".join(lines))
 
@@ -2361,7 +2388,7 @@ def send_next_pending_to_admin(admin_id):
     """Send next pending user's payment proof to admin or notify if none"""
     next_uid = get_next_pending_user_id()
     if not next_uid:
-        safe_send_message(bot, admin_id, "Ã¢Å“â€¦ No more pending payments")
+        safe_send_message(bot, admin_id, "✅ No more pending payments")
         return
     
     next_user = get_user(next_uid)
@@ -2369,19 +2396,19 @@ def send_next_pending_to_admin(admin_id):
     
     if not photo_id:
         name = next_user.get("name") or f"User {next_uid}"
-        safe_send_message(bot, admin_id, f"Ã°Å¸â€œÂ¥ Next pending: {name} (ID: {next_uid})")
+        safe_send_message(bot, admin_id, f"🧾 Next pending: {name} (ID: {next_uid})")
         return
     
     first_name = next_user.get("name") or "User"
     username = next_user.get("payment_username", "N/A")
     
-    caption = f"""Ã°Å¸â€œÂ¥ Payment Proof Received
+    caption = f"""🧾 Payment Proof Received
 
 User ID: {next_uid}
 Name: {first_name}
 Username: @{username}
 
-Status: Ã°Å¸Å¸Â¡ Pending"""
+Status: 🟡 Pending"""
     
     safe_send_photo(bot, 
         admin_id,
@@ -2516,7 +2543,7 @@ def photo_handler(message):
     if not is_admin(user_id):
         touch_user_activity(user_id)
     if is_on_cooldown(user_id):
-        safe_send_message(bot, user_id, "Please wait a moment Ã¢ÂÂ³")
+        safe_send_message(bot, user_id, "Please wait a moment ⏳")
         return
     user = get_user(user_id)
     file_id = message.photo[-1].file_id
@@ -2548,7 +2575,7 @@ def photo_handler(message):
         
         # Check if already under review
         if user.get("payment_status") == "pending":
-            safe_send_message(bot, user_id, "Ã¢ÂÂ³ Your payment is already under review. Please wait.")
+            safe_send_message(bot, user_id, "⏳ Your payment is already under review. Please wait.")
             return
         
         # Check if already approved
@@ -2561,13 +2588,13 @@ def photo_handler(message):
         username = message.from_user.username or "N/A"
         
         # Enhanced caption with user info and status
-        caption = f"""Ã°Å¸â€œÂ¥ Payment Proof Received
+        caption = f"""🧾 Payment Proof Received
 
 User ID: {user_id}
 Name: {first_name}
 Username: @{username}
 
-Status: Ã°Å¸Å¸Â¡ Pending"""
+Status: 🟡 Pending"""
         
         for admin in PAYMENT_ADMINS:
             safe_send_photo(bot, 
@@ -2584,7 +2611,7 @@ Status: Ã°Å¸Å¸Â¡ Pending"""
             user["payment_username"] = username
             save_state()
         
-        safe_send_message(bot, user_id, "Screenshot received Ã¢Å“â€¦\n\nWeÃ¢â‚¬â„¢re verifying itÃ¢â‚¬Â¦ please wait a moment", reply_markup=main_menu_keyboard(user_id))
+        safe_send_message(bot, user_id, "Screenshot received ✅\n\nWe’re verifying it… please wait a moment", reply_markup=main_menu_keyboard(user_id))
         return
     
     # Block if user is already VIP and sends photo without being in payment flow
@@ -2592,7 +2619,7 @@ Status: Ã°Å¸Å¸Â¡ Pending"""
         send_vip_already_message(user_id)
         return
 
-    safe_send_message(bot, user_id, "Something went wrongÃ¢â‚¬Â¦\n\nPlease try again")
+    safe_send_message(bot, user_id, "Something went wrong…\n\nPlease try again")
 
 
 
@@ -2618,13 +2645,12 @@ def callback_handler(call):
             bot.answer_callback_query(call.id, "Chat already closed")
             return
         set_chat_state(user_id, match_id, "ended")
-        print("DEBUG: CHAT ENDED")
-        append_system_message(user_id, match_id, "This chat has ended.\n\nYou can start a new one anytime Ã°Å¸â„¢â€š")
+        append_system_message(user_id, match_id, "This chat has ended.\n\nYou can start a new one anytime 🙂")
         notify_admin_chat_status(user_id, match_id, "User ended chat")
         remove_match_from_inbox(user_id, match_id)
         safe_send_message(bot, 
             user_id,
-            "<b>This chat has ended.\n\nYou can start a new one anytime Ã°Å¸â„¢â€š</b>",
+            "<b>This chat has ended.\n\nYou can start a new one anytime 🙂</b>",
             reply_markup=main_menu_keyboard(user_id),
             parse_mode="HTML",
         )
@@ -2632,7 +2658,6 @@ def callback_handler(call):
         return
 
     if call.data.startswith("start_chat:"):
-        print("DEBUG: CHAT BUTTON CLICKED")
         user_id = call.message.chat.id
         match_id_str = call.data.split(":", 1)[1]
         if not match_id_str.isdigit():
@@ -2640,7 +2665,6 @@ def callback_handler(call):
             return
         match_id = int(match_id_str)
         state = get_chat_state(user_id, match_id)
-        print(f"DEBUG: thread.state = {state}")
         if state != "active":
             if not can_start_new_chat(user_id):
                 safe_send_message(bot, user_id, unlock_vip_usage_message(user_id), reply_markup=chat_limit_keyboard(), parse_mode="HTML")
@@ -2680,8 +2704,8 @@ def callback_handler(call):
                     bot.answer_callback_query(call.id, "Chat is not active")
                     return
                 set_chat_state(user_id, match_id, "locked")
-                append_system_message(user_id, match_id, "She was about to say somethingÃ¢â‚¬Â¦\n\nUnlock to continue Ã¯Â¿Â½")
-                safe_send_message(bot, user_id, "<b>She was about to say somethingÃ¢â‚¬Â¦</b>\n\nUnlock to continue Ã¯Â¿Â½", reply_markup=likes_locked_keyboard(), parse_mode="HTML")
+                append_system_message(user_id, match_id, "She was about to say something…\n\nUnlock to continue 🔓")
+                safe_send_message(bot, user_id, "<b>She was about to say something…</b>\n\nUnlock to continue 🔓", reply_markup=likes_locked_keyboard(), parse_mode="HTML")
                 bot.answer_callback_query(call.id, "Chat locked")
                 return
 
@@ -2690,11 +2714,11 @@ def callback_handler(call):
                     bot.answer_callback_query(call.id, "Chat already closed")
                     return
                 set_chat_state(user_id, match_id, "ended")
-                append_system_message(user_id, match_id, "This chat has ended.\n\nYou can start a new one anytime Ã°Å¸â„¢â€š")
+                append_system_message(user_id, match_id, "This chat has ended.\n\nYou can start a new one anytime 🙂")
                 remove_match_from_inbox(user_id, match_id)
                 safe_send_message(bot, 
                     user_id,
-                    "<b>This chat has ended.\n\nYou can start a new one anytime Ã°Å¸â„¢â€š</b>",
+                    "<b>This chat has ended.\n\nYou can start a new one anytime 🙂</b>",
                     reply_markup=main_menu_keyboard(user_id),
                     parse_mode="HTML",
                 )
@@ -2817,11 +2841,11 @@ def callback_handler(call):
 
         safe_send_message(bot, 
             call.message.chat.id,
-            f"Ã¢Å“â€¦ User {user_id} approved successfully\nPlan: {plan_label}\nValid till: {time.strftime('%d %b %Y', time.localtime(end_ts))}"
+            f"✅ User {user_id} approved successfully\nPlan: {plan_label}\nValid till: {time.strftime('%d %b %Y', time.localtime(end_ts))}"
         )
         safe_send_message(bot, 
             user_id,
-            f"<b>Ã°Å¸â€™Å½ VIP Activated!\n\nPlan: {plan_label}\nÃ¢ÂÂ³ Valid till: {time.strftime('%d %b %Y', time.localtime(end_ts))}</b>",
+            f"<b>💎 VIP Activated!\n\nPlan: {plan_label}\n⏳ Valid till: {time.strftime('%d %b %Y', time.localtime(end_ts))}</b>",
             reply_markup=main_menu_keyboard(user_id),
             parse_mode="HTML",
         )
@@ -2864,13 +2888,13 @@ def callback_handler(call):
         # Send confirmation to admin
         safe_send_message(bot, 
             call.message.chat.id,
-            f"Ã¢Å“â€¦ User {user_id} approved successfully"
+            f"✅ User {user_id} approved successfully"
         )
         
         # Send activation message to user
         safe_send_message(bot, 
             user_id,
-            "<b>VIP activated Ã°Å¸â€™Å½\n\nYou can now start up to 5 chats in total\n(including any chats you've already used)\n\nChoose wisely Ã°Å¸Ëœâ€°</b>",
+            "<b>VIP activated 💎\n\nYou can now start up to 5 chats in total\n(including any chats you've already used)\n\nChoose wisely 😉</b>",
             reply_markup=main_menu_keyboard(user_id),
             parse_mode="HTML",
         )
@@ -2908,7 +2932,7 @@ def text_handler(message):
 
     if text == BTN_CONTINUE:
         if user["step"] == "start":
-            safe_send_message(bot, user_id, "Ã°Å¸â€Å¾ Are you 18 or older?\n\nYou must be 18+ to continue.", reply_markup=age_keyboard())
+            safe_send_message(bot, user_id, "🔞 Are you 18 or older?\n\nYou must be 18+ to continue.", reply_markup=age_keyboard())
         else:
             send_current_step_prompt(user_id)
         return
@@ -2973,7 +2997,7 @@ def text_handler(message):
         open_likes_you(user_id)
         return
 
-    if text == BTN_MATCHES or text.startswith("Ã°Å¸â€™â€“ Matches"):
+    if text == BTN_MATCHES or text.startswith("💖 Matches"):
         show_matches(user_id)
         return
 
@@ -2989,14 +3013,12 @@ def text_handler(message):
         safe_send_message(bot, user_id, "Choose a section.", reply_markup=settings_keyboard())
         return
 
-    print(f"DEBUG VIP: text='{text}' | BTN_BUY='{BTN_BUY}' | BTN_VIP='{BTN_VIP}' | Checking for match...")
-    if text in {"/buy", BTN_BUY, BTN_GET_VIP, BTN_VIP} or text == "Ã¯Â¿Â½ Unlock Chat":
+    if text in {"/buy", BTN_BUY, BTN_GET_VIP, BTN_VIP}:
         # Check if user is already VIP
         if user["paid"]:
             send_vip_already_message(user_id)
             return
-        
-        print(f"DEBUG: VIP button TRIGGERED for user_id={user_id}")
+
         safe_send_message(bot, user_id, unlock_text(), reply_markup=buy_keyboard(), parse_mode="HTML")
         return
 
@@ -3005,7 +3027,7 @@ def text_handler(message):
             send_vip_already_message(user_id)
             return
         if is_on_cooldown(user_id):
-            safe_send_message(bot, user_id, "Please wait a moment Ã¢ÂÂ³")
+            safe_send_message(bot, user_id, "Please wait a moment ⏳")
             return
         with state_lock:
             user["awaiting_payment"] = True
@@ -3041,7 +3063,7 @@ def text_handler(message):
         safe_send_message(bot, user_id, "Boost can be connected to coins later.", reply_markup=settings_keyboard())
         return
 
-    if text == BTN_MAIN_MENU or text == "Ã°Å¸â€â„¢ Main Menu":
+    if text == BTN_MAIN_MENU:
         send_main_menu(user_id)
         return
 
@@ -3102,7 +3124,7 @@ def text_handler(message):
 
     if text == BTN_LIKE:
         if is_on_cooldown(user_id):
-            safe_send_message(bot, user_id, "Please wait a moment Ã¢ÂÂ³")
+            safe_send_message(bot, user_id, "Please wait a moment ⏳")
             return
         profile_id = user["current_profile_id"]
         if profile_id is None:
@@ -3149,7 +3171,7 @@ def text_handler(message):
 
     if text == BTN_SKIP:
         if is_on_cooldown(user_id):
-            safe_send_message(bot, user_id, "Please wait a moment Ã¢ÂÂ³")
+            safe_send_message(bot, user_id, "Please wait a moment ⏳")
             return
         with state_lock:
             profile_id = user["current_profile_id"]
@@ -3166,9 +3188,7 @@ def text_handler(message):
     if user["current_match_id"]:
         match_id = user["current_match_id"]
         state = get_chat_state(user_id, match_id)
-        print(f"DEBUG MESSAGE HANDLER: user_id={user_id}, current_match_id={match_id}, state={state}")
         if state == "active":
-            print(f"DEBUG: Forwarding message to admins - text='{text}'")
             forward_user_message_to_admins(message)
             
             # Send "Chat started" system message on first message in new chat
@@ -3179,7 +3199,7 @@ def text_handler(message):
                 match_id_str = str(match_id)
                 if match_id_str not in chat_started_notified:
                     chats_left = get_chats_left(user_id)
-                    safe_send_message(bot, user_id, f"<b>Chat started Ã¢Å“â€¦</b>\nChats left: {chats_left} / {user['chat_limit']}", parse_mode="HTML")
+                    safe_send_message(bot, user_id, f"<b>Chat started!</b>\nChats left: {chats_left} / {user['chat_limit']}", parse_mode="HTML")
                     with state_lock:
                         user = get_user(user_id)
                         user.setdefault("chat_started_notified", {})[match_id_str] = True
@@ -3239,7 +3259,7 @@ def healthcheck():
 
 threading.Thread(target=inactivity_engagement_worker, daemon=True).start()
 threading.Thread(target=periodic_state_save, daemon=True).start()
-print("DATABASE_URL:", os.getenv("DATABASE_URL"))
+print(f"Database configured: {bool(os.getenv('DATABASE_URL'))}")
 print("DB schema ready")
 
 if __name__ == "__main__":
