@@ -1645,6 +1645,9 @@ def build_admin_chat_list_markup(admin_id, unread_only=False):
 
 
 def send_admin_chat_list(admin_id, unread_only=False):
+    admin_active_chat[admin_id] = {
+    "view": "unread" if unread_only else "all"
+    }
     clear_admin_active_chat(admin_id)
     markup = build_admin_chat_list_markup(admin_id, unread_only=unread_only)
     if not markup:
