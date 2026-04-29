@@ -1637,7 +1637,7 @@ def build_admin_chat_list_markup(admin_id, unread_only=False):
                 label += f"\n{preview}"
                 chat_rows.append((last_ts, admin_unread, label, user_id, match_id))
 
-    chat_rows.sort(key=lambda item: (-item[1], -item[0], item[2].lower()))
+    chat_rows.sort(key=lambda item: item[0])
     for _, _, label, user_id, match_id in chat_rows[:25]:
         markup.row(InlineKeyboardButton(label, callback_data=f"adminchat_{user_id}_{match_id}"))
     markup.row(InlineKeyboardButton("Unread", callback_data="adminunread"))
@@ -2179,6 +2179,11 @@ def forward_user_message_to_admins(message):
     if unread_admins:
         increment_admin_unread(user_id, match_id, admin_ids=unread_admins)
     maybe_send_fomo_message(message.chat.id, match_id)
+
+    user = get_user(user_id)
+
+    if user.get("active_view") == "inbox":
+        send_matches_inbox(user_id)
 
 
 def open_match_chat(user_id, match_id, show_history=True):
@@ -3217,6 +3222,32 @@ def periodic_state_save():
         save_state()
 
 
+
+def backup_database():
+    while True:
+        try:
+            conn = get_db_connection()
+            if conn:
+                cur = conn.cursor()
+                cur.execute("SELECT user_id, data FROM users")
+                rows = cur.fetchall()
+
+                data = {str(row[0]): json.loads(row[1]) for row in rows}
+
+                with open("backup.json", "w", encoding="utf-8") as f:
+                    json.dump({"users": data}, f, ensure_ascii=False, indent=2)
+
+                print("✅ Backup saved")
+
+                cur.close()
+                conn.close()
+
+        except Exception as e:
+            print("❌ Backup error:", e)
+
+        time.sleep(21600)  # 6 hours
+
+
 def get_webhook_base_url():
     if not WEBHOOK_BASE_URL:
         raise RuntimeError("Set WEBHOOK_BASE_URL or Railway public domain environment variable before starting the webhook server.")
@@ -3265,6 +3296,8 @@ print("DB schema ready")
 
 if __name__ == "__main__":
     configure_webhook()
+
+    threading.Thread(target=backup_database, daemon=True).start()
 
     port = int(os.environ["PORT"])
 
