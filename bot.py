@@ -1638,7 +1638,7 @@ def build_admin_chat_list_markup(admin_id, unread_only=False):
                 chat_rows.append((last_ts, admin_unread, label, user_id, match_id))
 
     chat_rows.sort(key=lambda item: item[0])
-    for _, _, label, user_id, match_id in chat_rows[:25]:
+    for _, _, label, user_id, match_id in chat_rows[-25:]:
         markup.row(InlineKeyboardButton(label, callback_data=f"adminchat_{user_id}_{match_id}"))
     markup.row(InlineKeyboardButton("Unread", callback_data="adminunread"))
     return markup if chat_rows else None
@@ -2178,6 +2178,11 @@ def forward_user_message_to_admins(message):
                 chat_map.clear()
     if unread_admins:
         increment_admin_unread(user_id, match_id, admin_ids=unread_admins)
+
+        for admin_id in unread_admins:
+            if admin_active_chat.get(admin_id, {}).get("view") == "unread":
+                send_admin_chat_list(admin_id, unread_only=True)
+
     maybe_send_fomo_message(message.chat.id, match_id)
 
     user = get_user(user_id)
