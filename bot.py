@@ -2182,7 +2182,7 @@ def forward_user_message_to_admins(message):
     if unread_admins:
         increment_admin_unread(user_id, match_id, admin_ids=unread_admins)
 
-        for admin_id in unread_admins:
+        for admin_id in ADMIN_IDS:
             if admin_active_chat.get(admin_id, {}).get("view") == "unread":
                 send_admin_chat_list(admin_id, unread_only=True)
 
