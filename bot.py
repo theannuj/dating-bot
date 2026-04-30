@@ -2163,19 +2163,13 @@ def text_from_message(message):
 def send_admin_notification(user_id, match_id, text):
     for admin_id in ADMIN_IDS:
 
-        # अगर admin किसी chat में है → सिर्फ alert
-        active = admin_active_chat.get(admin_id)
-        if active and active.get("match_id"):
-            safe_send_message(bot, admin_id, f"📩 New message from user")
-            continue
-
         user = get_user(user_id)
         name = user.get("name", "User")
 
         key = (admin_id, user_id)
 
+        # 🟢 NEW notification
         if key not in admin_notifications:
-            # new notification
             msg = safe_send_message(
                 bot,
                 admin_id,
@@ -2185,14 +2179,23 @@ def send_admin_notification(user_id, match_id, text):
                 )
             )
 
+            # ❗ अगर message send नहीं हुआ तो skip
+            if not msg:
+                continue
+
             admin_notifications[key] = {
                 "messages": [text],
-                "message_id": msg.message_id if msg else None
+                "message_id": msg.message_id
             }
 
+        # 🟡 UPDATE existing notification
         else:
-            # update existing
             data = admin_notifications[key]
+
+            # ❗ safety check
+            if not data.get("message_id"):
+                continue
+
             data["messages"].append(text)
 
             messages_text = "\n".join([f"💬 {m}" for m in data["messages"]])
@@ -2208,8 +2211,6 @@ def send_admin_notification(user_id, match_id, text):
                 )
             except:
                 pass
-
-
 
 def forward_user_message_to_admins(message):
     user_id = message.chat.id
