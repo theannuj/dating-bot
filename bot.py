@@ -512,6 +512,7 @@ app = Flask(__name__)
 state_lock = threading.RLock()
 chat_map = {}
 admin_active_chat = {}
+admin_notifications = {}
 LAST_ACTION_TIME = {}
 LAST_ACTIVITY_TIME = {}
 LAST_ENGAGEMENT_PING = {}
@@ -2159,6 +2160,56 @@ def text_from_message(message):
         return "[Photo]"
     return "[non-text message]"
 
+def send_admin_notification(user_id, match_id, text):
+    for admin_id in ADMIN_IDS:
+
+        # अगर admin किसी chat में है → सिर्फ alert
+        active = admin_active_chat.get(admin_id)
+        if active and active.get("match_id"):
+            safe_send_message(bot, admin_id, f"📩 New message from user")
+            continue
+
+        user = get_user(user_id)
+        name = user.get("name", "User")
+
+        key = (admin_id, user_id)
+
+        if key not in admin_notifications:
+            # new notification
+            msg = safe_send_message(
+                bot,
+                admin_id,
+                f"👤 {name}\n💬 {text}",
+                reply_markup=InlineKeyboardMarkup().add(
+                    InlineKeyboardButton("💬 Reply", callback_data=f"reply_{user_id}_{match_id}")
+                )
+            )
+
+            admin_notifications[key] = {
+                "messages": [text],
+                "message_id": msg.message_id if msg else None
+            }
+
+        else:
+            # update existing
+            data = admin_notifications[key]
+            data["messages"].append(text)
+
+            messages_text = "\n".join([f"💬 {m}" for m in data["messages"]])
+
+            try:
+                bot.edit_message_text(
+                    f"👤 {name} ({len(data['messages'])} messages)\n{messages_text}",
+                    admin_id,
+                    data["message_id"],
+                    reply_markup=InlineKeyboardMarkup().add(
+                        InlineKeyboardButton("💬 Reply", callback_data=f"reply_{user_id}_{match_id}")
+                    )
+                )
+            except:
+                pass
+
+
 
 def forward_user_message_to_admins(message):
     user_id = message.chat.id
@@ -2176,6 +2227,7 @@ def forward_user_message_to_admins(message):
     for admin in get_admin_recipients(user_id, match_id):
         if not is_admin_viewing_chat(admin, user_id, match_id):
             unread_admins.append(admin)
+            send_admin_notification(user_id, match_id, message_text)
             continue
         reset_admin_unread(user_id, match_id, admin)
         sent = safe_send_message(bot, 
@@ -2196,18 +2248,6 @@ def forward_user_message_to_admins(message):
                 chat_map.clear()
     if unread_admins:
         increment_admin_unread(user_id, match_id, admin_ids=unread_admins)
-
-        for admin_id in ADMIN_IDS:
-            state = admin_active_chat.get(admin_id)
-
-            if state and state.get("view") == "unread":
-                try:
-                    if state.get("message_id"):
-                        bot.delete_message(admin_id, state["message_id"])
-                except:
-                    pass
-
-                send_admin_chat_list(admin_id, unread_only=True)
 
     maybe_send_fomo_message(message.chat.id, match_id)
 
@@ -2500,6 +2540,9 @@ def admin_direct_reply(message):
             reply_markup=get_chat_keyboard(user_id, match_id),
             parse_mode="HTML"
         )
+        key = (admin_id, user_id)
+        if key in admin_notifications:
+            del admin_notifications[key]
     except:
         pass
 
@@ -2543,6 +2586,9 @@ def admin_reply_handler(message):
                 reply_markup=get_chat_keyboard(user_id, match_id),
                 parse_mode="HTML"
             )
+            key = (message.chat.id, user_id)
+            if key in admin_notifications:
+                del admin_notifications[key]
         except:
             pass
 
