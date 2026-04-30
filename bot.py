@@ -3000,37 +3000,37 @@ def callback_handler(call):
         send_next_pending_to_admin(call.message.chat.id)
         return
 
-    if call.data.startswith("reply_"):
-        try:
-            data = call.data.replace("reply_", "")
-            parts = data.split("_")
-
-            if len(parts) < 2:
-                safe_send_message(bot, call.message.chat.id, "❌ Invalid data")
-                return
-
-            user_id = int(parts[0])
-            match_id = int(parts[1])
-            admin_id = call.message.chat.id
-
-            # 🔥 set active chat
-            admin_active_chat[admin_id] = {
-                "user_id": user_id,
-                "match_id": match_id
-            }
-
-            # 🔥 CONFIRM IT WORKED
-            safe_send_message(
-                bot,
-                admin_id,
-                f"✅ Chat opened with user {user_id}"
-            )
-
-        except Exception as e:
-            print("Reply button error:", e)
-            safe_send_message(bot, call.message.chat.id, "❌ Reply failed")    
-
     bot.answer_callback_query(call.id, "Unknown action")
+
+
+@bot.callback_query_handler(func=lambda call: call.data.startswith("reply_"))
+def handle_reply_button(call):
+    try:
+        data = call.data.replace("reply_", "")
+        user_id, match_id = map(int, data.split("_"))
+        admin_id = call.message.chat.id
+
+        # 🔥 ACTIVE CHAT SET
+        admin_active_chat[admin_id] = {
+            "user_id": user_id,
+            "match_id": match_id
+        }
+
+        # 🔥 NOTIFICATION REMOVE
+        key = (admin_id, user_id)
+        if key in admin_notifications:
+            del admin_notifications[key]
+
+        bot.send_message(
+            admin_id,
+            f"💬 Chat opened with user {user_id}\nअब reply करो"
+        )
+
+        bot.answer_callback_query(call.id)
+
+    except Exception as e:
+        print("Reply handler error:", e)
+        bot.answer_callback_query(call.id, "Error")    
 
 
 @bot.message_handler(func=lambda message: message.chat.id not in CHAT_ADMINS, content_types=["text"])
