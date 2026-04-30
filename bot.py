@@ -2168,19 +2168,16 @@ def send_admin_notification(user_id, match_id, text):
 
         key = (admin_id, user_id)
 
-        # 🟢 NEW notification
         if key not in admin_notifications:
-            msg = safe_send_message(
-                bot,
-                admin_id,
-                f"👤 {name}\n💬 {text}",
-                reply_markup=InlineKeyboardMarkup().add(
-                    InlineKeyboardButton("💬 Reply", callback_data=f"reply_{user_id}_{match_id}")
+            try:
+                msg = bot.send_message(
+                    admin_id,
+                    f"👤 {name}\n💬 {text}",
+                    reply_markup=InlineKeyboardMarkup().add(
+                        InlineKeyboardButton("💬 Reply", callback_data=f"reply_{user_id}_{match_id}")
+                    )
                 )
-            )
-
-            # ❗ अगर message send नहीं हुआ तो skip
-            if not msg:
+            except:
                 continue
 
             admin_notifications[key] = {
@@ -2188,13 +2185,8 @@ def send_admin_notification(user_id, match_id, text):
                 "message_id": msg.message_id
             }
 
-        # 🟡 UPDATE existing notification
         else:
             data = admin_notifications[key]
-
-            # ❗ safety check
-            if not data.get("message_id"):
-                continue
 
             data["messages"].append(text)
 
