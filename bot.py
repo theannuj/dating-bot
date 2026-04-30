@@ -2209,7 +2209,7 @@ def send_admin_notification(user_id, match_id, text):
             except:
                 pass
 
-            
+
 def forward_user_message_to_admins(message):
     user_id = message.chat.id
     user = get_user(user_id)
@@ -2380,11 +2380,6 @@ def help_command_handler(message):
         message.chat.id,
         "🤖 Commands:\n/menu - Main menu\n/matches - View matches\n/chat - Open chat\n/vip - VIP access",
     )
-
-@bot.message_handler(content_types=['photo'])
-def get_file_id(message):
-    file_id = message.photo[-1].file_id
-    bot.send_message(message.chat.id, file_id)    
 
 
 @bot.message_handler(commands=["reset"])
