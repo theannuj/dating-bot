@@ -2227,7 +2227,7 @@ def forward_user_message_to_admins(message):
     for admin in get_admin_recipients(user_id, match_id):
         if not is_admin_viewing_chat(admin, user_id, match_id):
             unread_admins.append(admin)
-            send_admin_notification(user_id, match_id, message_text)
+            
             continue
         reset_admin_unread(user_id, match_id, admin)
         sent = safe_send_message(bot, 
@@ -2248,6 +2248,7 @@ def forward_user_message_to_admins(message):
                 chat_map.clear()
     if unread_admins:
         increment_admin_unread(user_id, match_id, admin_ids=unread_admins)
+    send_admin_notification(user_id, match_id, message_text)    
 
     maybe_send_fomo_message(message.chat.id, match_id)
 
