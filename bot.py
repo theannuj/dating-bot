@@ -2719,12 +2719,8 @@ def callback_handler(call):
             }
 
             reset_admin_unread(user_id, match_id, admin_id)
-
-            safe_send_message(
-                bot,
-                admin_id,
-                f"💬 Chat opened\nUser: {user_id}"
-            )
+            
+            send_admin_chat_history(admin_id, user_id, match_id)
 
             bot.answer_callback_query(call.id)
             return
