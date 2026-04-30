@@ -2997,6 +2997,31 @@ def callback_handler(call):
         send_next_pending_to_admin(call.message.chat.id)
         return
 
+    if call.data.startswith("reply_"):
+        try:
+            _, user_id, match_id = call.data.split("_")
+
+            user_id = int(user_id)
+            match_id = int(match_id)
+            admin_id = call.message.chat.id
+
+            admin_active_chat[admin_id] = {
+                "user_id": user_id,
+                "match_id": match_id
+            }
+
+            safe_send_message(
+                bot,
+                admin_id,
+                f"💬 Chat opened with user {user_id}"
+            )
+
+            bot.answer_callback_query(call.id)
+
+        except Exception as e:
+            print("Reply button error:", e)
+            bot.answer_callback_query(call.id, "Error")    
+
     bot.answer_callback_query(call.id, "Unknown action")
 
 
