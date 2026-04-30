@@ -3002,26 +3002,33 @@ def callback_handler(call):
 
     if call.data.startswith("reply_"):
         try:
-            _, user_id, match_id = call.data.split("_")
+            data = call.data.replace("reply_", "")
+            parts = data.split("_")
 
-            user_id = int(user_id)
-            match_id = int(match_id)
+            if len(parts) < 2:
+                safe_send_message(bot, call.message.chat.id, "❌ Invalid data")
+                return
+
+            user_id = int(parts[0])
+            match_id = int(parts[1])
             admin_id = call.message.chat.id
 
+            # 🔥 set active chat
             admin_active_chat[admin_id] = {
                 "user_id": user_id,
                 "match_id": match_id
             }
 
+            # 🔥 CONFIRM IT WORKED
             safe_send_message(
                 bot,
                 admin_id,
-                f"💬 Chat opened with user {user_id}"
+                f"✅ Chat opened with user {user_id}"
             )
 
         except Exception as e:
             print("Reply button error:", e)
-            bot.answer_callback_query(call.id, "Error")    
+            safe_send_message(bot, call.message.chat.id, "❌ Reply failed")    
 
     bot.answer_callback_query(call.id, "Unknown action")
 
