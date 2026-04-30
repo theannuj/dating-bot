@@ -2703,6 +2703,9 @@ Status: 🟡 Pending"""
 
 @bot.callback_query_handler(func=lambda call: True)
 def callback_handler(call):
+
+    bot.answer_callback_query(call.id)
+
     if not is_admin(call.message.chat.id):
         touch_user_activity(call.message.chat.id)
 
@@ -3015,8 +3018,6 @@ def callback_handler(call):
                 admin_id,
                 f"💬 Chat opened with user {user_id}"
             )
-
-            bot.answer_callback_query(call.id)
 
         except Exception as e:
             print("Reply button error:", e)
