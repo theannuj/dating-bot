@@ -2706,6 +2706,34 @@ def callback_handler(call):
 
     bot.answer_callback_query(call.id)
 
+    # 🔥 REPLY BUTTON FIX (TOP)
+    if call.data and call.data.startswith("reply_"):
+        try:
+            data = call.data.replace("reply_", "")
+            user_id, match_id = map(int, data.split("_"))
+            admin_id = call.message.chat.id
+
+            admin_active_chat[admin_id] = {
+                "user_id": user_id,
+                "match_id": match_id
+            }
+
+            reset_admin_unread(user_id, match_id, admin_id)
+
+            safe_send_message(
+                bot,
+                admin_id,
+                f"💬 Chat opened\nUser: {user_id}"
+            )
+
+            bot.answer_callback_query(call.id)
+            return
+
+        except Exception as e:
+            print("Reply error:", e)
+            bot.answer_callback_query(call.id, "Error")
+            return
+
     if not is_admin(call.message.chat.id):
         touch_user_activity(call.message.chat.id)
 
