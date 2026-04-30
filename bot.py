@@ -1645,18 +1645,33 @@ def build_admin_chat_list_markup(admin_id, unread_only=False):
 
 
 def send_admin_chat_list(admin_id, unread_only=False):
-    admin_active_chat[admin_id] = {
-    "view": "unread" if unread_only else "all"
-    }
     clear_admin_active_chat(admin_id)
+
     markup = build_admin_chat_list_markup(admin_id, unread_only=unread_only)
+
     if not markup:
         empty_text = "No unread messages right now." if unread_only else "No chats available right now."
-        safe_send_message(bot, admin_id, empty_text, reply_markup=admin_menu_keyboard())
-        return
-    title = "Unread chats" if unread_only else "Recent chats"
-    safe_send_message(bot, admin_id, f"{title}\nSelect a chat to view recent history.", reply_markup=markup)
+        msg = safe_send_message(bot, admin_id, empty_text, reply_markup=admin_menu_keyboard())
 
+        admin_active_chat[admin_id] = {
+            "view": "unread" if unread_only else "all",
+            "message_id": msg.message_id if msg else None
+        }
+        return
+
+    title = "Unread chats" if unread_only else "Recent chats"
+
+    msg = safe_send_message(
+        bot,
+        admin_id,
+        f"{title}\nSelect a chat to view recent history.",
+        reply_markup=markup
+    )
+
+    admin_active_chat[admin_id] = {
+        "view": "unread" if unread_only else "all",
+        "message_id": msg.message_id if msg else None
+    }
 
 def send_admin_chat_history(admin_id, user_id, match_id):
     if not can_admin_access_chat(admin_id, user_id, match_id):
@@ -2183,7 +2198,15 @@ def forward_user_message_to_admins(message):
         increment_admin_unread(user_id, match_id, admin_ids=unread_admins)
 
         for admin_id in ADMIN_IDS:
-            if admin_active_chat.get(admin_id, {}).get("view") == "unread":
+            state = admin_active_chat.get(admin_id)
+
+            if state and state.get("view") == "unread":
+                try:
+                    if state.get("message_id"):
+                        bot.delete_message(admin_id, state["message_id"])
+                except:
+                    pass
+
                 send_admin_chat_list(admin_id, unread_only=True)
 
     maybe_send_fomo_message(message.chat.id, match_id)
