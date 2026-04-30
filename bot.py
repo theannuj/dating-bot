@@ -2161,7 +2161,7 @@ def text_from_message(message):
     return "[non-text message]"
 
 def send_admin_notification(user_id, match_id, text):
-    for admin_id in ADMIN_IDS:
+    for admin_id in get_admin_recipients(user_id, match_id):
 
         user = get_user(user_id)
         name = user.get("name", "User")
