@@ -2163,6 +2163,11 @@ def text_from_message(message):
 def send_admin_notification(user_id, match_id, text):
     for admin_id in get_admin_recipients(user_id, match_id):
 
+        # 🔥 FIX: अगर admin उसी chat में है → notification skip
+        active = admin_active_chat.get(admin_id)
+        if active and active.get("user_id") == user_id:
+            continue
+
         user = get_user(user_id)
         name = user.get("name", "User")
 
@@ -2204,6 +2209,7 @@ def send_admin_notification(user_id, match_id, text):
             except:
                 pass
 
+            
 def forward_user_message_to_admins(message):
     user_id = message.chat.id
     user = get_user(user_id)
@@ -2719,7 +2725,7 @@ def callback_handler(call):
             }
 
             reset_admin_unread(user_id, match_id, admin_id)
-            
+
             send_admin_chat_history(admin_id, user_id, match_id)
 
             bot.answer_callback_query(call.id)
