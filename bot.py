@@ -14,8 +14,8 @@ import telebot
 from telebot import apihelper
 from telebot.types import InlineKeyboardButton, InlineKeyboardMarkup, ReplyKeyboardMarkup, ReplyKeyboardRemove
 
-apihelper.CONNECT_TIMEOUT = 60
-apihelper.READ_TIMEOUT = 60
+apihelper.CONNECT_TIMEOUT = 10
+apihelper.READ_TIMEOUT = 30
 
 TOKEN = os.getenv("BOT_TOKEN")
 MAIN_ADMIN_ID = 526264365
@@ -86,7 +86,7 @@ def get_db_connection():
     if not database_url:
         return None
     try:
-        conn = psycopg2.connect(database_url, connect_timeout=60)
+        conn = psycopg2.connect(database_url, connect_timeout=5)
         conn.set_client_encoding("UTF8")
         return conn
     except Exception as e:
@@ -869,15 +869,22 @@ def save_state():
     with state_lock:
         normalized_users = {str(user_id): normalize_storage_value(data) for user_id, data in users.items()}
         payload = {"users": normalized_users}
+        
+        # Pehle local file me jaldi se save kar lo
         try:
             with STATE_FILE.open("w", encoding="utf-8") as file:
                 json.dump(payload, file, ensure_ascii=False, indent=2)
         except Exception as e:
             print(f"Error saving state: {e}", flush=True)
+
+    # Database sync ko ek alag background thread me bhejo taki bot free rahe
+    def background_db_sync():
         try:
             sync_changed_users_to_db({int(user_id): data for user_id, data in normalized_users.items()})
         except Exception as e:
             print(f"Error syncing users to DB: {e}", flush=True)
+
+    threading.Thread(target=background_db_sync, daemon=True).start()
 
 
 def get_user(user_id):
@@ -964,7 +971,6 @@ def get_assigned_admin_id(user_id, match_id, create_if_missing=True):
         if assigned_admin_id is None and create_if_missing:
             assigned_admin_id = default_admin_for_user(user)
             thread["assigned_admin_id"] = assigned_admin_id
-            save_state()
         return assigned_admin_id
 
 
