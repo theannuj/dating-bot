@@ -39,6 +39,18 @@ WEBHOOK_BASE_URL = (
 )
 
 
+DISCLAIMER_TEXT = """📄 Terms & Disclaimer
+
+• This platform is for social interaction only.  
+• We do not guarantee any match or response.  
+• Users are responsible for their own actions.  
+• Do not share personal or sensitive information.  
+• Misuse may lead to permanent ban.  
+
+By continuing, you agree to these terms.
+"""
+
+
 def get_db_connection():
     database_url = os.getenv("DATABASE_URL")
     if not database_url:
@@ -1490,7 +1502,7 @@ def welcome_keyboard():
 def send_welcome_screen(user_id):
     safe_send_message(bot, 
         user_id,
-        "<b>Hey 😉 Welcome!</b>\n\nExplore profiles, find your matches,\nand start chatting with someone new 💫\n\nLet’s see how this goes…\n\nTap Continue 👇",
+        "<b>Hey 😉 Welcome!</b>\n\nExplore profiles, find your matches,\nand start chatting with someone new 💫\n\nLet’s see how this goes…\n\n👉 Type /disclaimer to read terms\n\nTap Continue 👇",
         reply_markup=welcome_keyboard(),
         parse_mode="HTML",
     )
@@ -1754,8 +1766,10 @@ def send_agreement_details(user_id):
         "- You are 18+\n"
         "- Be respectful to others\n"
         "- No spam or abuse\n"
-        "- Premium unlocks extra features",
+        "- Premium unlocks extra features\n\n"
+        "📝 Terms & Disclaimer: /disclaimer",
         reply_markup=agreement_keyboard(),
+        parse_mode="HTML",
     )
 
 
@@ -2370,6 +2384,11 @@ def vip_command_handler(message):
         send_vip_already_message(user_id)
         return
     safe_send_message(bot, user_id, unlock_text(), reply_markup=buy_keyboard(), parse_mode="HTML")
+
+
+@bot.message_handler(commands=['disclaimer'])
+def show_disclaimer(message):
+    bot.send_message(message.chat.id, DISCLAIMER_TEXT)
 
 
 @bot.message_handler(commands=["help"])
