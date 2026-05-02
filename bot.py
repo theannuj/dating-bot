@@ -39,16 +39,46 @@ WEBHOOK_BASE_URL = (
 )
 
 
-DISCLAIMER_TEXT = """📄 Terms & Disclaimer
+DISCLAIMER_TEXT = """📄 <b>Terms & Disclaimer</b>
 
-• This platform is for social interaction only.  
-• We do not guarantee any match or response.  
-• Users are responsible for their own actions.  
-• Do not share personal or sensitive information.  
-• Misuse may lead to permanent ban.  
+<b>1. Nature of Service</b>
+• This platform provides chat-based interactions for entertainment and social connection.  
+• We do not guarantee real-life meetings, relationships, or outcomes.
 
-By continuing, you agree to these terms.
-"""
+<b>2. Matching & Users</b>
+• Matches are based on system logic, availability, and user activity.  
+• We do not guarantee connection with any specific person.
+
+<b>3. Interaction System</b>
+• Some initial interactions may be automated to maintain engagement.  
+• These are designed to ensure a smooth user experience.
+
+<b>4. Payments & Features</b>
+• Payments unlock additional features such as extended chat access or priority matching.  
+• Payments do not guarantee any specific match or response.  
+• All payments are non-refundable once activated.
+
+<b>5. User Responsibility</b>
+• You agree to behave respectfully with others.  
+• Abuse, harassment, or misuse may result in restriction or permanent ban.
+
+<b>6. Privacy & Safety</b>
+• Do not share personal or sensitive information (phone, address, etc.).  
+• We are not responsible for information voluntarily shared with others.
+
+<b>7. Service Availability</b>
+• We do not guarantee uninterrupted or error-free service.  
+• Features may change at any time without notice.
+
+<b>8. Age Requirement</b>
+• You must be 18+ to use this service.  
+• Accounts found to be underage may be removed.
+
+<b>9. Data & Account Control</b>
+• You may reset your profile anytime using /reset.  
+• Some data may be retained for safety and system purposes.
+
+By continuing to use this service, you agree to these terms."""
 
 
 def get_db_connection():
@@ -2388,7 +2418,7 @@ def vip_command_handler(message):
 
 @bot.message_handler(commands=['disclaimer'])
 def show_disclaimer(message):
-    bot.send_message(message.chat.id, DISCLAIMER_TEXT)
+    bot.send_message(message.chat.id, DISCLAIMER_TEXT, parse_mode="HTML")
 
 
 @bot.message_handler(commands=["help"])
