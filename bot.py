@@ -1502,7 +1502,7 @@ def welcome_keyboard():
 def send_welcome_screen(user_id):
     safe_send_message(bot, 
         user_id,
-        "<b>Hey 😉 Welcome!</b>\n\nExplore profiles, find your matches,\nand start chatting with someone new 💫\n\nLet’s see how this goes…\n\n👉 Type /disclaimer to read terms\n\nTap Continue 👇",
+        "<b>Hey 😉 Welcome!</b>\n\nExplore profiles, find your matches,\nand start chatting with someone new 💫\n\nLet’s see how this goes…\n\nTap Continue 👇",
         reply_markup=welcome_keyboard(),
         parse_mode="HTML",
     )
