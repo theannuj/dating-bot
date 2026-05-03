@@ -1555,8 +1555,11 @@ def gender_keyboard():
 
 
 
-def agreement_keyboard():
-    return build_keyboard([BTN_READ_AGREEMENT], [BTN_AGREE_CONTINUE])
+def initial_agreement_keyboard():
+    return build_keyboard([BTN_READ_AGREEMENT])
+
+def final_agreement_keyboard():
+    return build_keyboard([BTN_AGREE_CONTINUE])
 
 
 
@@ -1792,8 +1795,8 @@ def send_main_menu(user_id):
 def send_agreement(user_id):
     safe_send_message(bot, 
         user_id,
-        "📜 <b>Please read and accept the agreement to continue</b>",
-        reply_markup=agreement_keyboard(),
+        "📜 <b>Please read the agreement to continue</b>",
+        reply_markup=initial_agreement_keyboard(),
         parse_mode="HTML",
     )
 
@@ -1807,7 +1810,7 @@ def send_agreement_details(user_id):
         "- No spam or abuse\n"
         "- Premium unlocks extra features\n\n"
         "📝 Terms & Disclaimer: /disclaimer",
-        reply_markup=agreement_keyboard(),
+        reply_markup=final_agreement_keyboard(),
         parse_mode="HTML",
     )
 
