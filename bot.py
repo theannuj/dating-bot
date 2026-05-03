@@ -1275,10 +1275,11 @@ def get_last_message_preview(user_id, match_id, limit=40):
     return f"{speaker}: {text}"
 
 
-def format_admin_chat_history(user_id, user_name, match_name, messages, unread_count, chat_state):
+def format_admin_chat_history(user_id, user_name, match_name, messages, unread_count, chat_state, match_age=""):
     user = get_user(user_id)
     tag = "🟢 VIP" if user.get("paid") else "🟡 FREE"
-    lines = [f"💬 <b>{html.escape(user_name)}</b> × <b>{html.escape(match_name)}</b> {tag}"]
+    age_text = f" (Age: {match_age})" if match_age else ""
+    lines = [f"💬 <b>{html.escape(user_name)}</b> × <b>{html.escape(match_name)}{age_text}</b> {tag}"]
     if user["paid"]:
         lines.append("💎 VIP: Active")
         lines.append(f"Plan: {get_vip_plan_label(user)}")
@@ -1743,9 +1744,11 @@ def send_admin_chat_history(admin_id, user_id, match_id):
         "Choose action:",
         reply_markup=build_admin_chat_controls(user_id, match_id),
     )
+
+    match_age = profile.get("age", "") if profile else ""
     sent = safe_send_message(bot, 
         admin_id,
-        format_admin_chat_history(user_id, user_name, match_name, history, unread_count, chat_state),
+        format_admin_chat_history(user_id, user_name, match_name, history, unread_count, chat_state, match_age),
         parse_mode="HTML",
     )
     if not sent:
