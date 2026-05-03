@@ -2751,8 +2751,13 @@ Status: 🟡 Pending"""
         return
     
     # Block if user is already VIP and sends photo without being in payment flow
-    if user["paid"]:
+    if user["paid"] and not is_admin(user_id):
         send_vip_already_message(user_id)
+        return
+
+    # SECRET ADMIN FEATURE: Agar admin random photo bheje, toh File ID de do
+    if is_admin(user_id):
+        safe_send_message(bot, user_id, f"Sir, Here is the File ID:\n<code>{file_id}</code>", parse_mode="HTML")
         return
 
     safe_send_message(bot, user_id, "Something went wrong…\n\nPlease try again")
