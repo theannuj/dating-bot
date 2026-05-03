@@ -1934,18 +1934,18 @@ def schedule_reaction_after_like(user, profile_id):
     if not has_match_already and total_unique_likes >= random.randint(3, 5):
         guaranteed_profile = choose_guaranteed_match(user, preferred_profile_id=profile_id)
         if guaranteed_profile is not None and not has_pending_event(user, "match", guaranteed_profile):
-            queue_event(user, "match", guaranteed_profile, random.randint(1, 2))
+            queue_event(user, "match", guaranteed_profile, random.randint(3, 5))
             return
 
     roll = random.random()
 
     if roll < 0.18:
         if not has_pending_event(user, "match", profile_id):
-            queue_event(user, "match", profile_id, random.randint(1, 2))
+            queue_event(user, "match", profile_id, random.randint(3, 5))
     elif roll < 0.52:
         selected = pick_profile_for_attention(user, preferred_profile_id=profile_id)
         if selected is not None and not has_pending_event(user, "incoming_like", selected):
-            queue_event(user, "incoming_like", selected, random.randint(1, 3))
+            queue_event(user, "incoming_like", selected, random.randint(2, 4))
 
 
 def send_like_feedback(user_id, profile):
@@ -1961,15 +1961,8 @@ def announce_incoming_like(user_id, profile_id):
     profile = get_profile(profile_id)
     if not profile:
         return
-    safe_send_message(bot, user_id, "Someone liked your profile 😉\n\nCheck it now")
-    time.sleep(random.uniform(1.0, 2.0))
-    safe_send_photo(bot, 
-        user_id,
-        profile["photo"],
-        caption=f"<b>{profile['name']}</b> liked your profile.\nYou can check it in Likes You.",
-        reply_markup=build_keyboard([BTN_SEE_LIKES], [BTN_MAIN_MENU]),
-        parse_mode="HTML",
-    )
+    # Sirf ek simple alert, bina kisi photo ya keyboard change ke
+    safe_send_message(bot, user_id, f"❤️ <b>Someone just liked your profile!</b>\nCheck 'Likes' from the Main Menu later.", parse_mode="HTML")
 
 
 def create_match(user_id, profile_id, source="system"):
@@ -2041,7 +2034,8 @@ def process_pending_events(user_id):
         current_swipes = user["swipes"]
         remaining = []
         for event in user["pending_events"]:
-            if event["due_swipes"] <= current_swipes:
+            # Sirf EK event ko ek time par process karo taaki bot fake na lage
+            if event["due_swipes"] <= current_swipes and len(due_events) < 1:
                 due_events.append(event)
             else:
                 remaining.append(event)
