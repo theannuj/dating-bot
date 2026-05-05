@@ -1291,7 +1291,7 @@ def format_admin_chat_history(user_id, user_name, match_name, messages, unread_c
     user = get_user(user_id)
     tag = "🟢 VIP" if user.get("paid") else "🟡 FREE"
     age_text = f" (Age: {match_age})" if match_age else ""
-    lines = [f"ðŸ’¬ <b>{html.escape(user_name)}</b> Ã— <b>{html.escape(match_name)}{age_text}</b> {tag}"]
+    lines = [f"💬 <b>{html.escape(user_name)}</b> × <b>{html.escape(match_name)}{age_text}</b> {tag}"]
     if user["paid"]:
         lines.append("💎 VIP: Active")
         lines.append(f"Plan: {get_vip_plan_label(user)}")
@@ -1331,7 +1331,7 @@ def notify_user_of_match_message(user_id, match_id, text):
         message_text = f"<b>{html.escape(match_name)}:</b> {html.escape(text)}"
     else:
         message_text = (
-            f"<b>ðŸ’¬ New message from {html.escape(match_name)}</b>\n\n"
+            f"<b>💬 New message from {html.escape(match_name)}</b>\n\n"
             f"<b>{html.escape(match_name)}:</b> {html.escape(text)}"
         )
 
@@ -1442,7 +1442,7 @@ def send_match_card(user_id, match_id):
     state = get_chat_state(user_id, match_id)
     unread = get_unread_count(user_id, match_id)
     preview = get_last_message_preview(user_id, match_id, limit=80)
-    lines = [f"<b>{profile['name']}</b>, {profile['age']} ðŸ™‚"]
+    lines = [f"<b>{profile['name']}</b>, {profile['age']} 🙂"]
     if unread:
         lines.append(f"Unread: {unread}")
     lines.append(preview)
@@ -1589,7 +1589,7 @@ def get_total_unread(user):
 def matches_button_text(user):
     unread_total = get_total_unread(user)
     if unread_total:
-        return f"ðŸ’– Matches ({unread_total})"
+        return f"💖 Matches ({unread_total})"
     return BTN_MATCHES
 
 
@@ -1691,7 +1691,7 @@ def build_admin_chat_list_markup(admin_id, unread_only=False):
             last_ts = int(messages[-1].get("ts", 0)) if messages else 0
             user = get_user(user_id)
             tag = "🟢 VIP" if user.get("paid") else "🟡 FREE"
-            label = f"{tag} â€¢ {user_name} Ã— {match_name}"
+            label = f"{tag} â€¢ {user_name} × {match_name}"
             if admin_unread:
                 label += f" ({admin_unread})"
             preview = get_last_message_preview(user_id, match_id, limit=26)
@@ -1873,7 +1873,7 @@ def choose_next_profile(user):
 
 
 def profile_caption_from_view(profile, profile_view, detailed=False):
-    lines = [f"â™€ï¸ <b>{profile['name']}</b>, {profile['age']}", f"ðŸŸ¢ {profile_view['activity']}"]
+    lines = [f"♀️ <b>{profile['name']}</b>, {profile['age']}", f"🟢 {profile_view['activity']}"]
     return "\n".join(lines)
 
 
@@ -1956,7 +1956,7 @@ def schedule_reaction_after_like(user, profile_id):
 def send_like_feedback(user_id, profile):
     safe_send_message(bot, 
         user_id,
-        f"<b>You liked {profile['name']} ðŸ˜‰</b>\n\nLet's see if it's a matchâ€¦",
+        f"<b>You liked {profile['name']} 😉</b>\n\nLet's see if it's a match…",
         reply_markup=build_keyboard([BTN_MAIN_MENU]),
         parse_mode="HTML",
     )
@@ -2220,7 +2220,7 @@ def send_admin_notification(user_id, match_id, text):
             try:
                 msg = bot.send_message(
                     admin_id,
-                    f"ðŸ‘¤ {name}\nðŸ’¬ {text}",
+                    f"👤 {name}\n💬 {text}",
                     reply_markup=InlineKeyboardMarkup().add(
                         InlineKeyboardButton("💬 Reply", callback_data=f"reply_{user_id}_{match_id}")
                     )
@@ -2238,11 +2238,11 @@ def send_admin_notification(user_id, match_id, text):
 
             data["messages"].append(text)
 
-            messages_text = "\n".join([f"ðŸ’¬ {m}" for m in data["messages"]])
+            messages_text = "\n".join([f"💬 {m}" for m in data["messages"]])
 
             try:
                 bot.edit_message_text(
-                    f"ðŸ‘¤ {name} ({len(data['messages'])} messages)\n{messages_text}",
+                    f"👤 {name} ({len(data['messages'])} messages)\n{messages_text}",
                     admin_id,
                     data["message_id"],
                     reply_markup=InlineKeyboardMarkup().add(
@@ -2462,7 +2462,7 @@ def stats_handler(message):
     vip_users = sum(1 for user in all_users.values() if is_vip_active(user))
     pending_users = sum(1 for user in all_users.values() if user.get("payment_status") == "pending")
     
-    stats_message = f"""ðŸ“Š Stats:
+    stats_message = f"""📊 Stats:
 Total Users: {total_users}
 VIP Users: {vip_users}
 Pending Payments: {pending_users}"""
@@ -2515,19 +2515,19 @@ def send_next_pending_to_admin(admin_id):
     
     if not photo_id:
         name = next_user.get("name") or f"User {next_uid}"
-        safe_send_message(bot, admin_id, f"ðŸ§¾ Next pending: {name} (ID: {next_uid})")
+        safe_send_message(bot, admin_id, f"🧾 Next pending: {name} (ID: {next_uid})")
         return
     
     first_name = next_user.get("name") or "User"
     username = next_user.get("payment_username", "N/A")
     
-    caption = f"""ðŸ§¾ Payment Proof Received
+    caption = f"""🧾 Payment Proof Received
 
 User ID: {next_uid}
 Name: {first_name}
 Username: @{username}
 
-Status: ðŸŸ¡ Pending"""
+Status: 🟡 Pending"""
     
     safe_send_photo(bot, 
         admin_id,
@@ -2711,13 +2711,13 @@ def photo_handler(message):
         username = message.from_user.username or "N/A"
         
         # Enhanced caption with user info and status
-        caption = f"""ðŸ§¾ Payment Proof Received
+        caption = f"""🧾 Payment Proof Received
 
 User ID: {user_id}
 Name: {first_name}
 Username: @{username}
 
-Status: ðŸŸ¡ Pending"""
+Status: 🟡 Pending"""
         
         for admin in PAYMENT_ADMINS:
             safe_send_photo(bot, 
@@ -2992,11 +2992,11 @@ def callback_handler(call):
 
         safe_send_message(bot, 
             call.message.chat.id,
-            f"âœ… User {user_id} approved successfully\nPlan: {plan_label}\nValid till: {time.strftime('%d %b %Y', time.localtime(end_ts))}"
+            f"✅ User {user_id} approved successfully\nPlan: {plan_label}\nValid till: {time.strftime('%d %b %Y', time.localtime(end_ts))}"
         )
         safe_send_message(bot, 
             user_id,
-            f"<b>ðŸ’Ž VIP Activated!\n\nPlan: {plan_label}\nâ³ Valid till: {time.strftime('%d %b %Y', time.localtime(end_ts))}</b>",
+            f"<b>💎 VIP Activated!\n\nPlan: {plan_label}\nâ³ Valid till: {time.strftime('%d %b %Y', time.localtime(end_ts))}</b>",
             reply_markup=main_menu_keyboard(user_id),
             parse_mode="HTML",
         )
@@ -3037,7 +3037,7 @@ def callback_handler(call):
         # Send confirmation to admin
         safe_send_message(bot, 
             call.message.chat.id,
-            f"âœ… User {user_id} approved successfully"
+            f"✅ User {user_id} approved successfully"
         )
         
         # Send activation message to user
@@ -3091,7 +3091,7 @@ def handle_reply_button(call):
 
         bot.send_message(
             admin_id,
-            f"ðŸ’¬ Chat opened with user {user_id}\nà¤…à¤¬ reply à¤•à¤°à¥‹"
+            f"💬 Chat opened with user {user_id}\nà¤…à¤¬ reply à¤•à¤°à¥‹"
         )
 
         bot.answer_callback_query(call.id)
