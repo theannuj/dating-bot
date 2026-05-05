@@ -1,4 +1,4 @@
-# -*- coding: utf-8 -*-
+﻿# -*- coding: utf-8 -*-
 import html 
 import json
 import os
@@ -389,7 +389,6 @@ def save_user_to_db(user_id, user):
         """, (user_id, serialized_user))
         conn.commit()
         cur.close()
-        DB_USER_CACHE[int(user_id)] = serialized_user
     except Exception as e:
         conn.rollback()
         print(f"DB save error: {e}", flush=True)
@@ -549,9 +548,8 @@ FOMO_MESSAGES = [
     "This conversation is getting interesting...",
 ]
 
-bot = telebot.TeleBot(TOKEN)
+bot = telebot.TeleBot(TOKEN, threaded=False)
 app = Flask(__name__)
-state_lock = threading.RLock()
 chat_map = {}
 admin_active_chat = {}
 admin_notifications = {}
@@ -562,7 +560,6 @@ COOLDOWN_SECONDS = 2.5
 INACTIVITY_MIN_SECONDS = 10 * 60
 INACTIVITY_MAX_SECONDS = 15 * 60
 INACTIVITY_CHECK_SECONDS = 60
-DB_USER_CACHE = {}
 
 
 def safe_send_message(bot, *args, **kwargs):
@@ -577,7 +574,7 @@ def safe_send_photo(bot, chat_id, photo, **kwargs):
     try:
         return bot.send_photo(chat_id, photo, **kwargs)
     except Exception as e:
-        print(f"❌ Bad photo skipped (chat_id={chat_id}):", photo, flush=True)
+        print(f"âŒ Bad photo skipped (chat_id={chat_id}):", photo, flush=True)
         return bot.send_message(chat_id, "Profile loaded")
 
 
@@ -765,154 +762,185 @@ def prepare_user_record(payload):
     return base
 
 
-def load_state():
-    file_users = {}
+REQUEST_USER_CONTEXT = threading.local()
+
+
+def get_request_user_cache():
+    cache = getattr(REQUEST_USER_CONTEXT, "loaded_users", None)
+    if cache is None:
+        cache = {}
+        REQUEST_USER_CONTEXT.loaded_users = cache
+    return cache
+
+
+def get_request_user_snapshots():
+    snapshots = getattr(REQUEST_USER_CONTEXT, "snapshots", None)
+    if snapshots is None:
+        snapshots = {}
+        REQUEST_USER_CONTEXT.snapshots = snapshots
+    return snapshots
+
+
+def clear_request_user_context():
+    REQUEST_USER_CONTEXT.loaded_users = {}
+    REQUEST_USER_CONTEXT.snapshots = {}
+
+
+def should_sync_vip_record(user):
+    return (
+        user.get("paid")
+        or user.get("payment_status") in {"pending", "approved", "expired", "rejected"}
+        or user.get("vip_start_date") is not None
+        or user.get("vip_end_date") is not None
+    )
+
+
+def load_all_users_from_db():
+    loaded = {}
+    for user_id, payload in load_users_from_db().items():
+        loaded[int(user_id)] = prepare_user_record(payload)
+    vip_data = load_vip_from_db()
+    for user_id, vip in vip_data.items():
+        user = loaded.get(user_id, prepare_user_record({}))
+        user["payment_status"] = vip.get("payment_status", user.get("payment_status", "none"))
+        if vip.get("vip_start_date") is not None:
+            user["vip_start_date"] = vip.get("vip_start_date")
+        if vip.get("vip_end_date") is not None:
+            user["vip_end_date"] = vip.get("vip_end_date")
+        if vip.get("matches"):
+            user["matches"] = vip.get("matches", [])
+        sync_user_vip_state(user)
+        loaded[user_id] = user
+    return loaded
+
+
+def migrate_state_file_to_db():
     if not STATE_FILE.exists():
-        try:
-            STATE_FILE.write_text(json.dumps({"users": {}}, ensure_ascii=False, indent=2), encoding="utf-8")
-        except OSError:
-            pass
+        return
 
     try:
         with STATE_FILE.open("r", encoding="utf-8") as file:
             raw = normalize_storage_value(json.load(file))
-            for user_id, payload in raw.get("users", {}).items():
-                file_users[int(user_id)] = prepare_user_record(payload)
     except (json.JSONDecodeError, OSError) as e:
-        print(f"State file load error: {e}", flush=True)
-        file_users = {}
-
-    db_users = load_users_from_db()
-    if db_users:
-        restored = {uid: prepare_user_record(payload) for uid, payload in db_users.items()}
-        for uid, payload in file_users.items():
-            prepared = prepare_user_record(payload)
-            if uid not in restored or user_record_score(prepared) > user_record_score(restored[uid]):
-                restored[uid] = prepared
-        print(f"Loaded {len(db_users)} users from PostgreSQL")
-        print(f"Loaded {len(file_users)} users from JSON fallback")
-    else:
-        restored = dict(file_users)
-        print("Loaded 0 users from PostgreSQL")
-        print(f"Loaded {len(file_users)} users from JSON fallback")
-
-    vip_data = load_vip_from_db()
-    print(f"Loaded {len(vip_data)} VIP records from PostgreSQL")
-    for uid, vip in vip_data.items():
-        if uid in restored:
-            restored[uid]["payment_status"] = vip.get("payment_status", "none")
-            if vip.get("vip_start_date") is not None:
-                restored[uid]["vip_start_date"] = vip.get("vip_start_date")
-            if vip.get("vip_end_date") is not None:
-                restored[uid]["vip_end_date"] = vip.get("vip_end_date")
-            if vip.get("matches"):
-                restored[uid]["matches"] = vip.get("matches", [])
-        else:
-            restored[uid] = prepare_user_record({})
-            restored[uid]["payment_status"] = vip.get("payment_status", "none")
-            restored[uid]["vip_start_date"] = vip.get("vip_start_date")
-            restored[uid]["vip_end_date"] = vip.get("vip_end_date")
-            restored[uid]["matches"] = vip.get("matches", [])
-        sync_user_vip_state(restored[uid])
-
-    vip_count = sum(1 for u in restored.values() if is_vip_active(u))
-    print(f"Loaded {len(restored)} merged users | VIP users: {vip_count}")
-
-    return restored
-
-
-def initialize_db_user_cache(users_map):
-    DB_USER_CACHE.clear()
-    for user_id, user in users_map.items():
-        DB_USER_CACHE[int(user_id)] = serialize_user_record(user)
-
-
-def sync_changed_users_to_db(users_map):
-    changed_rows = []
-    for user_id, user in users_map.items():
-        serialized = serialize_user_record(user)
-        if DB_USER_CACHE.get(int(user_id)) != serialized:
-            changed_rows.append((int(user_id), serialized))
-
-    if not changed_rows:
+        print(f"State migration skipped: {e}", flush=True)
         return
+
+    file_users = {}
+    for user_id, payload in raw.get("users", {}).items():
+        try:
+            file_users[int(user_id)] = prepare_user_record(payload)
+        except Exception as row_error:
+            print(f"Skipping bad migrated user {user_id}: {row_error}", flush=True)
+
+    if not file_users:
+        backup_path = BASE_DIR / "bot_state_migrated.json.backup"
+        try:
+            STATE_FILE.replace(backup_path)
+        except OSError:
+            pass
+        return
+
+    db_users = load_all_users_from_db()
+    migrated_count = 0
+    for user_id, payload in file_users.items():
+        existing = db_users.get(user_id)
+        final_user = payload
+        if existing and user_record_score(existing) > user_record_score(payload):
+            final_user = existing
+        save_user_to_db(user_id, final_user)
+        if should_sync_vip_record(final_user):
+            save_vip_to_db(user_id, final_user)
+        migrated_count += 1
+
+    backup_path = BASE_DIR / "bot_state_migrated.json.backup"
+    try:
+        if backup_path.exists():
+            backup_path.unlink()
+        STATE_FILE.replace(backup_path)
+    except OSError as e:
+        print(f"State backup rename failed: {e}", flush=True)
+    print(f"Migrated {migrated_count} users from bot_state.json", flush=True)
+
+
+def get_user_data(user_id):
+    user_id = int(user_id)
+    cache = get_request_user_cache()
+    if user_id in cache:
+        return cache[user_id]
 
     conn = get_db_connection()
     if not conn:
-        return
+        user = prepare_user_record(default_user())
+        cache[user_id] = user
+        get_request_user_snapshots()[user_id] = serialize_user_record(user)
+        return user
 
+    user = None
     try:
         cur = conn.cursor()
-        cur.executemany("""
-        INSERT INTO users (user_id, data)
-        VALUES (%s, %s)
-        ON CONFLICT (user_id)
-        DO UPDATE SET data = EXCLUDED.data
-        """, changed_rows)
-        conn.commit()
+        cur.execute("SELECT data FROM users WHERE user_id = %s", (user_id,))
+        row = cur.fetchone()
+        if row and row[0]:
+            try:
+                user = prepare_user_record(json.loads(row[0]))
+            except Exception as e:
+                print(f"Bad user row for {user_id}: {e}", flush=True)
+                user = prepare_user_record(default_user())
+        else:
+            user = prepare_user_record(default_user())
+            cur.execute("""
+            INSERT INTO users (user_id, data)
+            VALUES (%s, %s)
+            ON CONFLICT (user_id)
+            DO NOTHING
+            """, (user_id, serialize_user_record(user)))
+            conn.commit()
         cur.close()
-        for user_id, serialized in changed_rows:
-            DB_USER_CACHE[user_id] = serialized
     except Exception as e:
         conn.rollback()
-        print(f"DB sync error: {e}", flush=True)
+        print(f"User fetch error for {user_id}: {e}", flush=True)
+        user = prepare_user_record(default_user())
     finally:
         conn.close()
 
+    cache[user_id] = user
+    get_request_user_snapshots()[user_id] = serialize_user_record(user)
+    return user
+
+
+def save_user_data(user_id, user_dict):
+    user_id = int(user_id)
+    user = prepare_user_record(user_dict)
+    save_user_to_db(user_id, user)
+    if should_sync_vip_record(user):
+        save_vip_to_db(user_id, user)
+    cache = get_request_user_cache()
+    cache[user_id] = user
+    get_request_user_snapshots()[user_id] = serialize_user_record(user)
+    return user
+
+
+def flush_loaded_users():
+    cache = get_request_user_cache()
+    snapshots = get_request_user_snapshots()
+    for user_id, user in list(cache.items()):
+        serialized = serialize_user_record(user)
+        if snapshots.get(user_id) != serialized:
+            save_user_data(user_id, user)
+
 
 run_schema_migrations()
-users = load_state()
-initialize_db_user_cache(users)
-
-
-def save_state():
-    with state_lock:
-        normalized_users = {str(user_id): normalize_storage_value(data) for user_id, data in users.items()}
-        payload = {"users": normalized_users}
-        
-        # Pehle local file me jaldi se save kar lo
-        try:
-            with STATE_FILE.open("w", encoding="utf-8") as file:
-                json.dump(payload, file, ensure_ascii=False, indent=2)
-        except Exception as e:
-            print(f"Error saving state: {e}", flush=True)
-
-    # Database sync ko ek alag background thread me bhejo taki bot free rahe
-    def background_db_sync():
-        try:
-            sync_changed_users_to_db({int(user_id): data for user_id, data in normalized_users.items()})
-        except Exception as e:
-            print(f"Error syncing users to DB: {e}", flush=True)
-
-    threading.Thread(target=background_db_sync, daemon=True).start()
+migrate_state_file_to_db()
 
 
 def get_user(user_id):
-    with state_lock:
-        needs_save = False
-        if user_id not in users:
-            users[user_id] = default_user()
-            needs_save = True
-        user = users[user_id]
-        old_paid = user.get("paid")
-        old_chat_limit = user.get("chat_limit")
-        old_payment_status = user.get("payment_status")
-        sync_user_vip_state(user)
-        if (
-            needs_save
-            or user.get("paid") != old_paid
-            or user.get("chat_limit") != old_chat_limit
-            or user.get("payment_status") != old_payment_status
-        ):
-            pass
-        return user
+    return get_user_data(user_id)
 
 
 def reset_user(user_id):
-    with state_lock:
-        users[user_id] = default_user()
-        save_state()
-        return users[user_id]
+    user = prepare_user_record(default_user())
+    save_user_data(user_id, user)
+    return user
 
 
 def get_profile(profile_id):
@@ -952,7 +980,7 @@ def ensure_chat_thread(user, match_id):
             threads[thread_key]["assigned_admin_id"] = MAIN_ADMIN_ID
     thread = threads[thread_key]
 
-    # 🔥 FORCE FIX (MOST IMPORTANT)
+    # ðŸ”¥ FORCE FIX (MOST IMPORTANT)
     if thread.get("assigned_admin_id") != MAIN_ADMIN_ID:
         thread["assigned_admin_id"] = MAIN_ADMIN_ID
 
@@ -964,14 +992,13 @@ def default_admin_for_user(user):
 
 
 def get_assigned_admin_id(user_id, match_id, create_if_missing=True):
-    with state_lock:
-        user = get_user(user_id)
-        thread = ensure_chat_thread(user, match_id)
-        assigned_admin_id = thread.get("assigned_admin_id")
-        if assigned_admin_id is None and create_if_missing:
-            assigned_admin_id = default_admin_for_user(user)
-            thread["assigned_admin_id"] = assigned_admin_id
-        return assigned_admin_id
+    user = get_user(user_id)
+    thread = ensure_chat_thread(user, match_id)
+    assigned_admin_id = thread.get("assigned_admin_id")
+    if assigned_admin_id is None and create_if_missing:
+        assigned_admin_id = default_admin_for_user(user)
+        thread["assigned_admin_id"] = assigned_admin_id
+    return assigned_admin_id
 
 
 def get_admin_recipients(user_id, match_id):
@@ -1033,116 +1060,105 @@ def mirror_admin_reply_to_main_admin(source_admin_id, user_id, match_id, text):
             flush=True,
         )
         return
-    with state_lock:
-        chat_map[sent.message_id] = {"user_id": user_id, "match_id": match_id, "admin_id": MAIN_ADMIN_ID}
-        if len(chat_map) > 50:
-            chat_map.clear()
+    chat_map[sent.message_id] = {"user_id": user_id, "match_id": match_id, "admin_id": MAIN_ADMIN_ID}
+    if len(chat_map) > 50:
+        chat_map.clear()
 
 
 def append_chat_message(user_id, match_id, sender, text):
-    with state_lock:
-        user = get_user(user_id)
-        thread = ensure_chat_thread(user, match_id)
-        thread["messages"].append({"sender": sender, "text": text, "ts": int(time.time())})
-        thread["messages"] = thread["messages"][-MAX_CHAT_MESSAGES:]
+    user = get_user(user_id)
+    thread = ensure_chat_thread(user, match_id)
+    thread["messages"].append({"sender": sender, "text": text, "ts": int(time.time())})
+    thread["messages"] = thread["messages"][-MAX_CHAT_MESSAGES:]
 
 
 def increment_unread(user_id, match_id):
-    with state_lock:
-        user = get_user(user_id)
-        thread = ensure_chat_thread(user, match_id)
-        thread["user_unread"] += 1
+    user = get_user(user_id)
+    thread = ensure_chat_thread(user, match_id)
+    thread["user_unread"] += 1
 
 
 def reset_unread(user_id, match_id):
-    with state_lock:
-        user = get_user(user_id)
-        thread = ensure_chat_thread(user, match_id)
-        thread["user_unread"] = 0
+    user = get_user(user_id)
+    thread = ensure_chat_thread(user, match_id)
+    thread["user_unread"] = 0
 
 
 def get_unread_count(user_id, match_id):
-    with state_lock:
-        user = get_user(user_id)
-        thread = ensure_chat_thread(user, match_id)
-        return thread["user_unread"]
+    user = get_user(user_id)
+    thread = ensure_chat_thread(user, match_id)
+    return thread["user_unread"]
 
 
 def increment_admin_unread(user_id, match_id, admin_ids=None):
-    with state_lock:
-        user = get_user(user_id)
-        if admin_ids is None:
-            admin_ids = get_admin_recipients(user_id, match_id)
-        admin_unread = get_thread_admin_unread_map(user, match_id, fallback_admin_ids=admin_ids)
-        for admin_id in admin_ids:
-            admin_key = str(admin_id)
-            admin_unread[admin_key] = int(admin_unread.get(admin_key, 0)) + 1
-        save_state()
+    user = get_user(user_id)
+    if admin_ids is None:
+        admin_ids = get_admin_recipients(user_id, match_id)
+    admin_unread = get_thread_admin_unread_map(user, match_id, fallback_admin_ids=admin_ids)
+    for admin_id in admin_ids:
+        admin_key = str(admin_id)
+        admin_unread[admin_key] = int(admin_unread.get(admin_key, 0)) + 1
+    flush_loaded_users()
 
 
 def reset_admin_unread(user_id, match_id, admin_id=None):
-    with state_lock:
-        user = get_user(user_id)
-        fallback_admin_ids = get_admin_recipients(user_id, match_id)
-        admin_unread = get_thread_admin_unread_map(user, match_id, fallback_admin_ids=fallback_admin_ids)
-        if admin_id is None:
-            for admin_key in list(admin_unread):
-                admin_unread[admin_key] = 0
-        else:
-            admin_unread[str(admin_id)] = 0
-        save_state()
+    user = get_user(user_id)
+    fallback_admin_ids = get_admin_recipients(user_id, match_id)
+    admin_unread = get_thread_admin_unread_map(user, match_id, fallback_admin_ids=fallback_admin_ids)
+    if admin_id is None:
+        for admin_key in list(admin_unread):
+            admin_unread[admin_key] = 0
+    else:
+        admin_unread[str(admin_id)] = 0
+    flush_loaded_users()
 
 
 def get_admin_unread_count(user_id, match_id, admin_id=None):
-    with state_lock:
-        user = get_user(user_id)
-        fallback_admin_ids = get_admin_recipients(user_id, match_id)
-        admin_unread = get_thread_admin_unread_map(user, match_id, fallback_admin_ids=fallback_admin_ids)
-        if admin_id is None:
-            return sum(int(count) for count in admin_unread.values())
-        return int(admin_unread.get(str(admin_id), 0))
+    user = get_user(user_id)
+    fallback_admin_ids = get_admin_recipients(user_id, match_id)
+    admin_unread = get_thread_admin_unread_map(user, match_id, fallback_admin_ids=fallback_admin_ids)
+    if admin_id is None:
+        return sum(int(count) for count in admin_unread.values())
+    return int(admin_unread.get(str(admin_id), 0))
 
 
 def get_chat_state(user_id, match_id):
-    with state_lock:
-        user = get_user(user_id)
-        thread = ensure_chat_thread(user, match_id)
-        return thread["state"]
+    user = get_user(user_id)
+    thread = ensure_chat_thread(user, match_id)
+    return thread["state"]
 
 
 def set_chat_state(user_id, match_id, state):
-    with state_lock:
-        user = get_user(user_id)
-        thread = ensure_chat_thread(user, match_id)
-        old_state = thread.get("state", "available")
-        if state == "active" and old_state == "available":
-            chat_started_notified = user.get("chat_started_notified", {})
-            match_id_str = str(match_id)
-            if not thread.get("counted_for_limit", False) and match_id_str not in chat_started_notified:
-                user["total_chats_used"] = user.get("total_chats_used", 0) + 1
-                thread["counted_for_limit"] = True
-        thread["state"] = state
-        if state != "active":
-            user["chat_open"] = False
-        save_state()
+    user = get_user(user_id)
+    thread = ensure_chat_thread(user, match_id)
+    old_state = thread.get("state", "available")
+    if state == "active" and old_state == "available":
+        chat_started_notified = user.get("chat_started_notified", {})
+        match_id_str = str(match_id)
+        if not thread.get("counted_for_limit", False) and match_id_str not in chat_started_notified:
+            user["total_chats_used"] = user.get("total_chats_used", 0) + 1
+            thread["counted_for_limit"] = True
+    thread["state"] = state
+    if state != "active":
+        user["chat_open"] = False
+    flush_loaded_users()
 
 
 def remove_match_from_inbox(user_id, match_id):
-    with state_lock:
-        user = get_user(user_id)
+    user = get_user(user_id)
         
-        state = get_chat_state(user_id, match_id)
+    state = get_chat_state(user_id, match_id)
         
-        # ONLY remove if chat is ended or blocked
-        if state in ["ended", "blocked"]:
-            if match_id in user["matches"]:
-                user["matches"] = [item for item in user["matches"] if item != match_id]
+    # ONLY remove if chat is ended or blocked
+    if state in ["ended", "blocked"]:
+        if match_id in user["matches"]:
+            user["matches"] = [item for item in user["matches"] if item != match_id]
         
-        if user.get("current_match_id") == match_id:
-            user["current_match_id"] = None
-            user["chat_open"] = False
-            if user.get("active_view") in {"match", "chat", "inbox"}:
-                user["active_view"] = "menu"
+    if user.get("current_match_id") == match_id:
+        user["current_match_id"] = None
+        user["chat_open"] = False
+        if user.get("active_view") in {"match", "chat", "inbox"}:
+            user["active_view"] = "menu"
         
     
     # Only sync paid users to vip_users table to prevent free user data loss
@@ -1156,27 +1172,25 @@ def append_system_message(user_id, match_id, text):
 
 
 def count_active_chats(user_id):
-    with state_lock:
-        user = get_user(user_id)
-        total = 0
-        for match_id in user["matches"]:
-            thread = ensure_chat_thread(user, match_id)
-            if thread["state"] == "active":
-                total += 1
-        return total
+    user = get_user(user_id)
+    total = 0
+    for match_id in user["matches"]:
+        thread = ensure_chat_thread(user, match_id)
+        if thread["state"] == "active":
+            total += 1
+    return total
 
 
 def count_free_chat_slots_used(user_id, exclude_match_id=None):
-    with state_lock:
-        user = get_user(user_id)
-        total = 0
-        for match_id in user["matches"]:
-            if exclude_match_id is not None and match_id == exclude_match_id:
-                continue
-            thread = ensure_chat_thread(user, match_id)
-            if thread["state"] in {"active", "locked"}:
-                total += 1
-        return total
+    user = get_user(user_id)
+    total = 0
+    for match_id in user["matches"]:
+        if exclude_match_id is not None and match_id == exclude_match_id:
+            continue
+        thread = ensure_chat_thread(user, match_id)
+        if thread["state"] in {"active", "locked"}:
+            total += 1
+    return total
 
 
 def can_start_new_chat(user_id):
@@ -1222,19 +1236,17 @@ def is_visible_in_inbox(user_id, match_id):
 
 
 def get_recent_chat_history(user_id, match_id, limit=CHAT_PREVIEW_MESSAGES):
-    with state_lock:
-        user = get_user(user_id)
-        thread = ensure_chat_thread(user, match_id)
-        return list(thread["messages"][-limit:])
+    user = get_user(user_id)
+    thread = ensure_chat_thread(user, match_id)
+    return list(thread["messages"][-limit:])
 
 
 def get_last_message_ts(user_id, match_id):
-    with state_lock:
-        user = get_user(user_id)
-        thread = ensure_chat_thread(user, match_id)
-        if not thread["messages"]:
-            return 0
-        return int(thread["messages"][-1].get("ts", 0))
+    user = get_user(user_id)
+    thread = ensure_chat_thread(user, match_id)
+    if not thread["messages"]:
+        return 0
+    return int(thread["messages"][-1].get("ts", 0))
 
 
 def format_chat_history(match_name, messages):
@@ -1279,7 +1291,7 @@ def format_admin_chat_history(user_id, user_name, match_name, messages, unread_c
     user = get_user(user_id)
     tag = "🟢 VIP" if user.get("paid") else "🟡 FREE"
     age_text = f" (Age: {match_age})" if match_age else ""
-    lines = [f"💬 <b>{html.escape(user_name)}</b> × <b>{html.escape(match_name)}{age_text}</b> {tag}"]
+    lines = [f"ðŸ’¬ <b>{html.escape(user_name)}</b> Ã— <b>{html.escape(match_name)}{age_text}</b> {tag}"]
     if user["paid"]:
         lines.append("💎 VIP: Active")
         lines.append(f"Plan: {get_vip_plan_label(user)}")
@@ -1319,7 +1331,7 @@ def notify_user_of_match_message(user_id, match_id, text):
         message_text = f"<b>{html.escape(match_name)}:</b> {html.escape(text)}"
     else:
         message_text = (
-            f"<b>💬 New message from {html.escape(match_name)}</b>\n\n"
+            f"<b>ðŸ’¬ New message from {html.escape(match_name)}</b>\n\n"
             f"<b>{html.escape(match_name)}:</b> {html.escape(text)}"
         )
 
@@ -1348,19 +1360,18 @@ def maybe_send_fomo_message(user_id, match_id):
 
     should_send = False
     fomo_text = random.choice(FOMO_MESSAGES)
-    with state_lock:
-        user = get_user(user_id)
-        thread = ensure_chat_thread(user, match_id)
-        if thread.get("fomo_sent"):
-            return
-        active_messages = [item for item in thread["messages"] if item.get("sender") in {"user", "match"}]
-        count = len(active_messages)
-        if 2 <= count <= 4 or (count > 4 and random.random() < 0.22):
-            thread["fomo_sent"] = True
-            should_send = True
-            thread["messages"].append({"sender": "system", "text": fomo_text, "ts": int(time.time())})
-            thread["messages"] = thread["messages"][-MAX_CHAT_MESSAGES:]
-            save_state()
+    user = get_user(user_id)
+    thread = ensure_chat_thread(user, match_id)
+    if thread.get("fomo_sent"):
+        return
+    active_messages = [item for item in thread["messages"] if item.get("sender") in {"user", "match"}]
+    count = len(active_messages)
+    if 2 <= count <= 4 or (count > 4 and random.random() < 0.22):
+        thread["fomo_sent"] = True
+        should_send = True
+        thread["messages"].append({"sender": "system", "text": fomo_text, "ts": int(time.time())})
+        thread["messages"] = thread["messages"][-MAX_CHAT_MESSAGES:]
+        flush_loaded_users()
 
     if should_send:
         threading.Thread(
@@ -1410,10 +1421,9 @@ def build_user_inbox_markup(user_id, matches):
 def send_matches_inbox(user_id):
     user = get_user(user_id)
     matches = get_sorted_matches(user_id)
-    with state_lock:
-        user["active_view"] = "inbox"
-        user["chat_open"] = False
-        save_state()
+    user["active_view"] = "inbox"
+    user["chat_open"] = False
+    flush_loaded_users()
 
     if not matches:
         safe_send_message(bot, user_id, "Hmm… no one caught your vibe yet 😏\nTry again…", reply_markup=main_menu_keyboard(user_id))
@@ -1432,18 +1442,17 @@ def send_match_card(user_id, match_id):
     state = get_chat_state(user_id, match_id)
     unread = get_unread_count(user_id, match_id)
     preview = get_last_message_preview(user_id, match_id, limit=80)
-    lines = [f"<b>{profile['name']}</b>, {profile['age']} 🙂"]
+    lines = [f"<b>{profile['name']}</b>, {profile['age']} ðŸ™‚"]
     if unread:
         lines.append(f"Unread: {unread}")
     lines.append(preview)
     if state == "locked":
         lines.extend(["", "Upgrade to reply and unlock full chats 🔓"])
 
-    with state_lock:
-        user["current_match_id"] = match_id
-        user["active_view"] = "match"
-        user["chat_open"] = False
-        save_state()
+    user["current_match_id"] = match_id
+    user["active_view"] = "match"
+    user["chat_open"] = False
+    flush_loaded_users()
 
     safe_send_photo(bot, 
         user_id,
@@ -1494,29 +1503,29 @@ def inactivity_engagement_worker():
         now = time.time()
         targets = []
 
-        with state_lock:
-            for user_id, user in users.items():
-                if is_admin(user_id):
-                    continue
-                if not user.get("matches"):
-                    continue
-                if user.get("chat_open"):
-                    continue
+        all_users = load_all_users_from_db()
+        for user_id, user in all_users.items():
+            if is_admin(user_id):
+                continue
+            if not user.get("matches"):
+                continue
+            if user.get("chat_open"):
+                continue
 
-                last_active = LAST_ACTIVITY_TIME.get(user_id, 0)
-                if not last_active:
-                    continue
+            last_active = LAST_ACTIVITY_TIME.get(user_id, 0)
+            if not last_active:
+                continue
 
-                inactive_for = now - last_active
-                if inactive_for < INACTIVITY_MIN_SECONDS or inactive_for > INACTIVITY_MAX_SECONDS:
-                    continue
+            inactive_for = now - last_active
+            if inactive_for < INACTIVITY_MIN_SECONDS or inactive_for > INACTIVITY_MAX_SECONDS:
+                continue
 
-                last_ping = LAST_ENGAGEMENT_PING.get(user_id, 0)
-                if last_ping and now - last_ping < INACTIVITY_MAX_SECONDS:
-                    continue
+            last_ping = LAST_ENGAGEMENT_PING.get(user_id, 0)
+            if last_ping and now - last_ping < INACTIVITY_MAX_SECONDS:
+                continue
 
-                LAST_ENGAGEMENT_PING[user_id] = now
-                targets.append(user_id)
+            LAST_ENGAGEMENT_PING[user_id] = now
+            targets.append(user_id)
 
         for user_id in targets:
             try:
@@ -1580,7 +1589,7 @@ def get_total_unread(user):
 def matches_button_text(user):
     unread_total = get_total_unread(user)
     if unread_total:
-        return f"💖 Matches ({unread_total})"
+        return f"ðŸ’– Matches ({unread_total})"
     return BTN_MATCHES
 
 
@@ -1664,31 +1673,30 @@ def build_admin_chat_controls(user_id, match_id):
 def build_admin_chat_list_markup(admin_id, unread_only=False):
     markup = InlineKeyboardMarkup()
     chat_rows = []
-    with state_lock:
-        for user_id, user in users.items():
-            user_name = user.get("name") or f"User {user_id}"
-            for match_key, thread in user.get("chat_threads", {}).items():
-                messages = thread.get("messages", [])
-                if not messages:
-                    continue
-                match_id = int(match_key)
-                assigned_admin_id = get_assigned_admin_id(user_id, match_id)
-                if admin_id != MAIN_ADMIN_ID and assigned_admin_id != admin_id:
-                    continue
-                profile = get_profile(match_id)
-                match_name = profile["name"] if profile else f"Match {match_id}"
-                admin_unread = get_admin_unread_count(user_id, match_id, admin_id)
-                if unread_only and admin_unread <= 0:
-                    continue
-                last_ts = int(messages[-1].get("ts", 0)) if messages else 0
-                user = get_user(user_id)
-                tag = "🟢 VIP" if user.get("paid") else "🟡 FREE"
-                label = f"{tag} • {user_name} × {match_name}"
-                if admin_unread:
-                    label += f" ({admin_unread})"
-                preview = get_last_message_preview(user_id, match_id, limit=26)
-                label += f"\n{preview}"
-                chat_rows.append((last_ts, admin_unread, label, user_id, match_id))
+    for user_id, user in load_all_users_from_db().items():
+        user_name = user.get("name") or f"User {user_id}"
+        for match_key, thread in user.get("chat_threads", {}).items():
+            messages = thread.get("messages", [])
+            if not messages:
+                continue
+            match_id = int(match_key)
+            assigned_admin_id = get_assigned_admin_id(user_id, match_id)
+            if admin_id != MAIN_ADMIN_ID and assigned_admin_id != admin_id:
+                continue
+            profile = get_profile(match_id)
+            match_name = profile["name"] if profile else f"Match {match_id}"
+            admin_unread = get_admin_unread_count(user_id, match_id, admin_id)
+            if unread_only and admin_unread <= 0:
+                continue
+            last_ts = int(messages[-1].get("ts", 0)) if messages else 0
+            user = get_user(user_id)
+            tag = "🟢 VIP" if user.get("paid") else "🟡 FREE"
+            label = f"{tag} â€¢ {user_name} Ã— {match_name}"
+            if admin_unread:
+                label += f" ({admin_unread})"
+            preview = get_last_message_preview(user_id, match_id, limit=26)
+            label += f"\n{preview}"
+            chat_rows.append((last_ts, admin_unread, label, user_id, match_id))
 
     chat_rows.sort(key=lambda item: item[0])
     for _, _, label, user_id, match_id in chat_rows[-25:]:
@@ -1760,10 +1768,9 @@ def send_admin_chat_history(admin_id, user_id, match_id):
             flush=True,
         )
         return
-    with state_lock:
-        chat_map[sent.message_id] = {"user_id": user_id, "match_id": match_id, "admin_id": admin_id}
-        if len(chat_map) > 50:
-            chat_map.clear()
+    chat_map[sent.message_id] = {"user_id": user_id, "match_id": match_id, "admin_id": admin_id}
+    if len(chat_map) > 50:
+        chat_map.clear()
 
 
 def payment_markup(user_id):
@@ -1781,10 +1788,9 @@ def payment_markup(user_id):
 
 
 def send_main_menu(user_id):
-    with state_lock:
-        user = get_user(user_id)
-        user["active_view"] = "menu"
-        save_state()
+    user = get_user(user_id)
+    user["active_view"] = "menu"
+    flush_loaded_users()
     safe_send_message(bot, 
         user_id,
         "You can browse profiles, check matches, or adjust your settings here.",
@@ -1867,25 +1873,24 @@ def choose_next_profile(user):
 
 
 def profile_caption_from_view(profile, profile_view, detailed=False):
-    lines = [f"♀️ <b>{profile['name']}</b>, {profile['age']}", f"🟢 {profile_view['activity']}"]
+    lines = [f"â™€ï¸ <b>{profile['name']}</b>, {profile['age']}", f"ðŸŸ¢ {profile_view['activity']}"]
     return "\n".join(lines)
 
 
 def send_profile_card(user_id, detailed=False, profile_id=None):
     user = get_user(user_id)
-    with state_lock:
-        if profile_id is None:
-            profile_id = choose_next_profile(user)
-        if profile_id is None:
-            safe_send_message(bot, user_id, "Hmm… no one caught your vibe yet 😏\nTry again…", reply_markup=main_menu_keyboard(user_id))
-            return
-        if profile_id not in user["shown"]:
-            user["shown"].append(profile_id)
-        user["current_profile_id"] = profile_id
-        user["chat_open"] = False
-        user["active_view"] = "browse"
-        profile_view = get_profile_view(user, profile_id)
-        save_state()
+    if profile_id is None:
+        profile_id = choose_next_profile(user)
+    if profile_id is None:
+        safe_send_message(bot, user_id, "Hmm… no one caught your vibe yet 😏\nTry again…", reply_markup=main_menu_keyboard(user_id))
+        return
+    if profile_id not in user["shown"]:
+        user["shown"].append(profile_id)
+    user["current_profile_id"] = profile_id
+    user["chat_open"] = False
+    user["active_view"] = "browse"
+    profile_view = get_profile_view(user, profile_id)
+    flush_loaded_users()
 
     profile = get_profile(profile_id)
     if not profile:
@@ -1951,7 +1956,7 @@ def schedule_reaction_after_like(user, profile_id):
 def send_like_feedback(user_id, profile):
     safe_send_message(bot, 
         user_id,
-        f"<b>You liked {profile['name']} 😉</b>\n\nLet's see if it's a match…",
+        f"<b>You liked {profile['name']} ðŸ˜‰</b>\n\nLet's see if it's a matchâ€¦",
         reply_markup=build_keyboard([BTN_MAIN_MENU]),
         parse_mode="HTML",
     )
@@ -1962,26 +1967,25 @@ def announce_incoming_like(user_id, profile_id):
     if not profile:
         return
     # Sirf ek simple alert, bina kisi photo ya keyboard change ke
-    safe_send_message(bot, user_id, f"❤️ <b>Someone just liked your profile!</b>\nCheck 'Likes' from the Main Menu later.", parse_mode="HTML")
+    safe_send_message(bot, user_id, f"â¤ï¸ <b>Someone just liked your profile!</b>\nCheck 'Likes' from the Main Menu later.", parse_mode="HTML")
 
 
 def create_match(user_id, profile_id, source="system"):
     user = get_user(user_id)
-    with state_lock:
-        if profile_id in user["matches"]:
-            return
-        user["matches"].append(profile_id)
-        if profile_id in user["incoming_likes"]:
-            user["incoming_likes"].remove(profile_id)
-        user["current_match_id"] = profile_id
-        user["match_cursor"] = max(len(user["matches"]) - 1, 0)
-        user["chat_open"] = False
-        thread = ensure_chat_thread(user, profile_id)
-        thread["state"] = "available"
-        if thread.get("assigned_admin_id") is None:
-            thread["assigned_admin_id"] = default_admin_for_user(user)
-        paid = user["paid"]
-        save_state()
+    if profile_id in user["matches"]:
+        return
+    user["matches"].append(profile_id)
+    if profile_id in user["incoming_likes"]:
+        user["incoming_likes"].remove(profile_id)
+    user["current_match_id"] = profile_id
+    user["match_cursor"] = max(len(user["matches"]) - 1, 0)
+    user["chat_open"] = False
+    thread = ensure_chat_thread(user, profile_id)
+    thread["state"] = "available"
+    if thread.get("assigned_admin_id") is None:
+        thread["assigned_admin_id"] = default_admin_for_user(user)
+    paid = user["paid"]
+    flush_loaded_users()
     
     # Only sync paid users to vip_users table to prevent free user data loss
     # Free users rely on the full users table for match persistence
@@ -2006,9 +2010,8 @@ def create_match(user_id, profile_id, source="system"):
     
     opener = random.choice(available)
     used.append(opener)
-    with state_lock:
-        user["used_openers"] = used
-        save_state()
+    user["used_openers"] = used
+    flush_loaded_users()
     
     append_chat_message(user_id, profile_id, "match", opener)
     increment_unread(user_id, profile_id)
@@ -2030,32 +2033,30 @@ def create_match(user_id, profile_id, source="system"):
 def process_pending_events(user_id):
     due_events = []
     user = get_user(user_id)
-    with state_lock:
-        current_swipes = user["swipes"]
-        remaining = []
-        for event in user["pending_events"]:
-            # Sirf EK event ko ek time par process karo taaki bot fake na lage
-            if event["due_swipes"] <= current_swipes and len(due_events) < 1:
-                due_events.append(event)
-            else:
-                remaining.append(event)
-        user["pending_events"] = remaining
-        save_state()
+    current_swipes = user["swipes"]
+    remaining = []
+    for event in user["pending_events"]:
+        # Sirf EK event ko ek time par process karo taaki bot fake na lage
+        if event["due_swipes"] <= current_swipes and len(due_events) < 1:
+            due_events.append(event)
+        else:
+            remaining.append(event)
+    user["pending_events"] = remaining
+    flush_loaded_users()
 
     for event in due_events:
         if event["type"] == "incoming_like":
             profile_id = event["profile_id"]
-            with state_lock:
-                if (
-                    profile_id not in user["incoming_likes"]
-                    and profile_id not in user["matches"]
-                    and profile_id not in user["liked"]
-                ):
-                    user["incoming_likes"].append(profile_id)
-                    save_state()
-                    should_announce = True
-                else:
-                    should_announce = False
+            if (
+                profile_id not in user["incoming_likes"]
+                and profile_id not in user["matches"]
+                and profile_id not in user["liked"]
+            ):
+                user["incoming_likes"].append(profile_id)
+                flush_loaded_users()
+                should_announce = True
+            else:
+                should_announce = False
             if should_announce:
                 threading.Thread(target=announce_incoming_like, args=(user_id, profile_id), daemon=True).start()
         elif event["type"] == "match":
@@ -2069,21 +2070,19 @@ def delayed_moderation_success(user_id):
     time.sleep(random.uniform(2.0, 3.0))
 
     user = get_user(user_id)
-    with state_lock:
-        user["moderation_pending"] = False
-        user["step"] = "agreement"
-        save_state()
+    user["moderation_pending"] = False
+    user["step"] = "agreement"
+    flush_loaded_users()
 
     safe_send_message(bot, user_id, "✅ Photo approved!")
     send_agreement(user_id)
 
  
 def send_vip_already_message(user_id):
-    with state_lock:
-        user = get_user(user_id)
-        if user.get("awaiting_payment"):
-            user["awaiting_payment"] = False
-            save_state()
+    user = get_user(user_id)
+    if user.get("awaiting_payment"):
+        user["awaiting_payment"] = False
+        flush_loaded_users()
     safe_send_message(bot, user_id, "<b>✅ You already have VIP access.</b>", parse_mode="HTML")
 
 
@@ -2107,9 +2106,8 @@ def unlock_text():
 
 def open_likes_you(user_id):
     user = get_user(user_id)
-    with state_lock:
-        incoming = list(user["incoming_likes"])
-        paid = user["paid"]
+    incoming = list(user["incoming_likes"])
+    paid = user["paid"]
 
     if not incoming:
         safe_send_message(bot, user_id, "No new likes right now…\n\nCheck back later 😉", reply_markup=main_menu_keyboard(user_id))
@@ -2121,10 +2119,9 @@ def open_likes_you(user_id):
         return
 
     if paid:
-        with state_lock:
-            user["current_profile_id"] = profile_id
-            get_profile_view(user, profile_id)
-            save_state()
+        user["current_profile_id"] = profile_id
+        get_profile_view(user, profile_id)
+        flush_loaded_users()
         safe_send_photo(bot, 
             user_id,
             profile["photo"],
@@ -2135,9 +2132,8 @@ def open_likes_you(user_id):
             reply_markup=build_keyboard([BTN_SKIP, BTN_LIKE], [BTN_MATCHES, BTN_MAIN_MENU]),
         )
     else:
-        with state_lock:
-            get_profile_view(user, profile_id)
-            save_state()
+        get_profile_view(user, profile_id)
+        flush_loaded_users()
         safe_send_photo(bot, 
             user_id,
             profile["photo"],
@@ -2162,9 +2158,8 @@ def show_matches(user_id):
     else:
         cursor = 0
 
-    with state_lock:
-        user["match_cursor"] = cursor
-        save_state()
+    user["match_cursor"] = cursor
+    flush_loaded_users()
     send_match_card(user_id, matches[cursor])
 
 
@@ -2178,9 +2173,8 @@ def show_next_match(user_id):
 
     current_cursor = int(user.get("match_cursor", 0))
     next_cursor = (current_cursor + 1) % len(matches)
-    with state_lock:
-        user["match_cursor"] = next_cursor
-        save_state()
+    user["match_cursor"] = next_cursor
+    flush_loaded_users()
     send_match_card(user_id, matches[next_cursor])
 
 
@@ -2193,9 +2187,8 @@ def show_prev_match(user_id):
 
     current_cursor = int(user.get("match_cursor", 0))
     prev_cursor = (current_cursor - 1) % len(matches)
-    with state_lock:
-        user["match_cursor"] = prev_cursor
-        save_state()
+    user["match_cursor"] = prev_cursor
+    flush_loaded_users()
     send_match_card(user_id, matches[prev_cursor])
 
 
@@ -2213,7 +2206,7 @@ def text_from_message(message):
 def send_admin_notification(user_id, match_id, text):
     for admin_id in get_admin_recipients(user_id, match_id):
 
-        # 🔥 FIX: अगर admin उसी chat में है → notification skip
+        # ðŸ”¥ FIX: à¤…à¤—à¤° admin à¤‰à¤¸à¥€ chat à¤®à¥‡à¤‚ à¤¹à¥ˆ â†’ notification skip
         active = admin_active_chat.get(admin_id)
         if active and active.get("user_id") == user_id:
             continue
@@ -2227,7 +2220,7 @@ def send_admin_notification(user_id, match_id, text):
             try:
                 msg = bot.send_message(
                     admin_id,
-                    f"👤 {name}\n💬 {text}",
+                    f"ðŸ‘¤ {name}\nðŸ’¬ {text}",
                     reply_markup=InlineKeyboardMarkup().add(
                         InlineKeyboardButton("💬 Reply", callback_data=f"reply_{user_id}_{match_id}")
                     )
@@ -2245,11 +2238,11 @@ def send_admin_notification(user_id, match_id, text):
 
             data["messages"].append(text)
 
-            messages_text = "\n".join([f"💬 {m}" for m in data["messages"]])
+            messages_text = "\n".join([f"ðŸ’¬ {m}" for m in data["messages"]])
 
             try:
                 bot.edit_message_text(
-                    f"👤 {name} ({len(data['messages'])} messages)\n{messages_text}",
+                    f"ðŸ‘¤ {name} ({len(data['messages'])} messages)\n{messages_text}",
                     admin_id,
                     data["message_id"],
                     reply_markup=InlineKeyboardMarkup().add(
@@ -2291,10 +2284,9 @@ def forward_user_message_to_admins(message):
             )
             unread_admins.append(admin)
             continue
-        with state_lock:
-            chat_map[sent.message_id] = {"user_id": user_id, "match_id": match_id, "admin_id": admin}
-            if len(chat_map) > 50:
-                chat_map.clear()
+        chat_map[sent.message_id] = {"user_id": user_id, "match_id": match_id, "admin_id": admin}
+        if len(chat_map) > 50:
+            chat_map.clear()
     if unread_admins:
         increment_admin_unread(user_id, match_id, admin_ids=unread_admins)
     send_admin_notification(user_id, match_id, message_text)    
@@ -2334,12 +2326,11 @@ def open_match_chat(user_id, match_id, show_history=True):
         return
 
     match_profile = get_profile(match_id)
-    with state_lock:
-        user = get_user(user_id)
-        user["chat_open"] = True
-        user["active_view"] = "chat"
-        user["current_match_id"] = match_id
-        save_state()
+    user = get_user(user_id)
+    user["chat_open"] = True
+    user["active_view"] = "chat"
+    user["current_match_id"] = match_id
+    flush_loaded_users()
     reset_unread(user_id, match_id)
     if not show_history:
         return
@@ -2370,9 +2361,8 @@ def start_handler(message):
         safe_send_message(bot, message.chat.id, "Admin menu is ready.", reply_markup=admin_menu_keyboard())
         return
     touch_user_activity(message.chat.id)
-    with state_lock:
-        user["chat_open"] = False
-        user["active_view"] = "start"
+    user["chat_open"] = False
+    user["active_view"] = "start"
     send_welcome_screen(message.chat.id)
 
 
@@ -2466,13 +2456,13 @@ def stats_handler(message):
         safe_send_message(bot, message.chat.id, "This command is for admins only.")
         return
     clear_admin_active_chat(message.chat.id)
+
+    all_users = load_all_users_from_db()
+    total_users = len(all_users)
+    vip_users = sum(1 for user in all_users.values() if is_vip_active(user))
+    pending_users = sum(1 for user in all_users.values() if user.get("payment_status") == "pending")
     
-    with state_lock:
-        total_users = len(users)
-        vip_users = sum(1 for user in users.values() if is_vip_active(user))
-        pending_users = sum(1 for user in users.values() if user.get("payment_status") == "pending")
-    
-    stats_message = f"""📊 Stats:
+    stats_message = f"""ðŸ“Š Stats:
 Total Users: {total_users}
 VIP Users: {vip_users}
 Pending Payments: {pending_users}"""
@@ -2487,27 +2477,29 @@ def pending_handler(message):
         return
     clear_admin_active_chat(message.chat.id)
     
-    with state_lock:
-        pending_users = [(uid, user) for uid, user in users.items() if user.get("payment_status") == "pending"]
+    pending_users = [
+        (uid, user)
+        for uid, user in load_all_users_from_db().items()
+        if user.get("payment_status") == "pending"
+    ]
     
     if not pending_users:
         safe_send_message(bot, message.chat.id, "✅ No pending payments right now.")
         return
     
-    lines = [f"⏳ Pending Payments ({len(pending_users)}):"]
+    lines = [f"â³ Pending Payments ({len(pending_users)}):"]
     for uid, user in pending_users:
         name = user.get("name") or f"User {uid}"
-        lines.append(f"• {name} (ID: {uid})")
+        lines.append(f"â€¢ {name} (ID: {uid})")
     
     safe_send_message(bot, message.chat.id, "\n".join(lines))
 
 
 def get_next_pending_user_id():
     """Get the next pending user ID"""
-    with state_lock:
-        for uid, user in users.items():
-            if user.get("payment_status") == "pending":
-                return uid
+    for uid, user in load_all_users_from_db().items():
+        if user.get("payment_status") == "pending":
+            return uid
     return None
 
 
@@ -2523,19 +2515,19 @@ def send_next_pending_to_admin(admin_id):
     
     if not photo_id:
         name = next_user.get("name") or f"User {next_uid}"
-        safe_send_message(bot, admin_id, f"🧾 Next pending: {name} (ID: {next_uid})")
+        safe_send_message(bot, admin_id, f"ðŸ§¾ Next pending: {name} (ID: {next_uid})")
         return
     
     first_name = next_user.get("name") or "User"
     username = next_user.get("payment_username", "N/A")
     
-    caption = f"""🧾 Payment Proof Received
+    caption = f"""ðŸ§¾ Payment Proof Received
 
 User ID: {next_uid}
 Name: {first_name}
 Username: @{username}
 
-Status: 🟡 Pending"""
+Status: ðŸŸ¡ Pending"""
     
     safe_send_photo(bot, 
         admin_id,
@@ -2602,8 +2594,7 @@ def admin_direct_reply(message):
     content_types=["text"],
 )
 def admin_reply_handler(message):
-    with state_lock:
-        chat_context = chat_map.get(message.reply_to_message.message_id)
+    chat_context = chat_map.get(message.reply_to_message.message_id)
     if chat_context:
         user_id = chat_context["user_id"]
         match_id = chat_context["match_id"]
@@ -2682,11 +2673,10 @@ def photo_handler(message):
     file_id = message.photo[-1].file_id
 
     if user["step"] == "photo":
-        with state_lock:
-            user["photo"] = file_id
-            user["step"] = "moderation"
-            user["moderation_pending"] = True
-            save_state()
+        user["photo"] = file_id
+        user["step"] = "moderation"
+        user["moderation_pending"] = True
+        flush_loaded_users()
         threading.Thread(target=delayed_moderation_success, args=(user_id,), daemon=True).start()
         return
 
@@ -2721,13 +2711,13 @@ def photo_handler(message):
         username = message.from_user.username or "N/A"
         
         # Enhanced caption with user info and status
-        caption = f"""🧾 Payment Proof Received
+        caption = f"""ðŸ§¾ Payment Proof Received
 
 User ID: {user_id}
 Name: {first_name}
 Username: @{username}
 
-Status: 🟡 Pending"""
+Status: ðŸŸ¡ Pending"""
         
         for admin in PAYMENT_ADMINS:
             safe_send_photo(bot, 
@@ -2737,12 +2727,11 @@ Status: 🟡 Pending"""
                 reply_markup=payment_markup(user_id),
             )
         
-        with state_lock:
-            user["awaiting_payment"] = False
-            user["payment_status"] = "pending"
-            user["payment_proof_photo_id"] = file_id
-            user["payment_username"] = username
-            save_state()
+        user["awaiting_payment"] = False
+        user["payment_status"] = "pending"
+        user["payment_proof_photo_id"] = file_id
+        user["payment_username"] = username
+        flush_loaded_users()
         
         safe_send_message(bot, user_id, "Screenshot received ✅\n\nWe’re verifying it… please wait a moment", reply_markup=main_menu_keyboard(user_id))
         return
@@ -2767,7 +2756,7 @@ def callback_handler(call):
 
     bot.answer_callback_query(call.id)
 
-    # 🔥 REPLY BUTTON FIX (TOP)
+    # ðŸ”¥ REPLY BUTTON FIX (TOP)
     if call.data and call.data.startswith("reply_"):
         try:
             data = call.data.replace("reply_", "")
@@ -2934,9 +2923,8 @@ def callback_handler(call):
             if match_id not in user["matches"]:
                 bot.answer_callback_query(call.id, "Match not found")
                 return
-            with state_lock:
-                user["current_match_id"] = match_id
-                save_state()
+            user["current_match_id"] = match_id
+            flush_loaded_users()
             open_match_chat(user_id, match_id, show_history=True)
             bot.answer_callback_query(call.id, "Chat opened")
             return
@@ -2982,35 +2970,33 @@ def callback_handler(call):
         now_ts = get_current_timestamp()
         end_ts = now_ts + (duration_days * 86400)
 
-        with state_lock:
-            user["vip_start_date"] = now_ts
-            user["vip_end_date"] = end_ts
-            user["paid"] = True
-            user["chat_limit"] = 5
-            user["awaiting_payment"] = False
-            user["payment_status"] = "approved"
-            try:
-                save_vip_to_db(user_id, user)
-                print(f"VIP saved to DB: {user_id}")
-            except Exception as e:
-                print("VIP DB save error:", e)
-            for thread in user.get("chat_threads", {}).values():
-                if thread.get("state") == "locked":
-                    thread["state"] = "available"
-            save_state()
+        user["vip_start_date"] = now_ts
+        user["vip_end_date"] = end_ts
+        user["paid"] = True
+        user["chat_limit"] = 5
+        user["awaiting_payment"] = False
+        user["payment_status"] = "approved"
+        try:
+            save_vip_to_db(user_id, user)
+            print(f"VIP saved to DB: {user_id}")
+        except Exception as e:
+            print("VIP DB save error:", e)
+        for thread in user.get("chat_threads", {}).values():
+            if thread.get("state") == "locked":
+                thread["state"] = "available"
+        flush_loaded_users()
 
         import time as time_module
         time_module.sleep(0.1)
-        with state_lock:
-            save_state()
+        flush_loaded_users()
 
         safe_send_message(bot, 
             call.message.chat.id,
-            f"✅ User {user_id} approved successfully\nPlan: {plan_label}\nValid till: {time.strftime('%d %b %Y', time.localtime(end_ts))}"
+            f"âœ… User {user_id} approved successfully\nPlan: {plan_label}\nValid till: {time.strftime('%d %b %Y', time.localtime(end_ts))}"
         )
         safe_send_message(bot, 
             user_id,
-            f"<b>💎 VIP Activated!\n\nPlan: {plan_label}\n⏳ Valid till: {time.strftime('%d %b %Y', time.localtime(end_ts))}</b>",
+            f"<b>ðŸ’Ž VIP Activated!\n\nPlan: {plan_label}\nâ³ Valid till: {time.strftime('%d %b %Y', time.localtime(end_ts))}</b>",
             reply_markup=main_menu_keyboard(user_id),
             parse_mode="HTML",
         )
@@ -3029,31 +3015,29 @@ def callback_handler(call):
     if action == "approve":
         bot.answer_callback_query(call.id, "Use a duration button to approve VIP")
         return
-        with state_lock:
-            user["paid"] = True
-            user["chat_limit"] = 5
-            user["awaiting_payment"] = False
-            user["payment_status"] = "approved"
-            try:
-                save_vip_to_db(user_id, user)
-                print(f"VIP saved to DB: {user_id}")
-            except Exception as e:
-                print("VIP DB save error:", e)
-            for thread in user.get("chat_threads", {}).values():
-                if thread.get("state") == "locked":
-                    thread["state"] = "available"
-            save_state()
+        user["paid"] = True
+        user["chat_limit"] = 5
+        user["awaiting_payment"] = False
+        user["payment_status"] = "approved"
+        try:
+            save_vip_to_db(user_id, user)
+            print(f"VIP saved to DB: {user_id}")
+        except Exception as e:
+            print("VIP DB save error:", e)
+        for thread in user.get("chat_threads", {}).values():
+            if thread.get("state") == "locked":
+                thread["state"] = "available"
+        flush_loaded_users()
         
         # Double save to ensure persistence (critical on Railway)
         import time as time_module
         time_module.sleep(0.1)
-        with state_lock:
-            save_state()
+        flush_loaded_users()
         
         # Send confirmation to admin
         safe_send_message(bot, 
             call.message.chat.id,
-            f"✅ User {user_id} approved successfully"
+            f"âœ… User {user_id} approved successfully"
         )
         
         # Send activation message to user
@@ -3070,11 +3054,10 @@ def callback_handler(call):
         return
 
     if action == "reject":
-        with state_lock:
-            user["payment_status"] = "rejected"
-            # Clear stored photo_id on rejection
-            user["payment_proof_photo_id"] = None
-            save_state()
+        user["payment_status"] = "rejected"
+        # Clear stored photo_id on rejection
+        user["payment_proof_photo_id"] = None
+        flush_loaded_users()
         if user["paid"]:
             send_vip_already_message(user_id)
         else:
@@ -3095,20 +3078,20 @@ def handle_reply_button(call):
         user_id, match_id = map(int, data.split("_"))
         admin_id = call.message.chat.id
 
-        # 🔥 ACTIVE CHAT SET
+        # ðŸ”¥ ACTIVE CHAT SET
         admin_active_chat[admin_id] = {
             "user_id": user_id,
             "match_id": match_id
         }
 
-        # 🔥 NOTIFICATION REMOVE
+        # ðŸ”¥ NOTIFICATION REMOVE
         key = (admin_id, user_id)
         if key in admin_notifications:
             del admin_notifications[key]
 
         bot.send_message(
             admin_id,
-            f"💬 Chat opened with user {user_id}\nअब reply करो"
+            f"ðŸ’¬ Chat opened with user {user_id}\nà¤…à¤¬ reply à¤•à¤°à¥‹"
         )
 
         bot.answer_callback_query(call.id)
@@ -3134,9 +3117,8 @@ def text_handler(message):
 
     if user["step"] == "start":
         if text == BTN_18_YES:
-            with state_lock:
-                user["step"] = "gender"
-                save_state()
+            user["step"] = "gender"
+            flush_loaded_users()
             safe_send_message(bot, user_id, "Tell us your gender.", reply_markup=gender_keyboard())
         else:
             safe_send_message(bot, user_id, "Tap Continue to begin.", reply_markup=welcome_keyboard())
@@ -3146,19 +3128,17 @@ def text_handler(message):
         if text not in {BTN_GENDER_MALE, BTN_GENDER_FEMALE}:
             safe_send_message(bot, user_id, "Choose one of the gender buttons.", reply_markup=gender_keyboard())
             return
-        with state_lock:
-            user["gender"] = text
-            user["step"] = "city"
-            save_state()
+        user["gender"] = text
+        user["step"] = "city"
+        flush_loaded_users()
         safe_send_message(bot, user_id, "Enter your city.", reply_markup=ReplyKeyboardRemove())
         return
 
     if user["step"] == "city":
-        with state_lock:
-            user["city"] = text
-            user["name"] = message.from_user.first_name or "User"
-            user["step"] = "photo"
-            save_state()
+        user["city"] = text
+        user["name"] = message.from_user.first_name or "User"
+        user["step"] = "photo"
+        flush_loaded_users()
         safe_send_message(bot, user_id, "Send your best photo.")
         return
 
@@ -3175,10 +3155,9 @@ def text_handler(message):
             send_agreement_details(user_id)
             return
         if text == BTN_AGREE_CONTINUE:
-            with state_lock:
-                user["agreed"] = True
-                user["step"] = "ready"
-                save_state()
+            user["agreed"] = True
+            user["step"] = "ready"
+            flush_loaded_users()
             send_main_menu(user_id)
             return
         send_agreement(user_id)
@@ -3224,9 +3203,8 @@ def text_handler(message):
         if is_on_cooldown(user_id):
             safe_send_message(bot, user_id, "Please wait a moment ⏳")
             return
-        with state_lock:
-            user["awaiting_payment"] = True
-            save_state()
+        user["awaiting_payment"] = True
+        flush_loaded_users()
         safe_send_message(bot, user_id, "Send the payment screenshot now.")
         return
 
@@ -3327,20 +3305,19 @@ def text_handler(message):
             return
 
         profile = get_profile(profile_id)
-        with state_lock:
-            if profile_id in user["liked"] or profile_id in user["matches"]:
-                already_liked = True
-                save_state()
-            else:
-                already_liked = False
-                user["liked"].append(profile_id)
-            user["swipes"] += 1
-            was_incoming = profile_id in user["incoming_likes"]
-            if profile_id in user["incoming_likes"]:
-                user["incoming_likes"].remove(profile_id)
-            if not was_incoming and not already_liked:
-                schedule_reaction_after_like(user, profile_id)
-            save_state()
+        if profile_id in user["liked"] or profile_id in user["matches"]:
+            already_liked = True
+            flush_loaded_users()
+        else:
+            already_liked = False
+            user["liked"].append(profile_id)
+        user["swipes"] += 1
+        was_incoming = profile_id in user["incoming_likes"]
+        if profile_id in user["incoming_likes"]:
+            user["incoming_likes"].remove(profile_id)
+        if not was_incoming and not already_liked:
+            schedule_reaction_after_like(user, profile_id)
+        flush_loaded_users()
 
         if already_liked:
             safe_send_message(bot, 
@@ -3368,14 +3345,13 @@ def text_handler(message):
         if is_on_cooldown(user_id):
             safe_send_message(bot, user_id, "Please wait a moment ⏳")
             return
-        with state_lock:
-            profile_id = user["current_profile_id"]
-            if profile_id and profile_id not in user["skipped"]:
-                user["skipped"].append(profile_id)
-            if profile_id in user["incoming_likes"]:
-                user["incoming_likes"].remove(profile_id)
-            user["swipes"] += 1
-            save_state()
+        profile_id = user["current_profile_id"]
+        if profile_id and profile_id not in user["skipped"]:
+            user["skipped"].append(profile_id)
+        if profile_id in user["incoming_likes"]:
+            user["incoming_likes"].remove(profile_id)
+        user["swipes"] += 1
+        flush_loaded_users()
         process_pending_events(user_id)
         send_profile_card(user_id)
         return
@@ -3395,47 +3371,12 @@ def text_handler(message):
                 if match_id_str not in chat_started_notified:
                     chats_left = get_chats_left(user_id)
                     safe_send_message(bot, user_id, f"<b>Chat started!</b>\nChats left: {chats_left} / {user['chat_limit']}", parse_mode="HTML")
-                    with state_lock:
-                        user = get_user(user_id)
-                        user.setdefault("chat_started_notified", {})[match_id_str] = True
-                        save_state()
+                    user = get_user(user_id)
+                    user.setdefault("chat_started_notified", {})[match_id_str] = True
+                    flush_loaded_users()
             return
         safe_send_message(bot, user_id, inactive_chat_message(), parse_mode="HTML")
         return
-
-
-def periodic_state_save():
-    """Automatically save state every 2 minutes to ensure Railway persistence"""
-    while True:
-        time.sleep(120)  # Every 2 minutes
-        save_state()
-
-
-
-def backup_database():
-    while True:
-        try:
-            conn = get_db_connection()
-            if conn:
-                cur = conn.cursor()
-                cur.execute("SELECT user_id, data FROM users")
-                rows = cur.fetchall()
-
-                data = {str(row[0]): json.loads(row[1]) for row in rows}
-
-                with open("backup.json", "w", encoding="utf-8") as f:
-                    json.dump({"users": data}, f, ensure_ascii=False, indent=2)
-
-                print("✅ Backup saved")
-
-                cur.close()
-                conn.close()
-
-        except Exception as e:
-            print("❌ Backup error:", e)
-
-        time.sleep(21600)  # 6 hours
-
 
 def get_webhook_base_url():
     if not WEBHOOK_BASE_URL:
@@ -3463,6 +3404,7 @@ def configure_webhook():
 
 @app.route(f"/{TOKEN}", methods=["POST"])
 def webhook():
+    clear_request_user_context()
     try:
         json_str = request.get_data(cache=False, as_text=False).decode("utf-8")
         update = telebot.types.Update.de_json(json_str)
@@ -3470,6 +3412,11 @@ def webhook():
     except Exception as e:
         print(f"webhook error: {e}", flush=True)
         traceback.print_exc()
+    finally:
+        try:
+            flush_loaded_users()
+        finally:
+            clear_request_user_context()
     return "OK", 200
 
 
@@ -3479,14 +3426,11 @@ def healthcheck():
 
 
 threading.Thread(target=inactivity_engagement_worker, daemon=True).start()
-threading.Thread(target=periodic_state_save, daemon=True).start()
 print(f"Database configured: {bool(os.getenv('DATABASE_URL'))}")
 print("DB schema ready")
 
 if __name__ == "__main__":
     configure_webhook()
-
-    threading.Thread(target=backup_database, daemon=True).start()
 
     port = int(os.environ["PORT"])
 
@@ -3496,3 +3440,4 @@ if __name__ == "__main__":
         debug=False,
         use_reloader=False
     )
+
