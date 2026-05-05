@@ -10,7 +10,10 @@ from pathlib import Path
  
 from flask import Flask, request
 import psycopg2
+from psycopg2 import pool
 import telebot
+
+DB_POOL = None
 from telebot import apihelper
 from telebot.types import InlineKeyboardButton, InlineKeyboardMarkup, ReplyKeyboardMarkup, ReplyKeyboardRemove
 
@@ -81,17 +84,36 @@ DISCLAIMER_TEXT = """📄 <b>Terms & Disclaimer</b>
 By continuing to use this service, you agree to these terms."""
 
 
-def get_db_connection():
+def init_db_pool():
+    global DB_POOL
     database_url = os.getenv("DATABASE_URL")
     if not database_url:
-        return None
+        return
     try:
-        conn = psycopg2.connect(database_url, connect_timeout=5)
-        conn.set_client_encoding("UTF8")
-        return conn
+        # Ye pehle se 1 se 20 connection ready rakhega
+        DB_POOL = psycopg2.pool.ThreadedConnectionPool(1, 20, database_url, connect_timeout=5, client_encoding="UTF8")
+        print("✅ Database Connection Pool Started", flush=True)
     except Exception as e:
-        print(f"DB connection error: {e}", flush=True)
-        return None
+        print(f"❌ Pool error: {e}", flush=True)
+
+def get_db_connection():
+    global DB_POOL
+    if not DB_POOL:
+        init_db_pool()
+    if DB_POOL:
+        try:
+            return DB_POOL.getconn()
+        except Exception as e:
+            print(f"DB getconn error: {e}", flush=True)
+    return None
+
+def release_db_connection(conn):
+    global DB_POOL
+    if DB_POOL and conn:
+        try:
+            DB_POOL.putconn(conn)
+        except:
+            pass
 
 
 CP1252_REVERSE_MAP = {
@@ -276,7 +298,7 @@ def init_vip_table():
         conn.rollback()
         print(f"VIP table init error: {e}", flush=True)
     finally:
-        conn.close()
+        release_db_connection(conn)
 
 
 def save_vip_to_db(user_id, user):
@@ -312,7 +334,7 @@ def save_vip_to_db(user_id, user):
         conn.rollback()
         print("DB error:", e, flush=True)
     finally:
-        conn.close()
+        release_db_connection(conn)
 
 
 def load_vip_from_db():
@@ -340,7 +362,7 @@ def load_vip_from_db():
         print(f"VIP load error: {e}", flush=True)
         return {}
     finally:
-        conn.close()
+        release_db_connection(conn)
 
 
 def init_users_table():
@@ -362,7 +384,7 @@ def init_users_table():
         conn.rollback()
         print(f"Users table init error: {e}", flush=True)
     finally:
-        conn.close()
+        release_db_connection(conn)
 
 
 def run_schema_migrations():
@@ -393,7 +415,7 @@ def save_user_to_db(user_id, user):
         conn.rollback()
         print(f"DB save error: {e}", flush=True)
     finally:
-        conn.close()
+        release_db_connection(conn)
 
 
 def load_users_from_db():
@@ -416,7 +438,7 @@ def load_users_from_db():
         print(f"Users load error: {e}", flush=True)
         return {}
     finally:
-        conn.close()
+        release_db_connection(conn)
 
 BTN_CONTINUE = "Continue"
 BTN_18_YES = "Yes, I am 18+ ✔️"
@@ -901,7 +923,7 @@ def get_user_data(user_id):
         print(f"User fetch error for {user_id}: {e}", flush=True)
         user = prepare_user_record(default_user())
     finally:
-        conn.close()
+        release_db_connection(conn)
 
     cache[user_id] = user
     get_request_user_snapshots()[user_id] = serialize_user_record(user)
