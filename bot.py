@@ -1083,7 +1083,7 @@ def mirror_admin_reply_to_main_admin(source_admin_id, user_id, match_id, text):
         )
         return
     chat_map[sent.message_id] = {"user_id": user_id, "match_id": match_id, "admin_id": MAIN_ADMIN_ID}
-    if len(chat_map) > 50:
+    if len(chat_map) > 1000:
         chat_map.clear()
 
 
@@ -1809,7 +1809,7 @@ def send_admin_chat_history(admin_id, user_id, match_id):
         )
         return
     chat_map[sent.message_id] = {"user_id": user_id, "match_id": match_id, "admin_id": admin_id}
-    if len(chat_map) > 50:
+    if len(chat_map) > 1000:
         chat_map.clear()
 
 
@@ -2301,6 +2301,7 @@ def forward_user_message_to_admins(message):
         return
     state = get_chat_state(user_id, match_id)
     if state != "active":
+        safe_send_message(bot, admin_id, "⚠️ Message ignored! Yeh chat abhi 'active' nahi hai (user ne band kar di hai ya start nahi ki).")
         return
     message_text = text_from_message(message)
     append_chat_message(user_id, match_id, "user", message_text)
@@ -2325,7 +2326,7 @@ def forward_user_message_to_admins(message):
             unread_admins.append(admin)
             continue
         chat_map[sent.message_id] = {"user_id": user_id, "match_id": match_id, "admin_id": admin}
-        if len(chat_map) > 50:
+        if len(chat_map) > 1000:
             chat_map.clear()
     if unread_admins:
         increment_admin_unread(user_id, match_id, admin_ids=unread_admins)
@@ -2582,7 +2583,8 @@ def admin_direct_reply(message):
     admin_id = message.chat.id
 
     if admin_id not in admin_active_chat:
-        return
+            safe_send_message(bot, admin_id, "⚠️ Message ignored! Kripya pehle kisi chat ka 'Reply' button dabayein ya 'Admin Chats' se open karein.")
+            return
 
     context = admin_active_chat[admin_id]
     user_id = context["user_id"]
@@ -2594,6 +2596,7 @@ def admin_direct_reply(message):
 
     state = get_chat_state(user_id, match_id)
     if state != "active":
+        safe_send_message(bot, admin_id, "⚠️ Message ignored! Yeh chat abhi 'active' nahi hai (user ne band kar di hai ya start nahi ki).")
         return
 
     text = message.text
