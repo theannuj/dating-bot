@@ -1692,8 +1692,11 @@ def build_admin_chat_list_markup(admin_id, unread_only=False):
             match_name = profile["name"] if profile else f"Match {match_id}"
             
             # 🔥 FAST IN-MEMORY UNREAD CHECK (No DB Call)
-            admin_unread_dict = thread.get("admin_unread", {})
-            admin_unread = int(admin_unread_dict.get(str(admin_id), 0))
+            raw_unread = thread.get("admin_unread", {})
+            if isinstance(raw_unread, dict):
+                admin_unread = int(raw_unread.get(str(admin_id), 0))
+            else:
+                admin_unread = int(raw_unread or 0)
             
             if unread_only and admin_unread <= 0:
                 continue
