@@ -1984,7 +1984,7 @@ def schedule_reaction_after_like(user, profile_id):
 
     roll = random.random()
 
-    if roll < 0.18:
+    if roll < 0.35:
         if not has_pending_event(user, "match", profile_id):
             queue_event(user, "match", profile_id, random.randint(3, 5))
     elif roll < 0.52:
@@ -2100,7 +2100,7 @@ def process_pending_events(user_id):
             if should_announce:
                 threading.Thread(target=announce_incoming_like, args=(user_id, profile_id), daemon=True).start()
         elif event["type"] == "match":
-            threading.Thread(target=create_match, args=(user_id, event["profile_id"], "liked_back"), daemon=True).start()
+            create_match(user_id, event["profile_id"], "liked_back")
 
 
 def delayed_moderation_success(user_id):
@@ -3374,7 +3374,7 @@ def text_handler(message):
             send_like_feedback(user_id, profile)
 
         if was_incoming and profile_id not in user["matches"]:
-            threading.Thread(target=create_match, args=(user_id, profile_id, "liked_back"), daemon=True).start()
+            create_match(user_id, profile_id, "liked_back")
 
         process_pending_events(user_id)
         time.sleep(random.uniform(0.6, 1.1))
