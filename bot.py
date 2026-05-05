@@ -574,7 +574,7 @@ def safe_send_photo(bot, chat_id, photo, **kwargs):
     try:
         return bot.send_photo(chat_id, photo, **kwargs)
     except Exception as e:
-        print(f"âŒ Bad photo skipped (chat_id={chat_id}):", photo, flush=True)
+        print(f"❌ Bad photo skipped (chat_id={chat_id}):", photo, flush=True)
         return bot.send_message(chat_id, "Profile loaded")
 
 
@@ -980,7 +980,7 @@ def ensure_chat_thread(user, match_id):
             threads[thread_key]["assigned_admin_id"] = MAIN_ADMIN_ID
     thread = threads[thread_key]
 
-    # ðŸ”¥ FORCE FIX (MOST IMPORTANT)
+    # 🔥 FORCE FIX (MOST IMPORTANT)
     if thread.get("assigned_admin_id") != MAIN_ADMIN_ID:
         thread["assigned_admin_id"] = MAIN_ADMIN_ID
 
@@ -1673,6 +1673,8 @@ def build_admin_chat_controls(user_id, match_id):
 def build_admin_chat_list_markup(admin_id, unread_only=False):
     markup = InlineKeyboardMarkup()
     chat_rows = []
+    
+    # Ye ek hi baar database se saara data layega
     for user_id, user in load_all_users_from_db().items():
         user_name = user.get("name") or f"User {user_id}"
         for match_key, thread in user.get("chat_threads", {}).items():
@@ -1680,21 +1682,34 @@ def build_admin_chat_list_markup(admin_id, unread_only=False):
             if not messages:
                 continue
             match_id = int(match_key)
-            assigned_admin_id = get_assigned_admin_id(user_id, match_id)
+            
+            # 🔥 FAST IN-MEMORY CHECK (No DB Call)
+            assigned_admin_id = thread.get("assigned_admin_id", MAIN_ADMIN_ID)
             if admin_id != MAIN_ADMIN_ID and assigned_admin_id != admin_id:
                 continue
+                
             profile = get_profile(match_id)
             match_name = profile["name"] if profile else f"Match {match_id}"
-            admin_unread = get_admin_unread_count(user_id, match_id, admin_id)
+            
+            # 🔥 FAST IN-MEMORY UNREAD CHECK (No DB Call)
+            admin_unread_dict = thread.get("admin_unread", {})
+            admin_unread = int(admin_unread_dict.get(str(admin_id), 0))
+            
             if unread_only and admin_unread <= 0:
                 continue
+                
             last_ts = int(messages[-1].get("ts", 0)) if messages else 0
-            user = get_user(user_id)
+            
             tag = "🟢 VIP" if user.get("paid") else "🟡 FREE"
-            label = f"{tag} â€¢ {user_name} × {match_name}"
+            label = f"{tag} • {user_name} × {match_name}"
             if admin_unread:
                 label += f" ({admin_unread})"
-            preview = get_last_message_preview(user_id, match_id, limit=26)
+                
+            # 🔥 FAST IN-MEMORY PREVIEW (No DB Call)
+            preview = messages[-1].get("text", "").replace("\n", " ").strip()
+            if len(preview) > 26:
+                preview = preview[:23] + "..."
+            
             label += f"\n{preview}"
             chat_rows.append((last_ts, admin_unread, label, user_id, match_id))
 
@@ -1967,7 +1982,7 @@ def announce_incoming_like(user_id, profile_id):
     if not profile:
         return
     # Sirf ek simple alert, bina kisi photo ya keyboard change ke
-    safe_send_message(bot, user_id, f"â¤ï¸ <b>Someone just liked your profile!</b>\nCheck 'Likes' from the Main Menu later.", parse_mode="HTML")
+    safe_send_message(bot, user_id, f"❤️ <b>Someone just liked your profile!</b>\nCheck 'Likes' from the Main Menu later.", parse_mode="HTML")
 
 
 def create_match(user_id, profile_id, source="system"):
@@ -2206,7 +2221,7 @@ def text_from_message(message):
 def send_admin_notification(user_id, match_id, text):
     for admin_id in get_admin_recipients(user_id, match_id):
 
-        # ðŸ”¥ FIX: à¤…à¤—à¤° admin à¤‰à¤¸à¥€ chat à¤®à¥‡à¤‚ à¤¹à¥ˆ â†’ notification skip
+        # 🔥 FIX: अगर admin उसी chat में है → notification skip
         active = admin_active_chat.get(admin_id)
         if active and active.get("user_id") == user_id:
             continue
@@ -2487,10 +2502,10 @@ def pending_handler(message):
         safe_send_message(bot, message.chat.id, "✅ No pending payments right now.")
         return
     
-    lines = [f"â³ Pending Payments ({len(pending_users)}):"]
+    lines = [f"⏳ Pending Payments ({len(pending_users)}):"]
     for uid, user in pending_users:
         name = user.get("name") or f"User {uid}"
-        lines.append(f"â€¢ {name} (ID: {uid})")
+        lines.append(f"• {name} (ID: {uid})")
     
     safe_send_message(bot, message.chat.id, "\n".join(lines))
 
@@ -2756,7 +2771,7 @@ def callback_handler(call):
 
     bot.answer_callback_query(call.id)
 
-    # ðŸ”¥ REPLY BUTTON FIX (TOP)
+    # 🔥 REPLY BUTTON FIX (TOP)
     if call.data and call.data.startswith("reply_"):
         try:
             data = call.data.replace("reply_", "")
@@ -2996,7 +3011,7 @@ def callback_handler(call):
         )
         safe_send_message(bot, 
             user_id,
-            f"<b>💎 VIP Activated!\n\nPlan: {plan_label}\nâ³ Valid till: {time.strftime('%d %b %Y', time.localtime(end_ts))}</b>",
+            f"<b>💎 VIP Activated!\n\nPlan: {plan_label}\n⏳ Valid till: {time.strftime('%d %b %Y', time.localtime(end_ts))}</b>",
             reply_markup=main_menu_keyboard(user_id),
             parse_mode="HTML",
         )
@@ -3078,20 +3093,20 @@ def handle_reply_button(call):
         user_id, match_id = map(int, data.split("_"))
         admin_id = call.message.chat.id
 
-        # ðŸ”¥ ACTIVE CHAT SET
+        # 🔥 ACTIVE CHAT SET
         admin_active_chat[admin_id] = {
             "user_id": user_id,
             "match_id": match_id
         }
 
-        # ðŸ”¥ NOTIFICATION REMOVE
+        # 🔥 NOTIFICATION REMOVE
         key = (admin_id, user_id)
         if key in admin_notifications:
             del admin_notifications[key]
 
         bot.send_message(
             admin_id,
-            f"💬 Chat opened with user {user_id}\nà¤…à¤¬ reply à¤•à¤°à¥‹"
+            f"💬 Chat opened with user {user_id}\nअब reply करो"
         )
 
         bot.answer_callback_query(call.id)
