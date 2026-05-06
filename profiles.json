@@ -1,64 +1,14 @@
 [
-  {
-    "id": 1,
-    "name": "Tannu",
-    "age": 23,
-    "photo": "AgACAgUAAxkBAAPCaczZkRcIOSOGs5WYZrump-Rmp-IAAoEPaxtAq2hWTRntxsnrxUoBAAMCAAN5AAM6BA"
-  },
-  {
-    "id": 2,
-    "name": "Vaishnavi",
-    "age": 26,
-    "photo": "AgACAgUAAxkBAAPFaczaSJylPxhJhAhAZF_VxTdYL-AAAoUPaxtAq2hWLs9B4DfrQnoBAAMCAAN4AAM6BA"
-  },
-  {
-    "id": 3,
-    "name": "Monika",
-    "age": 27,
-    "photo": "AgACAgUAAxkBAAPIaczaaLpbMAGJS_A_sZqn_-OsGJIAAoYPaxtAq2hWFNaYtazRzg0BAAMCAAN5AAM6BA"
-  },
-  {
-    "id": 4,
-    "name": "Payal",
-    "age": 21,
-    "photo": "AgACAgUAAxkBAAPLaczaeFPI4fbPdEOdrQr5S25_HOcAAocPaxtAq2hW9sCwXQGhLY0BAAMCAAN5AAM6BA"
-  },
-  {
-    "id": 5,
-    "name": "Priya",
-    "age": 19,
-    "photo": "AgACAgUAAxkBAAPOaczahyEfiRCrs9yWTQkkBlPgzmQAAokPaxtAq2hWQpmWPvtu2BsBAAMCAAN5AAM6BA"
-  },
-  {
-    "id": 6,
-    "name": "Twinkle",
-    "age": 26,
-    "photo": "AgACAgUAAxkBAAPRaczanLU7nf9GFqRWOce6IG9BMq0AAooPaxtAq2hWCrD-zSsqL58BAAMCAAN5AAM6BA"
-  },
-  {
-    "id": 7,
-    "name": "Sumona",
-    "age": 23,
-    "photo": "AgACAgUAAxkBAAPUaczarv9wUrxTN61-nzdqiV4gKycAAosPaxtAq2hWdJmeWY-s5pEBAAMCAAN4AAM6BA"
-  },
-  {
-    "id": 8,
-    "name": "Riya Gupta",
-    "age": 29,
-    "photo": "AgACAgUAAxkBAAPXaczawDqGlduaSnFtmi09hbg1cAoAAo0PaxtAq2hWC5KP5wAB20QlAQADAgADeQADOgQ"
-  },
-  {
-    "id": 9,
-    "name": "Shrutika",
-    "age": 23,
-    "photo": "AgACAgUAAxkBAAPaaczbCfrRnVfQ2NV0Au9c1Rg9QsUAApAPaxtAq2hWtOZeZ6hattwBAAMCAAN5AAM6BA"
-  },
-  {
-    "id": 10,
-    "name": "Neha Singh",
-    "age": 25,
-    "photo": "AgACAgUAAxkBAAPgaczbNbkIYWOCP1ss8NfgLXipTMUAApEPaxtAq2hWl19T8H49o7UBAAMCAAN4AAM6BA"
-  },
+  {"id": 1, "name": "Tannu", "age": 23, "photo": "AgACAgUAAxkBAAPCaczZkRcIOSOGs5WYZrump-Rmp-IAAoEPaxtAq2hWTRntxsnrxUoBAAMCAAN5AAM6BA"},
+  {"id": 2, "name": "Vaishnavi", "age": 26, "photo": "AgACAgUAAxkBAAPFaczaSJylPxhJhAhAZF_VxTdYL-AAAoUPaxtAq2hWLs9B4DfrQnoBAAMCAAN4AAM6BA"},
+  {"id": 3, "name": "Monika", "age": 27, "photo": "AgACAgUAAxkBAAPIaczaaLpbMAGJS_A_sZqn_-OsGJIAAoYPaxtAq2hWFNaYtazRzg0BAAMCAAN5AAM6BA"},
+  {"id": 4, "name": "Payal", "age": 21, "photo": "AgACAgUAAxkBAAPLaczaeFPI4fbPdEOdrQr5S25_HOcAAocPaxtAq2hW9sCwXQGhLY0BAAMCAAN5AAM6BA"},
+  {"id": 5, "name": "Priya", "age": 19, "photo": "AgACAgUAAxkBAAPOaczahyEfiRCrs9yWTQkkBlPgzmQAAokPaxtAq2hWQpmWPvtu2BsBAAMCAAN5AAM6BA"},
+  {"id": 6, "name": "Twinkle", "age": 26, "photo": "AgACAgUAAxkBAAPRaczanLU7nf9GFqRWOce6IG9BMq0AAooPaxtAq2hWCrD-zSsqL58BAAMCAAN5AAM6BA"},
+  {"id": 7, "name": "Sumona", "age": 23, "photo": "AgACAgUAAxkBAAPUaczarv9wUrxTN61-nzdqiV4gKycAAosPaxtAq2hWdJmeWY-s5pEBAAMCAAN4AAM6BA"},
+  {"id": 8, "name": "Riya Gupta", "age": 29, "photo": "AgACAgUAAxkBAAPXaczawDqGlduaSnFtmi09hbg1cAoAAo0PaxtAq2hWC5KP5wAB20QlAQADAgADeQADOgQ"},
+  {"id": 9, "name": "Shrutika", "age": 23, "photo": "AgACAgUAAxkBAAPaaczbCfrRnVfQ2NV0Au9c1Rg9QsUAApAPaxtAq2hWtOZeZ6hattwBAAMCAAN5AAM6BA"},
+  {"id": 10, "name": "Neha Singh", "age": 25, "photo": "AgACAgUAAxkBAAPgaczbNbkIYWOCP1ss8NfgLXipTMUAApEPaxtAq2hWl19T8H49o7UBAAMCAAN4AAM6BA"},
   {"id":11,"name":"Anamika Sharma","age":29,"photo":"AgACAgUAAxkBAAISymnXdOKFK-e87xHPTvniCkSD2JfPAAL4DWsbrhzAVkg9HN6nOXGrAQADAgADeAADOwQ"},
   {"id":12,"name":"Christy Fernandes","age":31,"photo":"AgACAgUAAxkBAAISz2nXdPx4jIvJksPAQSROMmXKE2zZAAL5DWsbrhzAVhGiWR_ymopqAQADAgADeQADOwQ"},
   {"id":13,"name":"Kamna Verma","age":24,"photo":"AgACAgUAAxkBAAIS0mnXdf5EZNCL3cdJ-GpwZXEL1x42AAKzD2sbY2W5VlbzavqTwE4iAQADAgADeQADOwQ"},
@@ -97,7 +47,55 @@
   {"id":46,"name":"Nisha Verma","age":31,"photo":"AgACAgUAAxkBAAITWGnXgDxIhQec_Iun555NqOnJTmxfAAJ1EGsbY2W5Vg2Duhl2slG0AQADAgADeQADOwQ"},
   {"id":47,"name":"Ritu Sharma","age":22,"photo":"AgACAgUAAxkBAAITXGnXgHTuyZ2xEnF2fQXn4-c_j8bsAAJ2EGsbY2W5VltzJqMJmTscAQADAgADeQADOwQ"},
   {"id":48,"name":"Pooja Rani","age":35,"photo":"AgACAgUAAxkBAAITYGnXgQa0GMPgQRhJ20NfUlWClnd9AAJ3EGsbY2W5VoWRsapx4N-_AQADAgADeQADOwQ"},
-  {"id":49,"name":"Mitika Jain","age":20,"photo":"AgACCagUAAxkBAAITZGnXgUa84zfHvrj5fpsa871ULZOwAAJ5EGsbY2W5VkgDkxovhbUnAQADAgADeQADOwQ"},
-  {"id":50,"name":"Tanya Kapoor","age":25,"photo":"AgACAgUAAxkBAAKx4Wnw6-PWGkIeFsg0q2QxQWj7uUdYAAIID2sbH9KJVzbKTYRNGSQCAQADAgADeQADOwQ"}
-
+  {"id":49,"name":"Garima Jain","age":25,"photo":"AgACAgUAAxkBAAEBTtdp-4htQ5VPzH59Yzc_VyAacYpSIwACexBrG2W-4VeMVN3vx7B92QEAAwIAA3kAAzsE"},
+  {"id":50,"name":"Tanya Kapoor","age":25,"photo":"AgACAgUAAxkBAAKx4Wnw6-PWGkIeFsg0q2QxQWj7uUdYAAIID2sbH9KJVzbKTYRNGSQCAQADAgADeQADOwQ"},
+  {"id": 51, "name": "Kritika Verma", "age": 20, "photo": "AgACAgUAAxkBAAEBQBdp-1UuSf4WKmMtAAE2bEPosNnwcP4AAv8PaxtlvuFXsJe3zrfXEEgBAAMCAAN4AAM7BA"},
+  {"id": 52, "name": "Nidhi", "age": 29, "photo": "AgACAgUAAxkBAAEBQBlp-1VUUmTjoHgpSmuGvP3tV79MPwADEGsbZb7hVwS3IdRLjug7AQADAgADeQADOwQ"},
+  {"id": 53, "name": "Niharika Rajput", "age": 27, "photo": "AgACAgUAAxkBAAEBQB9p-1WIi-PyfnBwLhbICKkeI3bdKgACARBrG2W-4VewfeYNSwSt9gEAAwIAA3kAAzsE"},
+  {"id": 54, "name": "Sonam Sharma", "age": 24, "photo": "AgACAgUAAxkBAAEBQCdp-1XJgHd0kV1DOXOvvdfj29pYCAACAhBrG2W-4VcPbxW_e3X6xgEAAwIAA3kAAzsE"},
+  {"id": 55, "name": "Smita", "age": 33, "photo": "AgACAgUAAxkBAAEBQDZp-1YEH5b-pbf0F2NKqX28BmLkfQACBBBrG2W-4VcfEUKB62rKDgEAAwIAA3kAAzsE"},
+  {"id": 56, "name": "Avni Joshi", "age": 23, "photo": "AgACAgUAAxkBAAEBQFRp-1ZVCjHhNiZZcHkWCGJtrsYh6QACCBBrG2W-4VfKp3LPxURPMgEAAwIAA3gAAzsE"},
+  {"id": 57, "name": "Rinki", "age": 27, "photo": "AgACAgUAAxkBAAEBQKxp-1cOQkaX2j8KE7Czfek0WiolagACDxBrG2W-4VeA3ZC42ViOnAEAAwIAA3kAAzsE"},
+  {"id": 58, "name": "Mitali Agarwal", "age": 28, "photo": "AgACAgUAAxkBAAEBQLBp-1c9uS4WCaqhW5IVK8_lqccmvwACEhBrG2W-4VexUg2XkSGD1wEAAwIAA3kAAzsE"},
+  {"id": 59, "name": "Ritika", "age": 26, "photo": "AgACAgUAAxkBAAEBQLNp-1dtvD1mDXgc08otd463DJefhAACFBBrG2W-4VelU-xEVLcHzgEAAwIAA3gAAzsE"},
+  {"id": 60, "name": "Sheetal Pandey", "age": 27, "photo": "AgACAgUAAxkBAAEBQLVp-1e00rljtEF4mWYmzQmVM5WULgACFRBrG2W-4VfFjsAKGfUuIQEAAwIAA3kAAzsE"},
+  {"id": 61, "name": "Pooja", "age": 26, "photo": "AgACAgUAAxkBAAEBQLhp-1gZnInn5lihxHccpvDO5OFuTAACGBBrG2W-4VdABkiKHv3KsQEAAwIAA3gAAzsE"},
+  {"id": 62, "name": "Anaya", "age": 30, "photo": "AgACAgUAAxkBAAEBQOdp-1iTw_vneOnctp9ILN3b8lHjFgACGRBrG2W-4VepghwjHcJSZQEAAwIAA3kAAzsE"},
+  {"id": 63, "name": "Shobha Yadav", "age": 32, "photo": "AgACAgUAAxkBAAEBQPBp-1jaxEgdpWR8PKeVtNCjOOExmQACGxBrG2W-4Vcp21PNaEqc8gEAAwIAA3kAAzsE"},
+  {"id": 64, "name": "Priyanshi", "age": 22, "photo": "AgACAgUAAxkBAAEBQQtp-1kqAnQAAc8Xh1TfJJQjMukEoxUAAh0QaxtlvuFXURpUQ94ksecBAAMCAAN5AAM7BA"},
+  {"id": 65, "name": "Parul Sharma", "age": 28, "photo": "AgACAgUAAxkBAAEBQSNp-1lhwDoXznR9Ew-YoCuCA03GVQACHxBrG2W-4VcxovPZL9UaAQEAAwIAA3kAAzsE"},
+  {"id": 66, "name": "Trisha", "age": 29, "photo": "AgACAgUAAxkBAAEBQT9p-1mxFXgzi0OUmElGb5eGsLXGPwACIBBrG2W-4VcoGtDdDaJPjgEAAwIAA3kAAzsE"},
+  {"id": 67, "name": "Kashish Singh", "age": 24, "photo": "AgACAgUAAxkBAAEBQUNp-1n7OLFAhrflci_uC7JQjJF8QgACIhBrG2W-4VeNzU3xEK01ugEAAwIAA3kAAzsE"},
+  {"id": 68, "name": "No name", "age": 19, "photo": "AgACAgUAAxkBAAEBQU5p-1o9FSq_M1fTid7yjZPH9_8wZgACIxBrG2W-4VdXchidYpWGdAEAAwIAA3kAAzsE"},
+  {"id": 69, "name": "Kavita", "age": 31, "photo": "AgACAgUAAxkBAAEBQXZp-1rNWkKMKnpp7z3xYdia7upJEQACJxBrG2W-4VdsVPJfx2nlyQEAAwIAA3kAAzsE"},
+  {"id": 70, "name": "Anjali Mishra", "age": 26, "photo": "AgACAgUAAxkBAAEBQYJp-1sONXxAzjnJmS1DkO16p_UGOAACKhBrG2W-4VfDD0ryPDlrtgEAAwIAA3kAAzsE"},
+  {"id": 71, "name": "Tanisha", "age": 22, "photo": "AgACAgUAAxkBAAEBQYVp-1s6enNt3WQ9wowprf-z6kVYBwACKxBrG2W-4VdfxEmezHa43QEAAwIAA3kAAzsE"},
+  {"id": 72, "name": "Twinkle Kapoor", "age": 30, "photo": "AgACAgUAAxkBAAEBQYlp-1uBPPOh-FszO4O7gMDpShs4sgACLBBrG2W-4VclF6uJVewB1QEAAwIAA3gAAzsE"},
+  {"id": 73, "name": "Shivi", "age": 24, "photo": "AgACAgUAAxkBAAEBQm9p-11fvpkYP26-ul5Y6_EPGxijcwACMBBrG2W-4VfmQUkGo9OzEQEAAwIAA3kAAzsE"},
+  {"id": 74, "name": "Riva Jain", "age": 32, "photo": "AgACAgUAAxkBAAEBQpBp-12gzeMxVEd2YtftpDUO0NLCmQACMRBrG2W-4Ve12_fJrKkTBwEAAwIAA3kAAzsE"},
+  {"id": 75, "name": "Night Queen", "age": 29, "photo": "AgACAgUAAxkBAAEBQppp-131G57wBNy7CYJh-b5WeqBq4AACMhBrG2W-4VdKTQofOVP4kgEAAwIAA3kAAzsE"},
+  {"id": 76, "name": "Sunita", "age": 37, "photo": "AgACAgUAAxkBAAEBQr5p-16UKQa0h25RKc41Et0iH3Wy3wACMxBrG2W-4Vcpx1EqBl0DjAEAAwIAA3kAAzsE"},
+  {"id": 77, "name": "Kavya Dixit", "age": 26, "photo": "AgACAgUAAxkBAAEBQstp-17jbMQgf-74hblNhb8gchyTmgACNBBrG2W-4VdntZTrMyoCRwEAAwIAA3kAAzsE"},
+  {"id": 78, "name": "Shanaya", "age": 29, "photo": "AgACAgUAAxkBAAEBQtRp-18uqL0H_cm1xHZtrCmynUImNwACNRBrG2W-4VcQQf0F5tCO0wEAAwIAA3kAAzsE"},
+  {"id": 79, "name": "Nyra Bhatia", "age": 28, "photo": "AgACAgUAAxkBAAEBQuFp-19h8SRC8qHaeeWwtP-ahfhFEAACNhBrG2W-4Vf8Q8XKlnXvEQEAAwIAA3kAAzsE"},
+  {"id": 80, "name": "Ruhi", "age": 30, "photo": "AgACAgUAAxkBAAEBQuxp-1_Epc9ZRPtuL5by_xUi08PITgACNxBrG2W-4Vemg_BfhuKerAEAAwIAA3kAAzsE"},
+  {"id": 81, "name": "Mahi Arora", "age": 25, "photo": "AgACAgUAAxkBAAEBQvxp-2A38HHIV3gWnn8u6KceQKKmZQACOBBrG2W-4Vfspef4SzdZaQEAAwIAA3kAAzsE"},
+  {"id": 82, "name": "Rashi", "age": 23, "photo": "AgACAgUAAxkBAAEBQxJp-2DEjP2TBrmyU3RkxAJOPDyYbAACOhBrG2W-4VekOeqRNijOZwEAAwIAA3kAAzsE"},
+  {"id": 83, "name": "Sneha", "age": 33, "photo": "AgACAgUAAxkBAAEBQzZp-2EfG6WzVslYTU4VtU0rhPSoNgACPBBrG2W-4VdlWc1N5l1R0AEAAwIAA3cAAzsE"},
+  {"id": 84, "name": "Pihu", "age": 19, "photo": "AgACAgUAAxkBAAEBQzhp-2FMbjfCGVrskeYyilY8D6FrxgACPRBrG2W-4Vc6NSVgT8f4JwEAAwIAA3kAAzsE"},
+  {"id": 85, "name": "Sana", "age": 27, "photo": "AgACAgUAAxkBAAEBQzpp-2GhH6XeYvP7c263PAABNlyuMIgAAj4QaxtlvuFXkzt6vWqGt4sBAAMCAAN5AAM7BA"},
+  {"id": 86, "name": "No Name", "age": 23, "photo": "AgACAgUAAxkBAAEBQzxp-2HYKJi5YVuN9v-5WPFhEsOV4AACPxBrG2W-4VfDBrP9-eJ_MQEAAwIAA3kAAzsE"},
+  {"id": 87, "name": "Yashika", "age": 21, "photo": "AgACAgUAAxkBAAEBQz5p-2IjeFgwFD7J4jblZOcNLhCavAACQBBrG2W-4VdBfp-i_JGtxgEAAwIAA3cAAzsE"},
+  {"id": 88, "name": "Kashish", "age": 29, "photo": "AgACAgUAAxkBAAEBQ0Bp-2JkO0BdH67xWzg1tUL4uQT5oAACQRBrG2W-4Vc9yiZWpOmyDQEAAwIAA3gAAzsE"},
+  {"id": 89, "name": "Eshita", "age": 31, "photo": "AgACAgUAAxkBAAEBQ0Jp-2Li5bz8EweaaKeo4yjsPXjqAgACQhBrG2W-4Vfh0TeIVQABX7gBAAMCAAN4AAM7BA"},
+  {"id": 90, "name": "Anushka Sharma", "age": 26, "photo": "AgACAgUAAxkBAAEBQ1hp-2NyIf1IPk8kOeRsAd4ma-EUGgACQxBrG2W-4VcpZC0B7P_bPQEAAwIAA3gAAzsE"},
+  {"id": 91, "name": "Kajal Patel", "age": 23, "photo": "AgACAgUAAxkBAAEBQ2pp-2PWNtMGzd-Ui4G198spTlpH6gACRBBrG2W-4VfZ_cWqESBW2wEAAwIAA3gAAzsE"},
+  {"id": 92, "name": "Ahana", "age": 30, "photo": "AgACAgUAAxkBAAEBQ2xp-2P9pNzulpfvkB9uPApuOsZ1jQACRhBrG2W-4VeH69NuFq0XzgEAAwIAA3kAAzsE"},
+  {"id": 93, "name": "Reyanshi", "age": 31, "photo": "AgACAgUAAxkBAAEBQ3dp-2Q9qmSmGuqo_OSYMJpUWPYBCgACSBBrG2W-4VeJ9dc-GUy8LQEAAwIAA3kAAzsE"},
+  {"id": 94, "name": "Anvika", "age": 28, "photo": "AgACAgUAAxkBAAEBQ5Fp-2SUoDr12LODzI1pyc1rbfIrUwACShBrG2W-4VeVBlX3-56C2wEAAwIAA3cAAzsE"},
+  {"id": 95, "name": "Christy", "age": 29, "photo": "AgACAgUAAxkBAAEBSkJp-3-nrMrynHNdJgAB4H_x7BPwQWgAAvIVaxsb4NhXBOioT4Io8EQBAAMCAAN5AAM7BA"},
+  {"id": 96, "name": "Mahek Patel", "age": 31, "photo": "AgACAgUAAxkBAAEBSphp-4ANd8stSNzWXamqv-kgmBQMPwACbBBrG2W-4VdBxUh_z8pKEQEAAwIAA3kAAzsE"},
+  {"id": 97, "name": "Khusboo Verma", "age": 24, "photo": "AgACAgUAAxkBAAEBSxFp-4DhLTjp0npwuxgHW-YCGNZF4AACbRBrG2W-4VebqCft_gmvMAEAAwIAA3gAAzsE"},
+  {"id": 98, "name": "Devanshi", "age": 27, "photo": "AgACAgUAAxkBAAEBSytp-4EN06vzpbSZumSfxGhvtLF_HgACbhBrG2W-4VfDPrShgDxlpgEAAwIAA3kAAzsE"},
+  {"id": 101, "name": "Ankita", "age": 21, "photo": "AgACAgUAAxkBAAEBTtJp-4hDmcNmwS-6wbmdSV6IDX5z6QACehBrG2W-4Vcg1Lw0TFo-FAEAAwIAA3gAAzsE"}
 ]

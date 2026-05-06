@@ -1883,7 +1883,7 @@ def send_current_step_prompt(user_id):
         return
 
     if step == "photo":
-        safe_send_message(bot, user_id, "📸 Send your photo")
+        safe_send_message(bot, user_id, "✅ Final Step!\n\n<b>Add a photo or take a selfie!</b>\n\nPress 📎 and select a photo.", parse_mode="HTML")
         return
 
     if step == "moderation":
@@ -3182,11 +3182,11 @@ def text_handler(message):
         user["name"] = message.from_user.first_name or "User"
         user["step"] = "photo"
         flush_loaded_users()
-        safe_send_message(bot, user_id, "Send your best photo.")
+        safe_send_message(bot, user_id, "✅ Final Step!\n\n<b>Add a photo or take a selfie!</b>\n\nPress 📎 and select a photo.", parse_mode="HTML")
         return
 
     if user["step"] == "photo":
-        safe_send_message(bot, user_id, "Please send a photo to continue.")
+        safe_send_message(bot, user_id, "📸 Please attach a photo to continue.\n\nPress 📎 to select a photo.")
         return
 
     if user["step"] == "moderation":
