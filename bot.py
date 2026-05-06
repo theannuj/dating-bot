@@ -1978,19 +1978,26 @@ def pick_profile_for_attention(user, preferred_profile_id=None):
 def schedule_reaction_after_like(user, profile_id):
     total_unique_likes = len(user["liked"])
     has_match_already = bool(user["matches"])
+    
+    # 🔥 FIX: Check karo ki kya waiting list (queue) me already koi match laga hua hai?
+    has_pending_match = any(event["type"] == "match" for event in user["pending_events"])
 
-    if not has_match_already and total_unique_likes >= random.randint(3, 5):
+    # 1. Guaranteed First Match Logic (Ab ye sirf 1 baar chalega)
+    if not has_match_already and not has_pending_match and total_unique_likes >= 3:
         guaranteed_profile = choose_guaranteed_match(user, preferred_profile_id=profile_id)
-        if guaranteed_profile is not None and not has_pending_event(user, "match", guaranteed_profile):
-            queue_event(user, "match", guaranteed_profile, random.randint(3, 5))
-            return
+        if guaranteed_profile is not None:
+            queue_event(user, "match", guaranteed_profile, random.randint(2, 4))
+        return
+
+    # 2. Stop Spam: Agar already ek match queue me aane wala hai, toh naya queue mat karo
+    if has_pending_match:
+        return
 
     roll = random.random()
 
     if roll < 0.15:
-        # Match ka chance 15%, aur 4-7 swipe ke baad aayega (Not spammy)
-        if not has_pending_event(user, "match", profile_id):
-            queue_event(user, "match", profile_id, random.randint(4, 7))
+        # Match ka chance 15%, aur 4-7 swipe ke baad aayega
+        queue_event(user, "match", profile_id, random.randint(4, 7))
     elif roll < 0.40:
         # "Someone liked you" aane ka chance 25%, aur 3-6 swipe ke baad aayega
         selected = pick_profile_for_attention(user, preferred_profile_id=profile_id)
