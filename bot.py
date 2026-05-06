@@ -1987,13 +1987,15 @@ def schedule_reaction_after_like(user, profile_id):
 
     roll = random.random()
 
-    if roll < 0.35:
+    if roll < 0.15:
+        # Match ka chance 15%, aur 4-7 swipe ke baad aayega (Not spammy)
         if not has_pending_event(user, "match", profile_id):
-            queue_event(user, "match", profile_id, random.randint(3, 5))
-    elif roll < 0.52:
+            queue_event(user, "match", profile_id, random.randint(4, 7))
+    elif roll < 0.40:
+        # "Someone liked you" aane ka chance 25%, aur 3-6 swipe ke baad aayega
         selected = pick_profile_for_attention(user, preferred_profile_id=profile_id)
         if selected is not None and not has_pending_event(user, "incoming_like", selected):
-            queue_event(user, "incoming_like", selected, random.randint(2, 4))
+            queue_event(user, "incoming_like", selected, random.randint(3, 6))
 
 
 def send_like_feedback(user_id, profile):
