@@ -1905,10 +1905,13 @@ def send_current_step_prompt(user_id):
 
 
 def choose_next_profile(user):
-    available_ids = [pid for pid in PROFILE_IDS if pid not in user["shown"]]
+    # Ye line incoming likes ko normal swipe se bahar nikal degi
+    excluded = set(user.get("shown", [])) | set(user.get("incoming_likes", []))
+    available_ids = [pid for pid in PROFILE_IDS if pid not in excluded]
     if not available_ids:
         user["shown"] = []
-        available_ids = PROFILE_IDS[:]
+        excluded = set(user.get("incoming_likes", []))
+        available_ids = [pid for pid in PROFILE_IDS if pid not in excluded]
     return random.choice(available_ids) if available_ids else None
 
 
@@ -2156,12 +2159,17 @@ def open_likes_you(user_id):
     profile_id = incoming[0]
     profile = get_profile(profile_id)
     if not profile:
+        user["incoming_likes"].remove(profile_id)
+        flush_loaded_users()
+        open_likes_you(user_id)
         return
 
+    user["active_view"] = "likes"
+    user["current_profile_id"] = profile_id
+    get_profile_view(user, profile_id)
+    flush_loaded_users()
+
     if paid:
-        user["current_profile_id"] = profile_id
-        get_profile_view(user, profile_id)
-        flush_loaded_users()
         safe_send_photo(bot, 
             user_id,
             profile["photo"],
@@ -2172,8 +2180,6 @@ def open_likes_you(user_id):
             reply_markup=build_keyboard([BTN_SKIP, BTN_LIKE], [BTN_MATCHES, BTN_MAIN_MENU]),
         )
     else:
-        get_profile_view(user, profile_id)
-        flush_loaded_users()
         safe_send_photo(bot, 
             user_id,
             profile["photo"],
@@ -3342,6 +3348,8 @@ def text_handler(message):
         if is_on_cooldown(user_id):
             safe_send_message(bot, user_id, "Please wait a moment ⏳")
             return
+            
+        is_likes_view = (user.get("active_view") == "likes")
         profile_id = user["current_profile_id"]
         if profile_id is None:
             send_profile_card(user_id)
@@ -3354,49 +3362,78 @@ def text_handler(message):
         else:
             already_liked = False
             user["liked"].append(profile_id)
+            
         user["swipes"] += 1
         was_incoming = profile_id in user["incoming_likes"]
         if profile_id in user["incoming_likes"]:
             user["incoming_likes"].remove(profile_id)
+            
         if not was_incoming and not already_liked:
             schedule_reaction_after_like(user, profile_id)
         flush_loaded_users()
 
         if already_liked:
-            safe_send_message(bot, 
-                user_id,
-                "You already reacted to this profile. Let's keep moving.",
-                reply_markup=build_keyboard([BTN_MAIN_MENU]),
-            )
+            safe_send_message(bot, user_id, "You already reacted to this profile. Let's keep moving.", reply_markup=build_keyboard([BTN_MAIN_MENU]))
             process_pending_events(user_id)
-            time.sleep(random.uniform(0.4, 0.8))
-            send_profile_card(user_id)
+            if is_likes_view:
+                user["active_view"] = "menu"
+                flush_loaded_users()
+            else:
+                time.sleep(random.uniform(0.4, 0.8))
+                send_profile_card(user_id)
             return
 
-        if profile:
-            send_like_feedback(user_id, profile)
-
-        if was_incoming and profile_id not in user["matches"]:
-            create_match(user_id, profile_id, "liked_back")
-
-        process_pending_events(user_id)
-        time.sleep(random.uniform(0.6, 1.1))
-        send_profile_card(user_id)
+        if is_likes_view:
+            if profile:
+                send_like_feedback(user_id, profile)
+            if was_incoming and profile_id not in user["matches"]:
+                create_match(user_id, profile_id, "liked_back")
+            process_pending_events(user_id)
+            
+            incoming_now = list(user["incoming_likes"])
+            if incoming_now:
+                time.sleep(1)
+                open_likes_you(user_id)
+            else:
+                user["active_view"] = "menu"
+                flush_loaded_users()
+        else:
+            if profile:
+                send_like_feedback(user_id, profile)
+            if was_incoming and profile_id not in user["matches"]:
+                create_match(user_id, profile_id, "liked_back")
+            process_pending_events(user_id)
+            time.sleep(random.uniform(0.6, 1.1))
+            send_profile_card(user_id)
         return
 
     if text == BTN_SKIP:
         if is_on_cooldown(user_id):
             safe_send_message(bot, user_id, "Please wait a moment ⏳")
             return
+            
+        is_likes_view = (user.get("active_view") == "likes")
         profile_id = user["current_profile_id"]
+        
         if profile_id and profile_id not in user["skipped"]:
             user["skipped"].append(profile_id)
         if profile_id in user["incoming_likes"]:
             user["incoming_likes"].remove(profile_id)
+            
         user["swipes"] += 1
         flush_loaded_users()
         process_pending_events(user_id)
-        send_profile_card(user_id)
+        
+        if is_likes_view:
+            incoming_now = list(user["incoming_likes"])
+            if incoming_now:
+                open_likes_you(user_id)
+            else:
+                user["active_view"] = "menu"
+                flush_loaded_users()
+                safe_send_message(bot, user_id, "No more new likes right now.", reply_markup=main_menu_keyboard(user_id))
+        else:
+            send_profile_card(user_id)
         return
 
     if user["current_match_id"]:
