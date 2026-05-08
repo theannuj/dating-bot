@@ -3669,13 +3669,16 @@ def webhook():
         update = telebot.types.Update.de_json(json_str)
         bot.process_new_updates([update])
     except Exception as e:
-        print(f"webhook error: {e}", flush=True)
+        print(f"❌ Webhook Error: {e}", flush=True)
         traceback.print_exc()
     finally:
         try:
             flush_loaded_users()
+        except Exception as db_err:
+            print(f"❌ Database Save Error in Webhook: {db_err}", flush=True)
         finally:
             clear_request_user_context()
+    # 🛡️ SAFETY FIX: Hamesha 200 OK return karna hai, warna Telegram baar-baar same message bhejega
     return "OK", 200
 
 
@@ -3693,10 +3696,12 @@ if __name__ == "__main__":
 
     port = int(os.environ["PORT"])
 
-    app.run(
-        host="0.0.0.0",
-        port=port,
-        debug=False,
-        use_reloader=False
-    )
+    # 🔥 PRO-LEVEL: Flask Development Server hata kar Production Server (Waitress) lagaya
+    try:
+        from waitress import serve
+        print(f"🚀 Starting Production Server (Waitress) on port {port}...", flush=True)
+        serve(app, host="0.0.0.0", port=port, threads=16)
+    except ImportError:
+        print("⚠️ Waitress not found! Falling back to Flask Dev Server...", flush=True)
+        app.run(host="0.0.0.0", port=port, debug=False, use_reloader=False)
 
