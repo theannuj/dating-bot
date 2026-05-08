@@ -2889,11 +2889,19 @@ def callback_handler(call):
         touch_user_activity(call.message.chat.id)
 
     if call.data == "userend_cancel":
+        try:
+            bot.delete_message(call.message.chat.id, call.message.message_id)
+        except:
+            pass
         bot.answer_callback_query(call.id, "Cancelled")
         return
 
     if call.data == "userend_yes":
         user_id = call.message.chat.id
+        try:
+            bot.delete_message(user_id, call.message.message_id)
+        except:
+            pass
         user = get_user(user_id)
         if not user["current_match_id"]:
             bot.answer_callback_query(call.id, "Open a chat first")
@@ -2999,6 +3007,10 @@ def callback_handler(call):
         return
 
     if call.data == "chatctlcancel":
+        try:
+            bot.delete_message(call.message.chat.id, call.message.message_id)
+        except:
+            pass
         bot.answer_callback_query(call.id, "Cancelled")
         return
 
@@ -3060,14 +3072,36 @@ def callback_handler(call):
         bot.answer_callback_query(call.id, "Invalid chat")
         return
 
+    # --- ADMIN VIP CONFIRMATION SYSTEM ---
     if call.data.startswith("vipapprove_"):
         if call.message.chat.id != MAIN_ADMIN_ID:
             bot.answer_callback_query(call.id, "Main admin only")
             return
         parts = call.data.split("_")
-        if len(parts) != 3 or parts[1] not in VIP_PLAN_DAYS or not parts[2].isdigit():
-            bot.answer_callback_query(call.id, "Invalid plan")
+        plan_key = parts[1]
+        user_id = parts[2]
+        plan_label, _ = VIP_PLAN_DAYS[plan_key]
+        
+        markup = InlineKeyboardMarkup()
+        markup.row(
+            InlineKeyboardButton(f"✅ Confirm {plan_label}", callback_data=f"vipconfirm_{plan_key}_{user_id}"),
+            InlineKeyboardButton("❌ Cancel", callback_data=f"vipcancel_{user_id}")
+        )
+        bot.edit_message_reply_markup(call.message.chat.id, call.message.message_id, reply_markup=markup)
+        bot.answer_callback_query(call.id, "Please confirm")
+        return
+
+    if call.data.startswith("vipcancel_"):
+        user_id = call.data.split("_")[1]
+        bot.edit_message_reply_markup(call.message.chat.id, call.message.message_id, reply_markup=payment_markup(user_id))
+        bot.answer_callback_query(call.id, "Action cancelled")
+        return
+
+    if call.data.startswith("vipconfirm_"):
+        if call.message.chat.id != MAIN_ADMIN_ID:
+            bot.answer_callback_query(call.id, "Main admin only")
             return
+        parts = call.data.split("_")
         plan_key = parts[1]
         user_id = int(parts[2])
         plan_label, duration_days = VIP_PLAN_DAYS[plan_key]
@@ -3083,29 +3117,54 @@ def callback_handler(call):
         user["payment_status"] = "approved"
         try:
             save_vip_to_db(user_id, user)
-            print(f"VIP saved to DB: {user_id}")
         except Exception as e:
-            print("VIP DB save error:", e)
+            pass
         for thread in user.get("chat_threads", {}).values():
             if thread.get("state") == "locked":
                 thread["state"] = "available"
         flush_loaded_users()
 
-        import time as time_module
-        time_module.sleep(0.1)
-        flush_loaded_users()
+        # 🔥 SAFETY FIX: Approval ke baad screenshot se buttons delete kar do
+        try:
+            bot.edit_message_reply_markup(call.message.chat.id, call.message.message_id, reply_markup=None)
+        except:
+            pass
 
-        safe_send_message(bot, 
-            call.message.chat.id,
-            f"✅ User {user_id} approved successfully\nPlan: {plan_label}\nValid till: {time.strftime('%d %b %Y', time.localtime(end_ts))}"
-        )
-        safe_send_message(bot, 
-            user_id,
-            f"<b>💎 VIP Activated!\n\nPlan: {plan_label}\n⏳ Valid till: {time.strftime('%d %b %Y', time.localtime(end_ts))}</b>",
-            reply_markup=main_menu_keyboard(user_id),
-            parse_mode="HTML",
-        )
+        safe_send_message(bot, call.message.chat.id, f"✅ User {user_id} approved successfully\nPlan: {plan_label}\nValid till: {time.strftime('%d %b %Y', time.localtime(end_ts))}")
+        safe_send_message(bot, user_id, f"<b>💎 VIP Activated!\n\nPlan: {plan_label}\n⏳ Valid till: {time.strftime('%d %b %Y', time.localtime(end_ts))}</b>", reply_markup=main_menu_keyboard(user_id), parse_mode="HTML")
         bot.answer_callback_query(call.id, "Approved")
+        send_next_pending_to_admin(call.message.chat.id)
+        return
+
+    if call.data.startswith("reject_"):
+        user_id = call.data.replace("reject_", "")
+        markup = InlineKeyboardMarkup()
+        markup.row(
+            InlineKeyboardButton("✅ Confirm Reject", callback_data=f"rejectconfirm_{user_id}"),
+            InlineKeyboardButton("❌ Cancel", callback_data=f"vipcancel_{user_id}")
+        )
+        bot.edit_message_reply_markup(call.message.chat.id, call.message.message_id, reply_markup=markup)
+        bot.answer_callback_query(call.id, "Please confirm")
+        return
+
+    if call.data.startswith("rejectconfirm_"):
+        user_id = int(call.data.replace("rejectconfirm_", ""))
+        user = get_user(user_id)
+        user["payment_status"] = "rejected"
+        user["payment_proof_photo_id"] = None
+        flush_loaded_users()
+        
+        # 🔥 SAFETY FIX: Reject ke baad bhi buttons delete kar do
+        try:
+            bot.edit_message_reply_markup(call.message.chat.id, call.message.message_id, reply_markup=None)
+        except:
+            pass
+
+        if user["paid"]:
+            send_vip_already_message(user_id)
+        else:
+            safe_send_message(bot, user_id, "Payment wasn't approved. Please send a clear screenshot again.", reply_markup=buy_keyboard())
+        bot.answer_callback_query(call.id, "Rejected")
         send_next_pending_to_admin(call.message.chat.id)
         return
 
