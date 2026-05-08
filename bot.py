@@ -659,6 +659,7 @@ PROFILE_IDS = [profile["id"] for profile in PROFILES]
 def default_user():
     return {
         "step": "start",
+        "age": None,
         "gender": "",
         "city": "",
         "name": "",
@@ -1872,6 +1873,10 @@ def send_current_step_prompt(user_id):
             reply_markup=welcome_keyboard(),
             parse_mode="HTML",
         )
+        return
+
+    if step == "age":
+        safe_send_message(bot, user_id, "🔞 <b>Please enter your age:</b>\n(e.g., 22)", reply_markup=ReplyKeyboardRemove(), parse_mode="HTML")
         return
 
     if step == "gender":
@@ -3168,18 +3173,29 @@ def text_handler(message):
 
     if text == BTN_CONTINUE:
         if user["step"] == "start":
-            safe_send_message(bot, user_id, "🔞 Are you 18 or older?\n\nYou must be 18+ to continue.", reply_markup=age_keyboard())
+            user["step"] = "age"
+            flush_loaded_users()
+            safe_send_message(bot, user_id, "🔞 <b>Please enter your age:</b>\n(e.g., 22)", reply_markup=ReplyKeyboardRemove(), parse_mode="HTML")
         else:
             send_current_step_prompt(user_id)
         return
 
     if user["step"] == "start":
-        if text == BTN_18_YES:
-            user["step"] = "gender"
-            flush_loaded_users()
-            safe_send_message(bot, user_id, "Tell us your gender.", reply_markup=gender_keyboard())
-        else:
-            safe_send_message(bot, user_id, "Tap Continue to begin.", reply_markup=welcome_keyboard())
+        safe_send_message(bot, user_id, "Tap Continue to begin.", reply_markup=welcome_keyboard())
+        return
+
+    if user["step"] == "age":
+        if not text.isdigit():
+            safe_send_message(bot, user_id, "⚠️ Please enter a valid number (e.g., 22):")
+            return
+        age = int(text)
+        if age < 18:
+            safe_send_message(bot, user_id, "🚫 You must be 18+ to use this service.")
+            return
+        user["age"] = age
+        user["step"] = "gender"
+        flush_loaded_users()
+        safe_send_message(bot, user_id, "👤 Tell us about yourself\n\nSelect your gender:", reply_markup=gender_keyboard())
         return
 
     if user["step"] == "gender":
