@@ -485,6 +485,9 @@ def handle_rate_limit(e):
     if "too many requests" in error_msg or "429" in error_msg:
         match = re.search(r'retry after (\d+)', error_msg)
         return int(match.group(1)) + 1 if match else 2
+    # 🔥 NEW: Agar Telegram ka server slow ho ya Timeout aaye, toh 1 sec wait karke retry karo
+    if "timed out" in error_msg or "connection" in error_msg or "timeout" in error_msg:
+        return 1 
     return 0
 
 def safe_send_message(bot, *args, **kwargs):
@@ -494,7 +497,6 @@ def safe_send_message(bot, *args, **kwargs):
         except Exception as e:
             retry_after = handle_rate_limit(e)
             if retry_after > 0:
-                print(f"⚠️ Rate limit (Message). Retrying in {retry_after}s...", flush=True)
                 time.sleep(retry_after)
                 continue
             print(f"❌ send_message error: {e}", flush=True)
@@ -508,7 +510,6 @@ def safe_send_photo(bot, chat_id, photo, **kwargs):
         except Exception as e:
             retry_after = handle_rate_limit(e)
             if retry_after > 0:
-                print(f"⚠️ Rate limit (Photo). Retrying in {retry_after}s...", flush=True)
                 time.sleep(retry_after)
                 continue
             print(f"❌ Bad photo skipped (chat_id={chat_id}): {e}", flush=True)
@@ -535,10 +536,9 @@ def safe_edit_message_text(bot, text, chat_id, message_id, **kwargs):
         except Exception as e:
             error_msg = str(e).lower()
             if "message is not modified" in error_msg:
-                return None # Ignore this specific error safely
+                return None
             retry_after = handle_rate_limit(e)
             if retry_after > 0:
-                print(f"⚠️ Rate limit (Edit). Retrying in {retry_after}s...", flush=True)
                 time.sleep(retry_after)
                 continue
             print(f"❌ edit_message error: {e}", flush=True)
