@@ -1313,19 +1313,18 @@ def get_last_message_preview(user_id, match_id, limit=40):
 def format_admin_chat_history(user_id, user_name, match_name, messages, unread_count, chat_state, match_age=""):
     user = get_user(user_id)
     tag = "🟢 VIP" if user.get("paid") else "🟡 FREE"
-    age_text = f" (Age: {match_age})" if match_age else ""
-    lines = [f"💬 <b>{html.escape(user_name)}</b> × <b>{html.escape(match_name)}{age_text}</b> {tag}"]
-    if user["paid"]:
-        lines.append("💎 VIP: Active")
-        lines.append(f"Plan: {get_vip_plan_label(user)}")
-        lines.append(f"\u23F3 {get_vip_remaining_days(user)} days remaining")
-        lines.append(f"Expires: {format_vip_expiry_date(user)}")
-    else:
-        lines.append("💎 VIP: Not Active")
+    
+    # Ekdum clean aur professional header
+    lines = [
+        f"💬 <b>{html.escape(user_name)}</b> × <b>{html.escape(match_name)}</b>",
+        f"{tag} | State: {chat_state}"
+    ]
+    
     if unread_count:
         lines.append(f"Unread: {unread_count}")
-    lines.append(f"State: {chat_state}")
-    lines.append("")
+        
+    lines.append("") # Messages se pehle thodi space
+    
     if not messages:
         lines.append("No messages yet.")
     else:
@@ -1336,11 +1335,17 @@ def format_admin_chat_history(user_id, user_name, match_name, messages, unread_c
                 speaker = "Info"
             else:
                 speaker = match_name
+            
             safe_speaker = html.escape(speaker)
             safe_text = html.escape(item["text"])
-            lines.append(f"<b>{safe_speaker}:</b> {safe_text}")
+            
+            # System info wale message thode alag (bold) dikhenge
+            if item["sender"] == "system":
+                lines.append(f"<b>{safe_speaker}:</b> <b>{safe_text}</b>")
+            else:
+                lines.append(f"<b>{safe_speaker}:</b> {safe_text}")
             lines.append("")
-    lines.append("Reply to this message to continue the chat.")
+
     return "\n".join(lines).rstrip()
 
 
@@ -1675,6 +1680,12 @@ def build_admin_chat_controls(user_id, match_id):
     state = get_chat_state(user_id, match_id)
     markup = InlineKeyboardMarkup()
 
+    # Naye View Profile Buttons (Row 1)
+    markup.row(
+        InlineKeyboardButton("👤 View User", callback_data=f"admin_view_user_{user_id}"),
+        InlineKeyboardButton("👩 View Match", callback_data=f"admin_view_match_{match_id}")
+    )
+
     if state == "active" and not user["paid"]:
         markup.row(
             InlineKeyboardButton("Lock Chat", callback_data=f"chatctl_lock_{user_id}_{match_id}"),
@@ -1689,7 +1700,7 @@ def build_admin_chat_controls(user_id, match_id):
     elif state in {"locked", "ended"}:
         markup.row(InlineKeyboardButton("Block Chat", callback_data=f"chatctl_block_{user_id}_{match_id}"))
 
-    markup.row(InlineKeyboardButton("Refresh", callback_data=f"adminchat_{user_id}_{match_id}"))
+    markup.row(InlineKeyboardButton("🔄 Refresh", callback_data=f"adminchat_{user_id}_{match_id}"))
     return markup
 
 
@@ -2818,6 +2829,51 @@ Status: 🟡 Pending"""
 def callback_handler(call):
 
     bot.answer_callback_query(call.id)
+
+    # --- ADMIN VIEW PROFILE BUTTONS LOGIC ---
+    if call.data.startswith("admin_view_user_"):
+        uid = int(call.data.replace("admin_view_user_", ""))
+        u_data = get_user(uid)
+        tag = "🟢 VIP" if u_data.get("paid") else "🟡 FREE"
+        
+        vip_info = "Not Active"
+        if u_data.get("paid"):
+            plan_lbl = get_vip_plan_label(u_data)
+            rem_days = get_vip_remaining_days(u_data)
+            exp_date = format_vip_expiry_date(u_data)
+            vip_info = f"Active 💎\nPlan: {plan_lbl}\nRemaining: {rem_days} days\nExpires: {exp_date}"
+        
+        caption = (
+            f"👤 <b>Real User Details</b>\n\n"
+            f"Name: {u_data.get('name', 'N/A')}\n"
+            f"Age: {u_data.get('age', 'N/A')}\n"
+            f"City: {u_data.get('city', 'N/A')}\n"
+            f"Status: {tag}\n\n"
+            f"💎 <b>VIP Status:</b>\n{vip_info}"
+        )
+        if u_data.get("photo"):
+            safe_send_photo(bot, call.message.chat.id, u_data["photo"], caption=caption, parse_mode="HTML")
+        else:
+            safe_send_message(bot, call.message.chat.id, caption + "\n\n(No photo available)", parse_mode="HTML")
+        return
+
+    if call.data.startswith("admin_view_match_"):
+        mid = int(call.data.replace("admin_view_match_", ""))
+        m_data = get_profile(mid)
+        if m_data:
+            loc = m_data.get("location", "Not Set")
+            caption = (
+                f"👩 <b>Match Profile (Bot)</b>\n\n"
+                f"Name: {m_data['name']}\n"
+                f"Age: {m_data['age']}\n"
+                f"📍 Location: {loc}\n"
+                f"ID: {mid}"
+            )
+            safe_send_photo(bot, call.message.chat.id, m_data["photo"], caption=caption, parse_mode="HTML")
+        else:
+            safe_send_message(bot, call.message.chat.id, "Profile not found.")
+        return
+    # ----------------------------------------
 
     # 🔥 REPLY BUTTON FIX (TOP)
     if call.data and call.data.startswith("reply_"):
