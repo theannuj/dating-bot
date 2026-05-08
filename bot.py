@@ -116,115 +116,10 @@ def release_db_connection(conn):
             pass
 
 
-CP1252_REVERSE_MAP = {
-    0x20AC: 0x80,
-    0x201A: 0x82,
-    0x0192: 0x83,
-    0x201E: 0x84,
-    0x2026: 0x85,
-    0x2020: 0x86,
-    0x2021: 0x87,
-    0x02C6: 0x88,
-    0x2030: 0x89,
-    0x0160: 0x8A,
-    0x2039: 0x8B,
-    0x0152: 0x8C,
-    0x017D: 0x8E,
-    0x2018: 0x91,
-    0x2019: 0x92,
-    0x201C: 0x93,
-    0x201D: 0x94,
-    0x2022: 0x95,
-    0x2013: 0x96,
-    0x2014: 0x97,
-    0x02DC: 0x98,
-    0x2122: 0x99,
-    0x0161: 0x9A,
-    0x203A: 0x9B,
-    0x0153: 0x9C,
-    0x017E: 0x9E,
-    0x0178: 0x9F,
-}
-LEGACY_CORRUPT_TEXT_ORDS = set(range(0xC0, 0x100)) | {
-    0x0192,
-    0x0152,
-    0x0153,
-    0x0160,
-    0x0161,
-    0x0178,
-    0x017D,
-    0x017E,
-    0x20AC,
-    0x2013,
-    0x2014,
-    0x2018,
-    0x2019,
-    0x201C,
-    0x201D,
-    0x2020,
-    0x2021,
-    0x2022,
-    0x2026,
-    0x2030,
-    0x2039,
-    0x203A,
-    0x02C6,
-    0x02DC,
-    0x2122,
-    0x0081,
-    0x008D,
-    0x008F,
-    0x0090,
-    0x009D,
-    0x009F,
-}
-
-
-def looks_like_legacy_corrupt_text(value):
-    return isinstance(value, str) and any(ord(ch) in LEGACY_CORRUPT_TEXT_ORDS for ch in value)
-
-
-def decode_legacy_corrupt_text(value):
-    if not looks_like_legacy_corrupt_text(value):
-        return value
-
-    repaired = value
-    for _ in range(6):
-        if not looks_like_legacy_corrupt_text(repaired):
-            break
-        try:
-            raw_bytes = bytearray()
-            for ch in repaired:
-                codepoint = ord(ch)
-                if codepoint <= 0xFF:
-                    raw_bytes.append(codepoint)
-                elif codepoint in CP1252_REVERSE_MAP:
-                    raw_bytes.append(CP1252_REVERSE_MAP[codepoint])
-                else:
-                    return repaired
-            decoded = bytes(raw_bytes).decode("utf-8")
-        except Exception:
-            break
-        if decoded == repaired:
-            break
-        repaired = decoded
-    return repaired
-
-
-def normalize_legacy_payload(value):
-    if isinstance(value, str):
-        return decode_legacy_corrupt_text(value)
-    if isinstance(value, list):
-        return [normalize_legacy_payload(item) for item in value]
-    if isinstance(value, tuple):
-        return tuple(normalize_legacy_payload(item) for item in value)
-    if isinstance(value, dict):
-        return {key: normalize_legacy_payload(item) for key, item in value.items()}
-    return value
-
+# Legacy text checking removed to save CPU (Database uses clean UTF-8 now)
 
 def normalize_storage_value(value):
-    return normalize_legacy_payload(value)
+    return value
 
 
 def parse_matches_payload(value):
@@ -1974,13 +1869,6 @@ def send_current_step_prompt(user_id):
     send_main_menu(user_id)
 
 
-    if step == "agreement":
-        send_agreement(user_id)
-        return
-
-    send_main_menu(user_id)
-
-
 def choose_next_profile(user):
     # Ye line incoming likes ko normal swipe se bahar nikal degi
     excluded = set(user.get("shown", [])) | set(user.get("incoming_likes", []))
@@ -3231,43 +3119,6 @@ def callback_handler(call):
 
     if action == "approve":
         bot.answer_callback_query(call.id, "Use a duration button to approve VIP")
-        return
-        user["paid"] = True
-        user["chat_limit"] = 5
-        user["awaiting_payment"] = False
-        user["payment_status"] = "approved"
-        try:
-            save_vip_to_db(user_id, user)
-            print(f"VIP saved to DB: {user_id}")
-        except Exception as e:
-            print("VIP DB save error:", e)
-        for thread in user.get("chat_threads", {}).values():
-            if thread.get("state") == "locked":
-                thread["state"] = "available"
-        flush_loaded_users()
-        
-        # Double save to ensure persistence (critical on Railway)
-        import time as time_module
-        time_module.sleep(0.1)
-        flush_loaded_users()
-        
-        # Send confirmation to admin
-        safe_send_message(bot, 
-            call.message.chat.id,
-            f"✅ User {user_id} approved successfully"
-        )
-        
-        # Send activation message to user
-        safe_send_message(bot, 
-            user_id,
-            "<b>VIP activated 💎\n\nYou can now start up to 5 chats in total\n(including any chats you've already used)\n\nChoose wisely 😉</b>",
-            reply_markup=main_menu_keyboard(user_id),
-            parse_mode="HTML",
-        )
-        bot.answer_callback_query(call.id, "Approved")
-        
-        # Auto-open next pending user
-        send_next_pending_to_admin(call.message.chat.id)
         return
 
     if action == "reject":
