@@ -584,29 +584,71 @@ INACTIVITY_MAX_SECONDS = 15 * 60
 INACTIVITY_CHECK_SECONDS = 60
 
 
-def safe_send_message(bot, *args, **kwargs):
-    try:
-        return bot.send_message(*args, **kwargs)
-    except Exception as e:
-        print(f"send_message error: {e}", flush=True)
-        return None
+def handle_rate_limit(e):
+    import re
+    error_msg = str(e).lower()
+    if "too many requests" in error_msg or "429" in error_msg:
+        match = re.search(r'retry after (\d+)', error_msg)
+        return int(match.group(1)) + 1 if match else 2
+    return 0
 
+def safe_send_message(bot, *args, **kwargs):
+    for attempt in range(3):
+        try:
+            return bot.send_message(*args, **kwargs)
+        except Exception as e:
+            retry_after = handle_rate_limit(e)
+            if retry_after > 0:
+                print(f"⚠️ Rate limit (Message). Retrying in {retry_after}s...", flush=True)
+                time.sleep(retry_after)
+                continue
+            print(f"❌ send_message error: {e}", flush=True)
+            return None
+    return None
 
 def safe_send_photo(bot, chat_id, photo, **kwargs):
-    try:
-        return bot.send_photo(chat_id, photo, **kwargs)
-    except Exception as e:
-        print(f"❌ Bad photo skipped (chat_id={chat_id}):", photo, flush=True)
-        return bot.send_message(chat_id, "Profile loaded")
-
+    for attempt in range(3):
+        try:
+            return bot.send_photo(chat_id, photo, **kwargs)
+        except Exception as e:
+            retry_after = handle_rate_limit(e)
+            if retry_after > 0:
+                print(f"⚠️ Rate limit (Photo). Retrying in {retry_after}s...", flush=True)
+                time.sleep(retry_after)
+                continue
+            print(f"❌ Bad photo skipped (chat_id={chat_id}): {e}", flush=True)
+            return safe_send_message(bot, chat_id, "Profile loaded")
+    return None
 
 def safe_send_chat_action(bot, *args, **kwargs):
     target = args[0] if args else kwargs.get("chat_id")
-    try:
-        return bot.send_chat_action(*args, **kwargs)
-    except Exception as e:
-        print(f"chat_action error (chat_id={target}): {e}", flush=True)
-        traceback.print_exc()
+    for attempt in range(2):
+        try:
+            return bot.send_chat_action(*args, **kwargs)
+        except Exception as e:
+            retry_after = handle_rate_limit(e)
+            if retry_after > 0:
+                time.sleep(retry_after)
+                continue
+            return None
+    return None
+
+def safe_edit_message_text(bot, text, chat_id, message_id, **kwargs):
+    for attempt in range(3):
+        try:
+            return bot.edit_message_text(text, chat_id=chat_id, message_id=message_id, **kwargs)
+        except Exception as e:
+            error_msg = str(e).lower()
+            if "message is not modified" in error_msg:
+                return None # Ignore this specific error safely
+            retry_after = handle_rate_limit(e)
+            if retry_after > 0:
+                print(f"⚠️ Rate limit (Edit). Retrying in {retry_after}s...", flush=True)
+                time.sleep(retry_after)
+                continue
+            print(f"❌ edit_message error: {e}", flush=True)
+            return None
+    return None
 
 
 def is_on_cooldown(user_id):
@@ -2307,40 +2349,40 @@ def send_admin_notification(user_id, match_id, text):
         key = (admin_id, user_id)
 
         if key not in admin_notifications:
-            try:
-                msg = bot.send_message(
-                    admin_id,
-                    f"👤 {name}\n💬 {text}",
-                    reply_markup=InlineKeyboardMarkup().add(
-                        InlineKeyboardButton("💬 Reply", callback_data=f"reply_{user_id}_{match_id}")
-                    )
+            msg = safe_send_message(
+                bot,
+                admin_id,
+                f"👤 {name}\n💬 {text}",
+                reply_markup=InlineKeyboardMarkup().add(
+                    InlineKeyboardButton("💬 Reply", callback_data=f"reply_{user_id}_{match_id}")
                 )
-            except:
-                continue
-
-            admin_notifications[key] = {
-                "messages": [text],
-                "message_id": msg.message_id
-            }
+            )
+            
+            if msg:
+                admin_notifications[key] = {
+                    "messages": [text],
+                    "message_id": msg.message_id
+                }
 
         else:
             data = admin_notifications[key]
-
             data["messages"].append(text)
+            
+            # Spam protection: Agar 10 se jyada messages ikatthe ho gaye toh lamba message na bane
+            if len(data["messages"]) > 10:
+                data["messages"] = data["messages"][-10:]
 
             messages_text = "\n".join([f"💬 {m}" for m in data["messages"]])
 
-            try:
-                bot.edit_message_text(
-                    f"👤 {name} ({len(data['messages'])} messages)\n{messages_text}",
-                    admin_id,
-                    data["message_id"],
-                    reply_markup=InlineKeyboardMarkup().add(
-                        InlineKeyboardButton("💬 Reply", callback_data=f"reply_{user_id}_{match_id}")
-                    )
+            safe_edit_message_text(
+                bot,
+                f"👤 {name} ({len(data['messages'])} messages)\n{messages_text}",
+                chat_id=admin_id,
+                message_id=data["message_id"],
+                reply_markup=InlineKeyboardMarkup().add(
+                    InlineKeyboardButton("💬 Reply", callback_data=f"reply_{user_id}_{match_id}")
                 )
-            except:
-                pass
+            )
 
 
 def forward_user_message_to_admins(message):
