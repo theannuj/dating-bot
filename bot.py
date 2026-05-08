@@ -2529,11 +2529,29 @@ def stats_handler(message):
         return
     clear_admin_active_chat(message.chat.id)
 
-    all_users = load_all_users_from_db()
-    total_users = len(all_users)
-    vip_users = sum(1 for user in all_users.values() if is_vip_active(user))
-    pending_users = sum(1 for user in all_users.values() if user.get("payment_status") == "pending")
+    conn = get_db_connection()
+    total_users = 0
+    vip_users = 0
+    pending_users = 0
     
+    if conn:
+        try:
+            cur = conn.cursor()
+            cur.execute("SELECT COUNT(*) FROM users")
+            total_users = cur.fetchone()[0]
+
+            now_ts = get_current_timestamp()
+            cur.execute("SELECT COUNT(*) FROM vip_users WHERE paid = true OR vip_end_date > %s", (now_ts,))
+            vip_users = cur.fetchone()[0]
+
+            cur.execute("SELECT COUNT(*) FROM vip_users WHERE payment_status = 'pending'")
+            pending_users = cur.fetchone()[0]
+            cur.close()
+        except Exception as e:
+            print(f"Stats DB error: {e}", flush=True)
+        finally:
+            release_db_connection(conn)
+
     stats_message = f"""📊 Stats:
 Total Users: {total_users}
 VIP Users: {vip_users}
@@ -2549,18 +2567,27 @@ def pending_handler(message):
         return
     clear_admin_active_chat(message.chat.id)
     
-    pending_users = [
-        (uid, user)
-        for uid, user in load_all_users_from_db().items()
-        if user.get("payment_status") == "pending"
-    ]
+    conn = get_db_connection()
+    pending_ids = []
+    if conn:
+        try:
+            cur = conn.cursor()
+            cur.execute("SELECT user_id FROM vip_users WHERE payment_status = 'pending'")
+            rows = cur.fetchall()
+            pending_ids = [int(row[0]) for row in rows]
+            cur.close()
+        except Exception as e:
+            print(f"Pending DB error: {e}", flush=True)
+        finally:
+            release_db_connection(conn)
     
-    if not pending_users:
+    if not pending_ids:
         safe_send_message(bot, message.chat.id, "✅ No pending payments right now.")
         return
     
-    lines = [f"⏳ Pending Payments ({len(pending_users)}):"]
-    for uid, user in pending_users:
+    lines = [f"⏳ Pending Payments ({len(pending_ids)}):"]
+    for uid in pending_ids:
+        user = get_user(uid)  # Ye sirf usi 1 user ko safely load karega
         name = user.get("name") or f"User {uid}"
         lines.append(f"• {name} (ID: {uid})")
     
@@ -2568,10 +2595,20 @@ def pending_handler(message):
 
 
 def get_next_pending_user_id():
-    """Get the next pending user ID"""
-    for uid, user in load_all_users_from_db().items():
-        if user.get("payment_status") == "pending":
-            return uid
+    """Get the next pending user ID using Fast DB Query"""
+    conn = get_db_connection()
+    if conn:
+        try:
+            cur = conn.cursor()
+            cur.execute("SELECT user_id FROM vip_users WHERE payment_status = 'pending' LIMIT 1")
+            row = cur.fetchone()
+            cur.close()
+            if row:
+                return int(row[0])
+        except Exception as e:
+            print(f"Next Pending DB error: {e}", flush=True)
+        finally:
+            release_db_connection(conn)
     return None
 
 
