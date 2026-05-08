@@ -1531,17 +1531,11 @@ def inactivity_engagement_worker():
         now = time.time()
         targets = []
 
-        all_users = load_all_users_from_db()
-        for user_id, user in all_users.items():
+        # 🚀 OPTIMIZATION: Poora DB load nahi karenge! Sirf RAM me un users ko check karenge jo abhi active the
+        active_users_copy = list(LAST_ACTIVITY_TIME.items())
+        
+        for user_id, last_active in active_users_copy:
             if is_admin(user_id):
-                continue
-            if not user.get("matches"):
-                continue
-            if user.get("chat_open"):
-                continue
-
-            last_active = LAST_ACTIVITY_TIME.get(user_id, 0)
-            if not last_active:
                 continue
 
             inactive_for = now - last_active
@@ -1550,6 +1544,13 @@ def inactivity_engagement_worker():
 
             last_ping = LAST_ENGAGEMENT_PING.get(user_id, 0)
             if last_ping and now - last_ping < INACTIVITY_MAX_SECONDS:
+                continue
+                
+            # Sirf is ek user ko DB se uthayenge jo message bhejne ke qabil hai
+            user = get_user(user_id)
+            if not user.get("matches"):
+                continue
+            if user.get("chat_open"):
                 continue
 
             LAST_ENGAGEMENT_PING[user_id] = now
@@ -1708,8 +1709,29 @@ def build_admin_chat_list_markup(admin_id, unread_only=False):
     markup = InlineKeyboardMarkup()
     chat_rows = []
     
-    # Ye ek hi baar database se saara data layega
-    for user_id, user in load_all_users_from_db().items():
+    conn = get_db_connection()
+    if not conn:
+        return None
+        
+    try:
+        cur = conn.cursor()
+        # 🚀 SMART QUERY: Sirf unhi users ko nikalo jinke chat threads me 'messages' hain
+        cur.execute("SELECT user_id, data FROM users WHERE data LIKE '%\"messages\": [%'")
+        rows = cur.fetchall()
+        cur.close()
+    except Exception as e:
+        print(f"Admin chat DB error: {e}", flush=True)
+        rows = []
+    finally:
+        release_db_connection(conn)
+
+    for row in rows:
+        user_id = int(row[0])
+        try:
+            user = prepare_user_record(json.loads(row[1]))
+        except:
+            continue
+            
         user_name = user.get("name") or f"User {user_id}"
         for match_key, thread in user.get("chat_threads", {}).items():
             messages = thread.get("messages", [])
@@ -1717,7 +1739,6 @@ def build_admin_chat_list_markup(admin_id, unread_only=False):
                 continue
             match_id = int(match_key)
             
-            # 🔥 FAST IN-MEMORY CHECK (No DB Call)
             assigned_admin_id = thread.get("assigned_admin_id", MAIN_ADMIN_ID)
             if admin_id != MAIN_ADMIN_ID and assigned_admin_id != admin_id:
                 continue
@@ -1725,7 +1746,6 @@ def build_admin_chat_list_markup(admin_id, unread_only=False):
             profile = get_profile(match_id)
             match_name = profile["name"] if profile else f"Match {match_id}"
             
-            # 🔥 FAST IN-MEMORY UNREAD CHECK (No DB Call)
             raw_unread = thread.get("admin_unread", {})
             if isinstance(raw_unread, dict):
                 admin_unread = int(raw_unread.get(str(admin_id), 0))
@@ -1742,7 +1762,6 @@ def build_admin_chat_list_markup(admin_id, unread_only=False):
             if admin_unread:
                 label += f" ({admin_unread})"
                 
-            # 🔥 FAST IN-MEMORY PREVIEW (No DB Call)
             preview = messages[-1].get("text", "").replace("\n", " ").strip()
             if len(preview) > 26:
                 preview = preview[:23] + "..."
