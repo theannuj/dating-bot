@@ -1391,7 +1391,7 @@ def send_matches_inbox(user_id):
     flush_loaded_users()
 
     if not matches:
-        safe_send_message(bot, user_id, "Hmm… no one caught your vibe yet 😏\nTry again…", reply_markup=main_menu_keyboard(user_id))
+        safe_send_message(bot, user_id, "<b>Hmm… no one caught your vibe yet 😏</b>\n\nKeep exploring profiles and hit '💚' to get more matches!", reply_markup=main_menu_keyboard(user_id), parse_mode="HTML")
         return
 
     safe_send_message(bot, user_id, "<b>💖 Your chats</b>", reply_markup=build_user_inbox_markup(user_id, matches), parse_mode="HTML")
@@ -1890,7 +1890,7 @@ def send_profile_card(user_id, detailed=False, profile_id=None):
     if profile_id is None:
         profile_id = choose_next_profile(user)
     if profile_id is None:
-        safe_send_message(bot, user_id, "Hmm… no one caught your vibe yet 😏\nTry again…", reply_markup=main_menu_keyboard(user_id))
+        safe_send_message(bot, user_id, "<b>Hmm… no one caught your vibe yet 😏</b>\n\nKeep exploring profiles and hit '💚' to get more matches!", reply_markup=main_menu_keyboard(user_id), parse_mode="HTML")
         return
     if profile_id not in user["shown"]:
         user["shown"].append(profile_id)
@@ -2169,7 +2169,7 @@ def show_matches(user_id):
     user = get_user(user_id)
     matches = get_visible_match_ids(user_id)
     if not matches:
-        safe_send_message(bot, user_id, "Hmm… no one caught your vibe yet 😏\nTry again…", reply_markup=main_menu_keyboard(user_id))
+        safe_send_message(bot, user_id, "<b>Hmm… no one caught your vibe yet 😏</b>\n\nKeep exploring profiles and hit '💚' to get more matches!", reply_markup=main_menu_keyboard(user_id), parse_mode="HTML")
         return
 
     current_match_id = user.get("current_match_id")
@@ -2188,7 +2188,7 @@ def show_next_match(user_id):
     user = get_user(user_id)
     matches = get_visible_match_ids(user_id)
     if not matches:
-        safe_send_message(bot, user_id, "Hmm… no one caught your vibe yet 😏\nTry again…", reply_markup=main_menu_keyboard(user_id))
+        safe_send_message(bot, user_id, "<b>Hmm… no one caught your vibe yet 😏</b>\n\nKeep exploring profiles and hit '💚' to get more matches!", reply_markup=main_menu_keyboard(user_id), parse_mode="HTML")
         return
 
     current_cursor = int(user.get("match_cursor", 0))
@@ -2202,7 +2202,7 @@ def show_prev_match(user_id):
     user = get_user(user_id)
     matches = get_visible_match_ids(user_id)
     if not matches:
-        safe_send_message(bot, user_id, "Hmm… no one caught your vibe yet 😏\nTry again…", reply_markup=main_menu_keyboard(user_id))
+        safe_send_message(bot, user_id, "<b>Hmm… no one caught your vibe yet 😏</b>\n\nKeep exploring profiles and hit '💚' to get more matches!", reply_markup=main_menu_keyboard(user_id), parse_mode="HTML")
         return
 
     current_cursor = int(user.get("match_cursor", 0))
@@ -2909,7 +2909,7 @@ def callback_handler(call):
         remove_match_from_inbox(user_id, match_id)
         safe_send_message(bot, 
             user_id,
-            "<b>This chat has ended.\n\nYou can start a new one anytime 🙂</b>",
+            "<b>Chat closed. ✌️</b>\nHead to the Main Menu to explore new profiles and start a fresh conversation!",
             reply_markup=main_menu_keyboard(user_id),
             parse_mode="HTML",
         )
@@ -2977,7 +2977,7 @@ def callback_handler(call):
                 remove_match_from_inbox(user_id, match_id)
                 safe_send_message(bot, 
                     user_id,
-                    "<b>This chat has ended.\n\nYou can start a new one anytime 🙂</b>",
+                    "<b>Chat closed. ✌️</b>\nHead to the Main Menu to explore new profiles and start a fresh conversation!",
                     reply_markup=main_menu_keyboard(user_id),
                     parse_mode="HTML",
                 )
@@ -3369,8 +3369,9 @@ def text_handler(message):
         )
         safe_send_message(bot, 
             user_id,
-            f"End this chat?\n\nThis chat will be lost and your chat limit will not increase.\nChats left: {chats_left} / {user['chat_limit']}\n\nAre you sure?",
+            f"<b>Want to end this conversation? 🚪</b>\n\nThis chat will be closed permanently, and it will count towards your chat limit.\n(Chats left: {chats_left} / {user['chat_limit']})\n\nReady for a new connection?",
             reply_markup=markup,
+            parse_mode="HTML"
         )
         return
 
