@@ -354,8 +354,7 @@ BTN_SEND_GIFT = "🎁 Send gift"
 BTN_SEE_LIKES = "See who likes you"
 BTN_GET_VIP = "💎 Get VIP"
 BTN_MY_PROFILE = "👤 My profile"
-BTN_SEARCH_SETTINGS = "🔎 Search settings"
-BTN_BOOST = "🚀 Boost"
+BTN_HOW_IT_WORKS = "❓ How it works"
 BTN_VIP = "🔓 Unlock Chat"
 BTN_CHAT = "💬 Chat"
 BTN_SEND_PAYMENT = "Send payment screenshot"
@@ -1592,7 +1591,7 @@ def likes_locked_keyboard():
 
 
 def settings_keyboard():
-    return build_keyboard([BTN_MY_PROFILE, BTN_SEARCH_SETTINGS], [BTN_BOOST, BTN_VIP], [BTN_MAIN_MENU])
+    return build_keyboard([BTN_MY_PROFILE, BTN_HOW_IT_WORKS], [BTN_VIP, BTN_MAIN_MENU])
 
 
 
@@ -2828,6 +2827,20 @@ def callback_handler(call):
 
     safe_answer_callback_query(bot,call.id)
 
+    # --- HELP MENU LOGIC ---
+    if call.data.startswith("help_"):
+        if call.data == "help_matches":
+            text = "<b>How to get matches? ✨</b>\n\nBrowse through profiles and hit '💚' if you like someone. If they like you back, boom... it's a match! 🔥\n\n<i>Tip: If you don't want to wait, VIP members can directly see who liked them in the '👀 Likes' section.</i>"
+        elif call.data == "help_chat":
+            text = "<b>How chatting works? 💬</b>\n\nGood news: <b>Your first chat with any match is completely FREE!</b> 🎉\n\nTo keep conversations focused, free members can chat with <b>one person at a time</b>.\n\nWant to talk to a new match? Just use the 'End Chat' button in your current conversation to free up your slot for the next person.\n\n<i>(Or upgrade to VIP to talk to multiple people at the exact same time! 😉)</i>"
+        elif call.data == "help_vip":
+            text = "<b>Why upgrade to VIP? 🚀</b>\n\nVIP is for those who don't want to wait! Here is what you get:\n\n🔓 <b>Multiple Chats:</b> Hold conversations with several matches at the same time.\n👀 <b>See Your Admirers:</b> Instantly reveal who liked your profile.\n⚡ <b>Skip The Line:</b> Get faster connections.\n\nTap 'Unlock Chat' in the Main Menu to upgrade!"
+        elif call.data == "help_safety":
+            text = "<b>Safety & Privacy 🛡️</b>\n\nPlease be respectful to your matches. Bad behavior may lead to a permanent ban.\n\nIf you ever want to start fresh, change your photo, or delete your data, you can easily reset your entire profile anytime by sending the <b>/reset</b> command."
+        
+        safe_send_message(bot, call.message.chat.id, text, parse_mode="HTML")
+        return
+
     # --- ADMIN VIEW PROFILE BUTTONS LOGIC ---
     if call.data.startswith("admin_view_user_"):
         uid = int(call.data.replace("admin_view_user_", ""))
@@ -3374,16 +3387,17 @@ def text_handler(message):
             safe_send_message(bot, user_id, caption, reply_markup=settings_keyboard())
         return
 
-    if text == BTN_SEARCH_SETTINGS:
-        safe_send_message(bot, 
-            user_id,
-            "Search settings can be expanded later.\nRight now matching stays broad and natural.",
-            reply_markup=settings_keyboard(),
+    if text == BTN_HOW_IT_WORKS or text.lower() == "/help":
+        markup = InlineKeyboardMarkup()
+        markup.row(
+            InlineKeyboardButton("💚 Getting Matches", callback_data="help_matches"),
+            InlineKeyboardButton("💬 Chat Rules", callback_data="help_chat")
         )
-        return
-
-    if text == BTN_BOOST:
-        safe_send_message(bot, user_id, "Boost can be connected to coins later.", reply_markup=settings_keyboard())
+        markup.row(
+            InlineKeyboardButton("💎 VIP Benefits", callback_data="help_vip"),
+            InlineKeyboardButton("🛡️ Safety & Account", callback_data="help_safety")
+        )
+        safe_send_message(bot, user_id, "Need a quick guide? Choose a topic below to see how everything works 👇", reply_markup=markup)
         return
 
     if text == BTN_MAIN_MENU:
