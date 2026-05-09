@@ -2453,10 +2453,16 @@ def show_disclaimer(message):
 def help_command_handler(message):
     if not is_admin(message.chat.id):
         touch_user_activity(message.chat.id)
-    safe_send_message(bot, 
-        message.chat.id,
-        "🤖 Commands:\n/menu - Main menu\n/matches - View matches\n/chat - Open chat\n/vip - VIP access",
+    markup = InlineKeyboardMarkup()
+    markup.row(
+        InlineKeyboardButton("💚 Getting Matches", callback_data="help_matches"),
+        InlineKeyboardButton("💬 Chat Rules", callback_data="help_chat")
     )
+    markup.row(
+        InlineKeyboardButton("💎 VIP Benefits", callback_data="help_vip"),
+        InlineKeyboardButton("🛡️ Safety & Privacy", callback_data="help_safety")
+    )
+    safe_send_message(bot, message.chat.id, "Need a quick guide? Choose a topic below to see how everything works 👇", reply_markup=markup)
 
 
 @bot.message_handler(commands=["reset"])
@@ -3395,7 +3401,7 @@ def text_handler(message):
         )
         markup.row(
             InlineKeyboardButton("💎 VIP Benefits", callback_data="help_vip"),
-            InlineKeyboardButton("🛡️ Safety & Account", callback_data="help_safety")
+            InlineKeyboardButton("🛡️ Safety & Privacy", callback_data="help_safety")
         )
         safe_send_message(bot, user_id, "Need a quick guide? Choose a topic below to see how everything works 👇", reply_markup=markup)
         return
