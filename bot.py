@@ -3604,13 +3604,33 @@ def configure_webhook():
     raise RuntimeError("Failed to configure Telegram webhook after retries.")
 
 
+# 🔥 DEDUPLICATION CACHE: Telegram ke duplicate messages ko rokne ke liye
+PROCESSED_UPDATES = {}
+
 @app.route(f"/{TOKEN}", methods=["POST"])
 def webhook():
     clear_request_user_context()
     try:
         json_str = request.get_data(cache=False, as_text=False).decode("utf-8")
         update = telebot.types.Update.de_json(json_str)
+        
+        # 🛡️ ANTI-DUPLICATE SYSTEM: Check karo agar ye message pehle hi process ho chuka hai
+        update_id = update.update_id
+        if update_id in PROCESSED_UPDATES:
+            # Agar ID pehle se list me hai, toh chup-chaap OK bol kar wapas bhej do
+            return "OK", 200
+            
+        # Nayi ID ko list me save karo
+        PROCESSED_UPDATES[update_id] = True
+        
+        # Cache ko limit me rakho taaki RAM full na ho (Aakhiri 5000 messages yaad rakhega)
+        if len(PROCESSED_UPDATES) > 5000:
+            oldest_key = next(iter(PROCESSED_UPDATES))
+            del PROCESSED_UPDATES[oldest_key]
+
+        # Naye message ko process karne bhejo
         bot.process_new_updates([update])
+        
     except Exception as e:
         print(f"❌ Webhook Error: {e}", flush=True)
         traceback.print_exc()
@@ -3621,7 +3641,6 @@ def webhook():
             print(f"❌ Database Save Error in Webhook: {db_err}", flush=True)
         finally:
             clear_request_user_context()
-    # 🛡️ SAFETY FIX: Hamesha 200 OK return karna hai, warna Telegram baar-baar same message bhejega
     return "OK", 200
 
 
