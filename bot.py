@@ -17,8 +17,8 @@ DB_POOL = None
 from telebot import apihelper
 from telebot.types import InlineKeyboardButton, InlineKeyboardMarkup, ReplyKeyboardMarkup, ReplyKeyboardRemove
 
-apihelper.CONNECT_TIMEOUT = 10
-apihelper.READ_TIMEOUT = 30
+apihelper.CONNECT_TIMEOUT = 5
+apihelper.READ_TIMEOUT = 7
 
 TOKEN = os.getenv("BOT_TOKEN")
 MAIN_ADMIN_ID = 526264365
@@ -542,6 +542,18 @@ def safe_edit_message_text(bot, text, chat_id, message_id, **kwargs):
                 time.sleep(retry_after)
                 continue
             print(f"❌ edit_message error: {e}", flush=True)
+            return None
+    return None
+
+def safe_answer_callback_query(bot, *args, **kwargs):
+    for attempt in range(2):
+        try:
+            return safe_answer_callback_query(bot,*args, **kwargs)
+        except Exception as e:
+            retry_after = handle_rate_limit(e)
+            if retry_after > 0:
+                time.sleep(retry_after)
+                continue
             return None
     return None
 
@@ -2814,7 +2826,7 @@ Status: 🟡 Pending"""
 @bot.callback_query_handler(func=lambda call: True)
 def callback_handler(call):
 
-    bot.answer_callback_query(call.id)
+    safe_answer_callback_query(bot,call.id)
 
     # --- ADMIN VIEW PROFILE BUTTONS LOGIC ---
     if call.data.startswith("admin_view_user_"):
@@ -2877,12 +2889,12 @@ def callback_handler(call):
 
             send_admin_chat_history(admin_id, user_id, match_id)
 
-            bot.answer_callback_query(call.id)
+            safe_answer_callback_query(bot,call.id)
             return
 
         except Exception as e:
             print("Reply error:", e)
-            bot.answer_callback_query(call.id, "Error")
+            safe_answer_callback_query(bot,call.id, "Error")
             return
 
     if not is_admin(call.message.chat.id):
@@ -2893,7 +2905,7 @@ def callback_handler(call):
             bot.delete_message(call.message.chat.id, call.message.message_id)
         except:
             pass
-        bot.answer_callback_query(call.id, "Cancelled")
+        safe_answer_callback_query(bot,call.id, "Cancelled")
         return
 
     if call.data == "userend_yes":
@@ -2904,12 +2916,12 @@ def callback_handler(call):
             pass
         user = get_user(user_id)
         if not user["current_match_id"]:
-            bot.answer_callback_query(call.id, "Open a chat first")
+            safe_answer_callback_query(bot,call.id, "Open a chat first")
             return
         match_id = user["current_match_id"]
         state = get_chat_state(user_id, match_id)
         if state != "active":
-            bot.answer_callback_query(call.id, "Chat already closed")
+            safe_answer_callback_query(bot,call.id, "Chat already closed")
             return
         set_chat_state(user_id, match_id, "ended")
         append_system_message(user_id, match_id, "This chat has ended.\n\nYou can start a new one anytime 🙂")
@@ -2921,37 +2933,37 @@ def callback_handler(call):
             reply_markup=main_menu_keyboard(user_id),
             parse_mode="HTML",
         )
-        bot.answer_callback_query(call.id, "Chat ended")
+        safe_answer_callback_query(bot,call.id, "Chat ended")
         return
 
     if call.data.startswith("start_chat:"):
         user_id = call.message.chat.id
         match_id_str = call.data.split(":", 1)[1]
         if not match_id_str.isdigit():
-            bot.answer_callback_query(call.id, "Invalid match")
+            safe_answer_callback_query(bot,call.id, "Invalid match")
             return
         match_id = int(match_id_str)
         state = get_chat_state(user_id, match_id)
         if state != "active":
             if not can_start_new_chat(user_id):
                 safe_send_message(bot, user_id, unlock_vip_usage_message(user_id), reply_markup=chat_limit_keyboard(), parse_mode="HTML")
-                bot.answer_callback_query(call.id, "No chats left")
+                safe_answer_callback_query(bot,call.id, "No chats left")
                 return
             if not can_activate_chat(user_id, match_id):
                 reply_markup = chat_limit_keyboard() if not get_user(user_id)["paid"] else main_menu_keyboard(user_id)
                 safe_send_message(bot, user_id, chat_limit_message(user_id), reply_markup=reply_markup, parse_mode="HTML")
-                bot.answer_callback_query(call.id, "Cannot start chat")
+                safe_answer_callback_query(bot,call.id, "Cannot start chat")
                 return
             set_chat_state(user_id, match_id, "active")
         bot.edit_message_text("Opening chat...", user_id, call.message.message_id)
         open_match_chat(user_id, match_id, show_history=True)
-        bot.answer_callback_query(call.id, "Chat opened")
+        safe_answer_callback_query(bot,call.id, "Chat opened")
         return
 
     if call.data == "cancel_start_chat":
         user_id = call.message.chat.id
         bot.edit_message_text("Cancelled. Choose another action.", user_id, call.message.message_id)
-        bot.answer_callback_query(call.id, "Cancelled")
+        safe_answer_callback_query(bot,call.id, "Cancelled")
         return
 
     if call.data.startswith("chatctlyes_"):
@@ -2965,20 +2977,20 @@ def callback_handler(call):
 
             if action == "lock":
                 if user["paid"]:
-                    bot.answer_callback_query(call.id, "VIP chat cannot be locked")
+                    safe_answer_callback_query(bot,call.id, "VIP chat cannot be locked")
                     return
                 if state != "active":
-                    bot.answer_callback_query(call.id, "Chat is not active")
+                    safe_answer_callback_query(bot,call.id, "Chat is not active")
                     return
                 set_chat_state(user_id, match_id, "locked")
                 append_system_message(user_id, match_id, "She was about to say something…\n\nUnlock to continue 🔓")
                 safe_send_message(bot, user_id, "<b>She was about to say something…</b>\n\nUnlock to continue 🔓", reply_markup=likes_locked_keyboard(), parse_mode="HTML")
-                bot.answer_callback_query(call.id, "Chat locked")
+                safe_answer_callback_query(bot,call.id, "Chat locked")
                 return
 
             if action == "end":
                 if state in {"ended", "blocked"}:
-                    bot.answer_callback_query(call.id, "Chat already closed")
+                    safe_answer_callback_query(bot,call.id, "Chat already closed")
                     return
                 set_chat_state(user_id, match_id, "ended")
                 append_system_message(user_id, match_id, "This chat has ended.\n\nYou can start a new one anytime 🙂")
@@ -2989,21 +3001,21 @@ def callback_handler(call):
                     reply_markup=main_menu_keyboard(user_id),
                     parse_mode="HTML",
                 )
-                bot.answer_callback_query(call.id, "Chat ended")
+                safe_answer_callback_query(bot,call.id, "Chat ended")
                 return
 
             if action == "block":
                 if state == "blocked":
-                    bot.answer_callback_query(call.id, "Chat already blocked")
+                    safe_answer_callback_query(bot,call.id, "Chat already blocked")
                     return
                 set_chat_state(user_id, match_id, "blocked")
                 append_system_message(user_id, match_id, "This chat is no longer available.")
                 remove_match_from_inbox(user_id, match_id)
                 safe_send_message(bot, user_id, "<b>This chat is no longer available.</b>", reply_markup=main_menu_keyboard(user_id), parse_mode="HTML")
-                bot.answer_callback_query(call.id, "Chat blocked")
+                safe_answer_callback_query(bot,call.id, "Chat blocked")
                 return
 
-        bot.answer_callback_query(call.id, "Invalid action")
+        safe_answer_callback_query(bot,call.id, "Invalid action")
         return
 
     if call.data == "chatctlcancel":
@@ -3011,7 +3023,7 @@ def callback_handler(call):
             bot.delete_message(call.message.chat.id, call.message.message_id)
         except:
             pass
-        bot.answer_callback_query(call.id, "Cancelled")
+        safe_answer_callback_query(bot,call.id, "Cancelled")
         return
 
     if call.data.startswith("chatctl_"):
@@ -3026,9 +3038,9 @@ def callback_handler(call):
                 InlineKeyboardButton("Cancel", callback_data="chatctlcancel"),
             )
             safe_send_message(bot, call.message.chat.id, "Are you sure?", reply_markup=markup)
-            bot.answer_callback_query(call.id)
+            safe_answer_callback_query(bot,call.id)
             return
-        bot.answer_callback_query(call.id, "Invalid action")
+        safe_answer_callback_query(bot,call.id, "Invalid action")
         return
 
     if call.data.startswith("userchat_"):
@@ -3038,24 +3050,24 @@ def callback_handler(call):
             match_id = int(match_id_text)
             user = get_user(user_id)
             if match_id not in user["matches"]:
-                bot.answer_callback_query(call.id, "Match not found")
+                safe_answer_callback_query(bot,call.id, "Match not found")
                 return
             user["current_match_id"] = match_id
             flush_loaded_users()
             open_match_chat(user_id, match_id, show_history=True)
-            bot.answer_callback_query(call.id, "Chat opened")
+            safe_answer_callback_query(bot,call.id, "Chat opened")
             return
-        bot.answer_callback_query(call.id, "Invalid chat")
+        safe_answer_callback_query(bot,call.id, "Invalid chat")
         return
 
     if call.data == "adminrefresh":
         send_admin_chat_list(call.message.chat.id)
-        bot.answer_callback_query(call.id, "Refreshed")
+        safe_answer_callback_query(bot,call.id, "Refreshed")
         return
 
     if call.data == "adminunread":
         send_admin_chat_list(call.message.chat.id, unread_only=True)
-        bot.answer_callback_query(call.id, "Showing unread chats")
+        safe_answer_callback_query(bot,call.id, "Showing unread chats")
         return
 
     if call.data.startswith("adminchat_"):
@@ -3064,18 +3076,18 @@ def callback_handler(call):
             user_id = int(parts[1])
             match_id = int(parts[2])
             if not can_admin_access_chat(call.message.chat.id, user_id, match_id):
-                bot.answer_callback_query(call.id, "This chat is assigned to another admin.")
+                safe_answer_callback_query(bot,call.id, "This chat is assigned to another admin.")
                 return
             send_admin_chat_history(call.message.chat.id, user_id, match_id)
-            bot.answer_callback_query(call.id, "Chat opened")
+            safe_answer_callback_query(bot,call.id, "Chat opened")
             return
-        bot.answer_callback_query(call.id, "Invalid chat")
+        safe_answer_callback_query(bot,call.id, "Invalid chat")
         return
 
     # --- ADMIN VIP CONFIRMATION SYSTEM ---
     if call.data.startswith("vipapprove_"):
         if call.message.chat.id != MAIN_ADMIN_ID:
-            bot.answer_callback_query(call.id, "Main admin only")
+            safe_answer_callback_query(bot,call.id, "Main admin only")
             return
         parts = call.data.split("_")
         plan_key = parts[1]
@@ -3088,18 +3100,18 @@ def callback_handler(call):
             InlineKeyboardButton("❌ Cancel", callback_data=f"vipcancel_{user_id}")
         )
         bot.edit_message_reply_markup(call.message.chat.id, call.message.message_id, reply_markup=markup)
-        bot.answer_callback_query(call.id, "Please confirm")
+        safe_answer_callback_query(bot,call.id, "Please confirm")
         return
 
     if call.data.startswith("vipcancel_"):
         user_id = call.data.split("_")[1]
         bot.edit_message_reply_markup(call.message.chat.id, call.message.message_id, reply_markup=payment_markup(user_id))
-        bot.answer_callback_query(call.id, "Action cancelled")
+        safe_answer_callback_query(bot,call.id, "Action cancelled")
         return
 
     if call.data.startswith("vipconfirm_"):
         if call.message.chat.id != MAIN_ADMIN_ID:
-            bot.answer_callback_query(call.id, "Main admin only")
+            safe_answer_callback_query(bot,call.id, "Main admin only")
             return
         parts = call.data.split("_")
         plan_key = parts[1]
@@ -3132,7 +3144,7 @@ def callback_handler(call):
 
         safe_send_message(bot, call.message.chat.id, f"✅ User {user_id} approved successfully\nPlan: {plan_label}\nValid till: {time.strftime('%d %b %Y', time.localtime(end_ts))}")
         safe_send_message(bot, user_id, f"<b>💎 VIP Activated!\n\nPlan: {plan_label}\n⏳ Valid till: {time.strftime('%d %b %Y', time.localtime(end_ts))}</b>", reply_markup=main_menu_keyboard(user_id), parse_mode="HTML")
-        bot.answer_callback_query(call.id, "Approved")
+        safe_answer_callback_query(bot,call.id, "Approved")
         send_next_pending_to_admin(call.message.chat.id)
         return
 
@@ -3144,7 +3156,7 @@ def callback_handler(call):
             InlineKeyboardButton("❌ Cancel", callback_data=f"vipcancel_{user_id}")
         )
         bot.edit_message_reply_markup(call.message.chat.id, call.message.message_id, reply_markup=markup)
-        bot.answer_callback_query(call.id, "Please confirm")
+        safe_answer_callback_query(bot,call.id, "Please confirm")
         return
 
     if call.data.startswith("rejectconfirm_"):
@@ -3164,20 +3176,20 @@ def callback_handler(call):
             send_vip_already_message(user_id)
         else:
             safe_send_message(bot, user_id, "Payment wasn't approved. Please send a clear screenshot again.", reply_markup=buy_keyboard())
-        bot.answer_callback_query(call.id, "Rejected")
+        safe_answer_callback_query(bot,call.id, "Rejected")
         send_next_pending_to_admin(call.message.chat.id)
         return
 
     action, _, raw_user_id = call.data.partition("_")
     if not raw_user_id.isdigit():
-        bot.answer_callback_query(call.id, "Invalid action")
+        safe_answer_callback_query(bot,call.id, "Invalid action")
         return
 
     user_id = int(raw_user_id)
     user = get_user(user_id)
 
     if action == "approve":
-        bot.answer_callback_query(call.id, "Use a duration button to approve VIP")
+        safe_answer_callback_query(bot,call.id, "Use a duration button to approve VIP")
         return
 
     if action == "reject":
@@ -3189,13 +3201,13 @@ def callback_handler(call):
             send_vip_already_message(user_id)
         else:
             safe_send_message(bot, user_id, "Payment wasn't approved. Please send a clear screenshot again.", reply_markup=buy_keyboard())
-        bot.answer_callback_query(call.id, "Rejected")
+        safe_answer_callback_query(bot,call.id, "Rejected")
         
         # Auto-open next pending user
         send_next_pending_to_admin(call.message.chat.id)
         return
 
-    bot.answer_callback_query(call.id, "Unknown action")
+    safe_answer_callback_query(bot,call.id, "Unknown action")
 
 
 @bot.callback_query_handler(func=lambda call: call.data.startswith("reply_"))
@@ -3221,11 +3233,11 @@ def handle_reply_button(call):
             f"💬 Chat opened with user {user_id}\nअब reply करो"
         )
 
-        bot.answer_callback_query(call.id)
+        safe_answer_callback_query(bot,call.id)
 
     except Exception as e:
         print("Reply handler error:", e)
-        bot.answer_callback_query(call.id, "Error")    
+        safe_answer_callback_query(bot,call.id, "Error")    
 
 
 @bot.message_handler(func=lambda message: message.chat.id not in CHAT_ADMINS, content_types=["text"])
