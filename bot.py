@@ -2437,6 +2437,14 @@ def stop_ai_test(message):
     if message.chat.id in ai_test_mode_users:
         del ai_test_mode_users[message.chat.id]
         safe_send_message(bot, message.chat.id, "🛑 <b>AI Test Mode OFF!</b> Normal chat mode wapas chalu ho gaya hai.", parse_mode="HTML")
+
+# 🔥 THE SAFEST INTERCEPTOR: Ye ekdum alag function hai
+@bot.message_handler(func=lambda message: message.chat.id in ai_test_mode_users, content_types=["text"])
+def ai_test_chat_handler(message):
+    user_id = message.chat.id
+    safe_send_chat_action(bot, user_id, 'typing')
+    ai_response = get_ai_reply(message.text)
+    safe_send_message(bot, user_id, ai_response)
 # --- AI TESTING SWITCH END ---
 
 
@@ -3321,13 +3329,6 @@ def text_handler(message):
     text = message.text.strip()
     user = get_user(user_id)
 
-    # -- AI INTERCEPTOR START --
-    if user_id in ai_test_mode_users:
-        safe_send_chat_action(bot, user_id, 'typing')
-        ai_response = get_ai_reply(text)
-        safe_send_message(bot, user_id, ai_response)
-        return
-    # -- AI INTERCEPTOR END --
 
     if text == BTN_CONTINUE:
         if user["step"] == "start":
