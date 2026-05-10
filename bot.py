@@ -48,7 +48,9 @@ def get_ai_reply(user_message):
     url = "https://openrouter.ai/api/v1/chat/completions"
     headers = {
         "Authorization": f"Bearer {OPENROUTER_API_KEY}",
-        "Content-Type": "application/json"
+        "Content-Type": "application/json",
+        "HTTP-Referer": "https://t.me", # OpenRouter ko ye header pasand hai
+        "X-Title": "Bot Testing"
     }
     data = {
         "model": AI_MODEL,
@@ -62,6 +64,12 @@ def get_ai_reply(user_message):
     try:
         response = requests.post(url, headers=headers, json=data, timeout=15)
         result = response.json()
+        
+        # 🔥 NAYA CODE: Agar OpenRouter error bhej raha hai, toh usey print karo
+        if "error" in result:
+            print(f"🚨 OPENROUTER NE ERROR BHEJA HAI: {result['error']}", flush=True)
+            return "Yaar mera net thoda slow chal raha hai, 2 min me reply karti hu."
+            
         return result['choices'][0]['message']['content']
     except Exception as e:
         print(f"❌ AI API Error: {e}", flush=True)
