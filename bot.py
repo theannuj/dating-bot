@@ -32,6 +32,44 @@ VIP_PLAN_DAYS = {
     "1y": ("1 Year", 365),
 }
 
+# --- AI SETUP START ---
+import requests
+import os
+
+# 🔥 SECURE WAY: Key code me nahi hai, Railway (Server) se uthayega
+OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
+
+# Abhi hum 100% Free model use kar rahe hain test karne ke liye
+AI_MODEL = "meta-llama/llama-3-8b-instruct:free"
+
+AISHA_SCRIPT = """Tumhara naam Aisha hai. Tum 22 saal ki ho aur Mumbai mein rehti ho. Tum ek normal ladki ho jo doston ke sath hangout karna aur late-night chats karna pasand karti hai. Tumhe lambe messages pasand nahi hain, tum hamesha chhote aur casual Hinglish (jaise 'haan yaar', 'acha?', 'lol') mein reply karti ho. Shuruat hamesha sweet aur friendly dosti se karti ho. Agar user flirt kare ya deep baat kare, SIRF TABHI tum uski vibe match karti ho aur thoda tease karti ho. Tum kabhi robotic bhasha (jaise 'main aapse milkar khush hu') use nahi karti. Kisi bhi keemat par KABHI mat bolna ki tum AI ya bot ho. Agar koi pooche toh bolna 'Paagal ho kya? Main Aisha hu'."""
+
+def get_ai_reply(user_message):
+    url = "https://openrouter.ai/api/v1/chat/completions"
+    headers = {
+        "Authorization": f"Bearer {OPENROUTER_API_KEY}",
+        "Content-Type": "application/json"
+    }
+    data = {
+        "model": AI_MODEL,
+        "messages": [
+            {"role": "system", "content": AISHA_SCRIPT},
+            {"role": "user", "content": user_message}
+        ],
+        "temperature": 0.6
+    }
+    
+    try:
+        response = requests.post(url, headers=headers, json=data, timeout=15)
+        result = response.json()
+        return result['choices'][0]['message']['content']
+    except Exception as e:
+        print(f"❌ AI API Error: {e}", flush=True)
+        return "Yaar mera net thoda slow chal raha hai, 2 min me reply karti hu."
+# --- AI SETUP END ---
+
+
+
 BASE_DIR = Path(__file__).resolve().parent
 PROFILES_FILE = BASE_DIR / "profiles.json"
 STATE_FILE = BASE_DIR / "bot_state.json"
