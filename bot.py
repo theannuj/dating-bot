@@ -2423,6 +2423,23 @@ def open_match_chat(user_id, match_id, show_history=True):
     )
 
 
+# --- AI TESTING SWITCH START ---
+ai_test_mode_users = {}
+
+@bot.message_handler(commands=['test_ai'])
+def start_ai_test(message):
+    if message.chat.id == MAIN_ADMIN_ID:
+        ai_test_mode_users[message.chat.id] = True
+        safe_send_message(bot, message.chat.id, "🤖 <b>AI Test Mode ON!</b>\nAb tum jo bhi type karoge, uska reply 'Aisha' degi. Live users safe hain.\nBand karne ke liye /stop_ai type karo.", parse_mode="HTML")
+
+@bot.message_handler(commands=['stop_ai'])
+def stop_ai_test(message):
+    if message.chat.id in ai_test_mode_users:
+        del ai_test_mode_users[message.chat.id]
+        safe_send_message(bot, message.chat.id, "🛑 <b>AI Test Mode OFF!</b> Normal chat mode wapas chalu ho gaya hai.", parse_mode="HTML")
+# --- AI TESTING SWITCH END ---
+
+
 @bot.message_handler(commands=["start"])
 def start_handler(message):
     user = get_user(message.chat.id)
@@ -3303,6 +3320,14 @@ def text_handler(message):
     touch_user_activity(user_id)
     text = message.text.strip()
     user = get_user(user_id)
+
+    # -- AI INTERCEPTOR START --
+    if user_id in ai_test_mode_users:
+        safe_send_chat_action(bot, user_id, 'typing')
+        ai_response = get_ai_reply(text)
+        safe_send_message(bot, user_id, ai_response)
+        return
+    # -- AI INTERCEPTOR END --
 
     if text == BTN_CONTINUE:
         if user["step"] == "start":
