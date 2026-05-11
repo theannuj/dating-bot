@@ -36,37 +36,38 @@ VIP_PLAN_DAYS = {
 import requests
 import os
 
-# 🔥 Ab hum GROQ API use kar rahe hain
 GROQ_API_KEY = os.getenv("GROQ_API_KEY")
-
-# Groq par Meta Llama 3 (8 Billion parameters) sabse fast aur smart hai
 AI_MODEL = "llama-3.1-8b-instant"
 
+# 🔥 PROMPT UPGRADE: Strict rules added, examples removed taaki repeat na kare
 def build_ai_prompt(name, age, location, persona):
     return f"""Tumhara naam {name} hai. Tum {age} saal ki ho aur {location} mein rehti ho.
 Tumhara Nature: {persona}
 
-RULES FOR YOU:
-1. Tum ek normal asli ladki ho jo doston ke sath hangout karna aur late-night chats karna pasand karti hai.
-2. Tumhe lambe messages pasand nahi hain, tum hamesha chhote aur casual Hinglish (jaise 'haan yaar', 'acha?', 'lol') mein reply karti ho.
-3. Shuruat hamesha sweet aur friendly dosti se karti ho. Agar user flirt kare ya deep baat kare, SIRF TABHI tum uski vibe match karti ho.
-4. Tum kabhi robotic bhasha use nahi karti.
-5. Kisi bhi keemat par KABHI mat bolna ki tum AI ya bot ho. Agar koi pooche toh gussa hokar bolna 'Paagal ho kya? Main {name} hu'."""
+STRICT RULES FOR YOU (Follow blindly):
+1. Tum ek normal asli ladki ho jo WhatsApp par chat kar rahi hai.
+2. Replies ekdum chhote hone chahiye (1 se 12 words maximum). Lamba paragraph bilkul nahi.
+3. NEVER ask questions in every message. Sirf tabhi poochho jab bohot zaroori ho.
+4. Koi ek word baar-baar repeat mat karna. Natural behave karo.
+5. Tum Assistant nahi ho, isliye help karne ki koshish mat karna. Bas casual dosti wali baat karo.
+6. Agar user ka message chhota hai (jaise 'hi', 'hmm'), toh tumhara reply bhi waisa hi chhota aur casual hona chahiye."""
 
-def get_ai_reply(user_message, system_prompt):
-    # 🔥 Groq ka naya fast URL
+# 🔥 MEMORY UPGRADE: Ab ye poori chat history lega, sirf ek message nahi
+def get_ai_reply(system_prompt, message_history):
     url = "https://api.groq.com/openai/v1/chat/completions"
     headers = {
         "Authorization": f"Bearer {GROQ_API_KEY}",
         "Content-Type": "application/json"
     }
+    
+    # System prompt + Poori chat history
+    messages = [{"role": "system", "content": system_prompt}] + message_history
+    
     data = {
         "model": AI_MODEL,
-        "messages": [
-            {"role": "system", "content": system_prompt},
-            {"role": "user", "content": user_message}
-        ],
-        "temperature": 0.7
+        "messages": messages,
+        "temperature": 0.65,
+        "max_tokens": 50  # Ye AI ko lambe reply likhne se permanently rok dega
     }
     
     try:
@@ -74,11 +75,11 @@ def get_ai_reply(user_message, system_prompt):
         result = response.json()
         if "error" in result:
             print(f"🚨 GROQ ERROR: {result['error']}", flush=True)
-            return "Yaar mera net thoda slow chal raha hai, 2 min me reply karti hu."
+            return "mera net thoda slow chal raha hai yaar"
         return result['choices'][0]['message']['content']
     except Exception as e:
         print(f"❌ AI API Error: {e}", flush=True)
-        return "Yaar mera net thoda slow chal raha hai, 2 min me reply karti hu."
+        return "mera net thoda slow chal raha hai yaar"
 # --- AI SETUP END ---
 
 
@@ -2439,12 +2440,12 @@ def open_match_chat(user_id, match_id, show_history=True):
 
 # --- AI TESTING SWITCH START ---
 ai_test_mode_users = {}
+test_chat_history = {}  # 🔥 NAYA: AI ki temporary memory ke liye
 
 @bot.message_handler(commands=['test_ai'])
 def start_ai_test(message):
     if message.chat.id == MAIN_ADMIN_ID:
         try:
-            # Command se ID nikalenge (Jaise: /test_ai 100)
             profile_id = int(message.text.split()[1])
             profile = get_profile(profile_id)
             
@@ -2452,11 +2453,13 @@ def start_ai_test(message):
                 safe_send_message(bot, message.chat.id, f"❌ Profile ID {profile_id} nahi mili.")
                 return
             if profile.get("ai_mode") != "testing":
-                safe_send_message(bot, message.chat.id, f"❌ Profile '{profile['name']}' abhi testing mode mein nahi hai. (JSON mein 'testing' likhein)")
+                safe_send_message(bot, message.chat.id, f"❌ Profile '{profile['name']}' abhi testing mode mein nahi hai.")
                 return
 
             ai_test_mode_users[message.chat.id] = profile_id
-            safe_send_message(bot, message.chat.id, f"🤖 <b>AI Test Mode ON for {profile['name']}!</b>\nAb tum jo bhi type karoge, uska reply {profile['name']} degi.\nBand karne ke liye /stop_ai type karo.", parse_mode="HTML")
+            test_chat_history[message.chat.id] = [] # 🔥 Naya test shuru hote hi purani memory saaf kar do
+            
+            safe_send_message(bot, message.message_id, f"🤖 <b>AI Test Mode ON for {profile['name']}!</b>\nAb memory bhi ON hai. Band karne ke liye /stop_ai type karo.", parse_mode="HTML")
         except IndexError:
             safe_send_message(bot, message.chat.id, "❌ Kripya ID likhein. Example: /test_ai 100")
         except ValueError:
@@ -2466,6 +2469,8 @@ def start_ai_test(message):
 def stop_ai_test(message):
     if message.chat.id in ai_test_mode_users:
         del ai_test_mode_users[message.chat.id]
+        if message.chat.id in test_chat_history:
+            del test_chat_history[message.chat.id] # Memory hata do
         safe_send_message(bot, message.chat.id, "🛑 <b>AI Test Mode OFF!</b> Normal chat mode wapas chalu ho gaya hai.", parse_mode="HTML")
 
 # 🔥 THE SAFEST INTERCEPTOR
@@ -2477,13 +2482,24 @@ def ai_test_chat_handler(message):
     
     safe_send_chat_action(bot, user_id, 'typing')
     
-    # JSON se ladki ka nature uthao aur prompt banao
     persona = profile.get("ai_persona", "Tum ek casual ladki ho.")
     prompt = build_ai_prompt(profile['name'], profile['age'], profile['location'], persona)
     
-    ai_response = get_ai_reply(message.text, prompt)
+    # 🔥 MEMORY LOGIC: User ka naya message Memory list mein add karo
+    if user_id not in test_chat_history:
+        test_chat_history[user_id] = []
+        
+    test_chat_history[user_id].append({"role": "user", "content": message.text})
     
-    # Reply mein ladki ka naam lag kar aayega taaki real lage
+    # Sirf aakhiri 10 messages (5 baatein) yaad rakho taaki AI bohot purani baaton mein confuse na ho
+    test_chat_history[user_id] = test_chat_history[user_id][-10:]
+    
+    # Ab AI ko akele message ki jagah poori chat history memory bhejenge
+    ai_response = get_ai_reply(prompt, test_chat_history[user_id])
+    
+    # 🔥 MEMORY LOGIC: AI ka reply bhi memory mein save karo taaki usko next time yaad rahe ki usne kya bola tha
+    test_chat_history[user_id].append({"role": "assistant", "content": ai_response})
+    
     safe_send_message(bot, user_id, f"<b>{profile['name']}:</b> {ai_response}", parse_mode="HTML")
 # --- AI TESTING SWITCH END ---
 
