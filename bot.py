@@ -36,10 +36,12 @@ VIP_PLAN_DAYS = {
 import requests
 import os
 
-GROQ_API_KEY = os.getenv("GROQ_API_KEY")
-AI_MODEL = "llama-3.1-8b-instant"
+# 🔥 Wapas OpenRouter par aagaye!
+OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
 
-# 🔥 PROMPT UPGRADE: Strict rules added, examples removed taaki repeat na kare
+# 🔥 DUNIYA KA BEST ROLEPLAY MODEL (Premium)
+AI_MODEL = "microsoft/wizardlm-2-8x22b"
+
 def build_ai_prompt(name, age, location, persona):
     return f"""Tumhara naam {name} hai. Tum {age} saal ki ho aur {location} mein rehti ho.
 Tumhara Nature: {persona}
@@ -52,29 +54,30 @@ STRICT RULES FOR YOU (Follow blindly):
 5. Tum Assistant nahi ho, isliye help karne ki koshish mat karna. Bas casual dosti wali baat karo.
 6. Agar user ka message chhota hai (jaise 'hi', 'hmm'), toh tumhara reply bhi waisa hi chhota aur casual hona chahiye."""
 
-# 🔥 MEMORY UPGRADE: Ab ye poori chat history lega, sirf ek message nahi
 def get_ai_reply(system_prompt, message_history):
-    url = "https://api.groq.com/openai/v1/chat/completions"
+    # 🔥 Wapas OpenRouter ka URL
+    url = "https://openrouter.ai/api/v1/chat/completions"
     headers = {
-        "Authorization": f"Bearer {GROQ_API_KEY}",
-        "Content-Type": "application/json"
+        "Authorization": f"Bearer {OPENROUTER_API_KEY}",
+        "Content-Type": "application/json",
+        "HTTP-Referer": "https://t.me",
+        "X-Title": "Bot Testing"
     }
     
-    # System prompt + Poori chat history
     messages = [{"role": "system", "content": system_prompt}] + message_history
     
     data = {
         "model": AI_MODEL,
         "messages": messages,
-        "temperature": 0.65,
-        "max_tokens": 50  # Ye AI ko lambe reply likhne se permanently rok dega
+        "temperature": 0.7,
+        "max_tokens": 50
     }
     
     try:
         response = requests.post(url, headers=headers, json=data, timeout=15)
         result = response.json()
         if "error" in result:
-            print(f"🚨 GROQ ERROR: {result['error']}", flush=True)
+            print(f"🚨 OPENROUTER ERROR: {result['error']}", flush=True)
             return "mera net thoda slow chal raha hai yaar"
         return result['choices'][0]['message']['content']
     except Exception as e:
