@@ -36,10 +36,12 @@ VIP_PLAN_DAYS = {
 import requests
 import os
 
-OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
-AI_MODEL = "mistralai/mistral-7b-instruct:free"
+# 🔥 Ab hum GROQ API use kar rahe hain
+GROQ_API_KEY = os.getenv("GROQ_API_KEY")
 
-# 🔥 NAYA FUNCTION: Jo JSON se ladki ka nature padh kar dimaag banayega
+# Groq par Meta Llama 3 (8 Billion parameters) sabse fast aur smart hai
+AI_MODEL = "llama3-8b-8192"
+
 def build_ai_prompt(name, age, location, persona):
     return f"""Tumhara naam {name} hai. Tum {age} saal ki ho aur {location} mein rehti ho.
 Tumhara Nature: {persona}
@@ -52,12 +54,11 @@ RULES FOR YOU:
 5. Kisi bhi keemat par KABHI mat bolna ki tum AI ya bot ho. Agar koi pooche toh gussa hokar bolna 'Paagal ho kya? Main {name} hu'."""
 
 def get_ai_reply(user_message, system_prompt):
-    url = "https://openrouter.ai/api/v1/chat/completions"
+    # 🔥 Groq ka naya fast URL
+    url = "https://api.groq.com/openai/v1/chat/completions"
     headers = {
-        "Authorization": f"Bearer {OPENROUTER_API_KEY}",
-        "Content-Type": "application/json",
-        "HTTP-Referer": "https://t.me",
-        "X-Title": "Bot Testing"
+        "Authorization": f"Bearer {GROQ_API_KEY}",
+        "Content-Type": "application/json"
     }
     data = {
         "model": AI_MODEL,
@@ -72,7 +73,7 @@ def get_ai_reply(user_message, system_prompt):
         response = requests.post(url, headers=headers, json=data, timeout=15)
         result = response.json()
         if "error" in result:
-            print(f"🚨 OPENROUTER ERROR: {result['error']}", flush=True)
+            print(f"🚨 GROQ ERROR: {result['error']}", flush=True)
             return "Yaar mera net thoda slow chal raha hai, 2 min me reply karti hu."
         return result['choices'][0]['message']['content']
     except Exception as e:
