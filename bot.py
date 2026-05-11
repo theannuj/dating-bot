@@ -516,6 +516,7 @@ chat_map = {}
 admin_active_chat = {}
 admin_notifications = {}
 LAST_ACTION_TIME = {}
+LAST_TEXT_TIME = {}
 LAST_ACTIVITY_TIME = {}
 LAST_ENGAGEMENT_PING = {}
 COOLDOWN_SECONDS = 2.5
@@ -2959,6 +2960,8 @@ def callback_handler(call):
             except:
                 pass
 
+            admin_notifications.pop((admin_id, user_id), None)
+            
             admin_active_chat[admin_id] = {
                 "user_id": user_id,
                 "match_id": match_id
@@ -3294,9 +3297,9 @@ def text_handler(message):
 
     # 🔥 ANTI-SPAM: Agar user 1.0 second ke andar lagataar message bhej raha hai (double click), toh ignore karo
     now = time.time()
-    if now - LAST_ACTION_TIME.get(user_id, 0) < 1.0:
+    if now - LAST_TEXT_TIME.get(user_id, 0) < 1.0:
         return
-    LAST_ACTION_TIME[user_id] = now
+    LAST_TEXT_TIME[user_id] = now
 
     touch_user_activity(user_id)
     text = message.text.strip()
