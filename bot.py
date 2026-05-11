@@ -36,10 +36,7 @@ VIP_PLAN_DAYS = {
 import requests
 import os
 
-# 🔥 Wapas OpenRouter par aagaye!
 OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
-
-# 🔥 DUNIYA KA BEST ROLEPLAY MODEL (Premium)
 AI_MODEL = "microsoft/wizardlm-2-8x22b"
 
 def build_ai_prompt(name, age, location, persona):
@@ -47,15 +44,14 @@ def build_ai_prompt(name, age, location, persona):
 Tumhara Nature: {persona}
 
 STRICT RULES FOR YOU (Follow blindly):
-1. Tum ek normal asli ladki ho jo WhatsApp par chat kar rahi hai.
-2. Replies ekdum chhote hone chahiye (1 se 12 words maximum). Lamba paragraph bilkul nahi.
-3. NEVER ask questions in every message. Sirf tabhi poochho jab bohot zaroori ho.
-4. Koi ek word baar-baar repeat mat karna. Natural behave karo.
-5. Tum Assistant nahi ho, isliye help karne ki koshish mat karna. Bas casual dosti wali baat karo.
-6. Agar user ka message chhota hai (jaise 'hi', 'hmm'), toh tumhara reply bhi waisa hi chhota aur casual hona chahiye."""
+1. Tum ek normal asli ladki ho. User ek ladka (male) hai.
+2. HINGLISH GRAMMAR: Hamesha ladkiyon wale verbs use karna. Jaise "main kha RAHI hu", "main aa RAHI hu". Galti se bhi "raha hu" ya ladko wali grammar mat use karna.
+3. NEVER REPEAT: Pichli baat ko dobara repeat mat karna. Nayi baat karna.
+4. REPLIES: Ekdum chhote aur natural (1 se 15 words). Lamba paragraph bilkul nahi.
+5. FALTU FORMATTING NAHI: Apne reply ke shuru mein apna naam ya faltu spaces mat lagana. Sirf direct message likhna.
+6. Agar user flirt kare ya adult/romantic baat kare, toh uski vibe match karna, ghabrana mat."""
 
 def get_ai_reply(system_prompt, message_history):
-    # 🔥 Wapas OpenRouter ka URL
     url = "https://openrouter.ai/api/v1/chat/completions"
     headers = {
         "Authorization": f"Bearer {OPENROUTER_API_KEY}",
@@ -69,8 +65,10 @@ def get_ai_reply(system_prompt, message_history):
     data = {
         "model": AI_MODEL,
         "messages": messages,
-        "temperature": 0.7,
-        "max_tokens": 50
+        "temperature": 0.85, # 🔥 Thoda aur human-like aur creative banaya
+        "max_tokens": 100, # Lamba taaki sentence beech me na kate
+        "frequency_penalty": 0.8, # 🔥 LOOP BREAKER: Same word dobara use karne par rok
+        "presence_penalty": 0.6   # 🔥 Naye topics par baat karne ke liye push karega
     }
     
     try:
@@ -78,11 +76,11 @@ def get_ai_reply(system_prompt, message_history):
         result = response.json()
         if "error" in result:
             print(f"🚨 OPENROUTER ERROR: {result['error']}", flush=True)
-            return "mera net thoda slow chal raha hai yaar"
+            return "mera net thoda slow chal raha hai"
         return result['choices'][0]['message']['content']
     except Exception as e:
         print(f"❌ AI API Error: {e}", flush=True)
-        return "mera net thoda slow chal raha hai yaar"
+        return "mera net thoda slow chal raha hai"
 # --- AI SETUP END ---
 
 
@@ -2489,19 +2487,23 @@ def ai_test_chat_handler(message):
     persona = profile.get("ai_persona", "Tum ek casual ladki ho.")
     prompt = build_ai_prompt(profile['name'], profile['age'], profile['location'], persona)
     
-    # 🔥 MEMORY LOGIC: User ka naya message Memory list mein add karo
     if user_id not in test_chat_history:
         test_chat_history[user_id] = []
         
     test_chat_history[user_id].append({"role": "user", "content": message.text})
-    
-    # Sirf aakhiri 10 messages (5 baatein) yaad rakho taaki AI bohot purani baaton mein confuse na ho
     test_chat_history[user_id] = test_chat_history[user_id][-10:]
     
-    # Ab AI ko akele message ki jagah poori chat history memory bhejenge
     ai_response = get_ai_reply(prompt, test_chat_history[user_id])
     
-    # 🔥 MEMORY LOGIC: AI ka reply bhi memory mein save karo taaki usko next time yaad rahe ki usne kya bola tha
+    # 🔥 CLEANING MAGIC: Faltu spaces, new lines, aur AI ka khud ka likha naam yahan saaf hoga
+    if ai_response:
+        # Agar usne galti se 'Aisha: ' ya 'Aisha - ' likha hai toh use hata do
+        ai_response = ai_response.replace(f"{profile['name']}:", "").replace(f"{profile['name']} -", "")
+        # Aage-peechhe ke saare faltu gaps (spaces) hata do
+        ai_response = ai_response.strip()
+    else:
+        ai_response = "hmm"
+        
     test_chat_history[user_id].append({"role": "assistant", "content": ai_response})
     
     safe_send_message(bot, user_id, f"<b>{profile['name']}:</b> {ai_response}", parse_mode="HTML")
