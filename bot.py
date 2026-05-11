@@ -269,7 +269,7 @@ def save_vip_to_db(user_id, user):
         conn.commit()
         cur.execute("SELECT COUNT(*) FROM vip_users")
         count = cur.fetchone()[0]
-        print("VIP rows after insert:", count)
+        # print("VIP rows after insert:", count)
         cur.close()
     except Exception as e:
         conn.rollback()
@@ -2688,10 +2688,16 @@ def admin_direct_reply(message):
     admin_id = message.chat.id
 
     if admin_id not in admin_active_chat:
-            safe_send_message(bot, admin_id, "⚠️ Message ignored! Kripya pehle kisi chat ka 'Reply' button dabayein ya 'Admin Chats' se open karein.")
-            return
+        safe_send_message(bot, admin_id, "⚠️ Message ignored! Kripya pehle kisi chat ka 'Reply' button dabayein ya 'Admin Chats' se open karein.")
+        return
 
     context = admin_active_chat[admin_id]
+
+    # 🔥 BUG FIX: Pehle check karo ki admin chat ke andar hai ya list dekh raha hai
+    if "user_id" not in context or "match_id" not in context:
+        safe_send_message(bot, admin_id, "⚠️ Kripya pehle kisi chat par click karke usko open karein, phir reply likhein.")
+        return
+
     user_id = context["user_id"]
     match_id = context["match_id"]
 
