@@ -600,7 +600,8 @@ def safe_edit_message_text(bot, text, chat_id, message_id, **kwargs):
 def safe_answer_callback_query(bot, *args, **kwargs):
     for attempt in range(2):
         try:
-            return safe_answer_callback_query(bot,*args, **kwargs)
+            # 🔥 FIX: Yahan 'bot.answer_callback_query' aayega, khud ka naam nahi!
+            return bot.answer_callback_query(*args, **kwargs)
         except Exception as e:
             retry_after = handle_rate_limit(e)
             if retry_after > 0:
