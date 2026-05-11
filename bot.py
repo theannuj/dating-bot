@@ -36,40 +36,44 @@ VIP_PLAN_DAYS = {
 import requests
 import os
 
-# 🔥 SECURE WAY: Key code me nahi hai, Railway (Server) se uthayega
 OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
-
-# Abhi hum 100% Free model use kar rahe hain test karne ke liye
 AI_MODEL = "mistralai/mistral-7b-instruct:free"
 
-AISHA_SCRIPT = """Tumhara naam Aisha hai. Tum 22 saal ki ho aur Mumbai mein rehti ho. Tum ek normal ladki ho jo doston ke sath hangout karna aur late-night chats karna pasand karti hai. Tumhe lambe messages pasand nahi hain, tum hamesha chhote aur casual Hinglish (jaise 'haan yaar', 'acha?', 'lol') mein reply karti ho. Shuruat hamesha sweet aur friendly dosti se karti ho. Agar user flirt kare ya deep baat kare, SIRF TABHI tum uski vibe match karti ho aur thoda tease karti ho. Tum kabhi robotic bhasha (jaise 'main aapse milkar khush hu') use nahi karti. Kisi bhi keemat par KABHI mat bolna ki tum AI ya bot ho. Agar koi pooche toh bolna 'Paagal ho kya? Main Aisha hu'."""
+# 🔥 NAYA FUNCTION: Jo JSON se ladki ka nature padh kar dimaag banayega
+def build_ai_prompt(name, age, location, persona):
+    return f"""Tumhara naam {name} hai. Tum {age} saal ki ho aur {location} mein rehti ho.
+Tumhara Nature: {persona}
 
-def get_ai_reply(user_message):
+RULES FOR YOU:
+1. Tum ek normal asli ladki ho jo doston ke sath hangout karna aur late-night chats karna pasand karti hai.
+2. Tumhe lambe messages pasand nahi hain, tum hamesha chhote aur casual Hinglish (jaise 'haan yaar', 'acha?', 'lol') mein reply karti ho.
+3. Shuruat hamesha sweet aur friendly dosti se karti ho. Agar user flirt kare ya deep baat kare, SIRF TABHI tum uski vibe match karti ho.
+4. Tum kabhi robotic bhasha use nahi karti.
+5. Kisi bhi keemat par KABHI mat bolna ki tum AI ya bot ho. Agar koi pooche toh gussa hokar bolna 'Paagal ho kya? Main {name} hu'."""
+
+def get_ai_reply(user_message, system_prompt):
     url = "https://openrouter.ai/api/v1/chat/completions"
     headers = {
         "Authorization": f"Bearer {OPENROUTER_API_KEY}",
         "Content-Type": "application/json",
-        "HTTP-Referer": "https://t.me", # OpenRouter ko ye header pasand hai
+        "HTTP-Referer": "https://t.me",
         "X-Title": "Bot Testing"
     }
     data = {
         "model": AI_MODEL,
         "messages": [
-            {"role": "system", "content": AISHA_SCRIPT},
+            {"role": "system", "content": system_prompt},
             {"role": "user", "content": user_message}
         ],
-        "temperature": 0.6
+        "temperature": 0.7
     }
     
     try:
         response = requests.post(url, headers=headers, json=data, timeout=15)
         result = response.json()
-        
-        # 🔥 NAYA CODE: Agar OpenRouter error bhej raha hai, toh usey print karo
         if "error" in result:
-            print(f"🚨 OPENROUTER NE ERROR BHEJA HAI: {result['error']}", flush=True)
+            print(f"🚨 OPENROUTER ERROR: {result['error']}", flush=True)
             return "Yaar mera net thoda slow chal raha hai, 2 min me reply karti hu."
-            
         return result['choices'][0]['message']['content']
     except Exception as e:
         print(f"❌ AI API Error: {e}", flush=True)
@@ -2438,8 +2442,24 @@ ai_test_mode_users = {}
 @bot.message_handler(commands=['test_ai'])
 def start_ai_test(message):
     if message.chat.id == MAIN_ADMIN_ID:
-        ai_test_mode_users[message.chat.id] = True
-        safe_send_message(bot, message.chat.id, "🤖 <b>AI Test Mode ON!</b>\nAb tum jo bhi type karoge, uska reply 'Aisha' degi. Live users safe hain.\nBand karne ke liye /stop_ai type karo.", parse_mode="HTML")
+        try:
+            # Command se ID nikalenge (Jaise: /test_ai 100)
+            profile_id = int(message.text.split()[1])
+            profile = get_profile(profile_id)
+            
+            if not profile:
+                safe_send_message(bot, message.chat.id, f"❌ Profile ID {profile_id} nahi mili.")
+                return
+            if profile.get("ai_mode") != "testing":
+                safe_send_message(bot, message.chat.id, f"❌ Profile '{profile['name']}' abhi testing mode mein nahi hai. (JSON mein 'testing' likhein)")
+                return
+
+            ai_test_mode_users[message.chat.id] = profile_id
+            safe_send_message(bot, message.chat.id, f"🤖 <b>AI Test Mode ON for {profile['name']}!</b>\nAb tum jo bhi type karoge, uska reply {profile['name']} degi.\nBand karne ke liye /stop_ai type karo.", parse_mode="HTML")
+        except IndexError:
+            safe_send_message(bot, message.chat.id, "❌ Kripya ID likhein. Example: /test_ai 100")
+        except ValueError:
+            safe_send_message(bot, message.chat.id, "❌ ID number hona chahiye. Example: /test_ai 100")
 
 @bot.message_handler(commands=['stop_ai'])
 def stop_ai_test(message):
@@ -2447,13 +2467,23 @@ def stop_ai_test(message):
         del ai_test_mode_users[message.chat.id]
         safe_send_message(bot, message.chat.id, "🛑 <b>AI Test Mode OFF!</b> Normal chat mode wapas chalu ho gaya hai.", parse_mode="HTML")
 
-# 🔥 THE SAFEST INTERCEPTOR: Ye ekdum alag function hai
+# 🔥 THE SAFEST INTERCEPTOR
 @bot.message_handler(func=lambda message: message.chat.id in ai_test_mode_users, content_types=["text"])
 def ai_test_chat_handler(message):
     user_id = message.chat.id
+    profile_id = ai_test_mode_users[user_id]
+    profile = get_profile(profile_id)
+    
     safe_send_chat_action(bot, user_id, 'typing')
-    ai_response = get_ai_reply(message.text)
-    safe_send_message(bot, user_id, ai_response)
+    
+    # JSON se ladki ka nature uthao aur prompt banao
+    persona = profile.get("ai_persona", "Tum ek casual ladki ho.")
+    prompt = build_ai_prompt(profile['name'], profile['age'], profile['location'], persona)
+    
+    ai_response = get_ai_reply(message.text, prompt)
+    
+    # Reply mein ladki ka naam lag kar aayega taaki real lage
+    safe_send_message(bot, user_id, f"<b>{profile['name']}:</b> {ai_response}", parse_mode="HTML")
 # --- AI TESTING SWITCH END ---
 
 
@@ -2961,7 +2991,7 @@ def callback_handler(call):
                 pass
 
             admin_notifications.pop((admin_id, user_id), None)
-            
+
             admin_active_chat[admin_id] = {
                 "user_id": user_id,
                 "match_id": match_id
