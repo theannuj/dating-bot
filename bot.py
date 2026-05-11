@@ -40,7 +40,7 @@ import os
 GROQ_API_KEY = os.getenv("GROQ_API_KEY")
 
 # Groq par Meta Llama 3 (8 Billion parameters) sabse fast aur smart hai
-AI_MODEL = "llama3-8b-8192"
+AI_MODEL = "llama-3.1-8b-instant"
 
 def build_ai_prompt(name, age, location, persona):
     return f"""Tumhara naam {name} hai. Tum {age} saal ki ho aur {location} mein rehti ho.
