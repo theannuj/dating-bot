@@ -2604,31 +2604,8 @@ def pending_handler(message):
         return
     clear_admin_active_chat(message.chat.id)
     
-    conn = get_db_connection()
-    pending_ids = []
-    if conn:
-        try:
-            cur = conn.cursor()
-            cur.execute("SELECT user_id FROM vip_users WHERE payment_status = 'pending'")
-            rows = cur.fetchall()
-            pending_ids = [int(row[0]) for row in rows]
-            cur.close()
-        except Exception as e:
-            print(f"Pending DB error: {e}", flush=True)
-        finally:
-            release_db_connection(conn)
-    
-    if not pending_ids:
-        safe_send_message(bot, message.chat.id, "✅ No pending payments right now.")
-        return
-    
-    lines = [f"⏳ Pending Payments ({len(pending_ids)}):"]
-    for uid in pending_ids:
-        user = get_user(uid)  # Ye sirf usi 1 user ko safely load karega
-        name = user.get("name") or f"User {uid}"
-        lines.append(f"• {name} (ID: {uid})")
-    
-    safe_send_message(bot, message.chat.id, "\n".join(lines))
+    # 🔥 SMART FIX: Purani list ki jagah, seedha photo aur Approve/Reject ke buttons bhej do
+    send_next_pending_to_admin(message.chat.id)
 
 
 def get_next_pending_user_id():
@@ -2976,15 +2953,19 @@ def callback_handler(call):
             user_id, match_id = map(int, data.split("_"))
             admin_id = call.message.chat.id
 
+            # 🔥 TRICK: Button dabte hi us notification ko delete kar do taaki koi double click na kar sake
+            try:
+                bot.delete_message(admin_id, call.message.message_id)
+            except:
+                pass
+
             admin_active_chat[admin_id] = {
                 "user_id": user_id,
                 "match_id": match_id
             }
 
             reset_admin_unread(user_id, match_id, admin_id)
-
             send_admin_chat_history(admin_id, user_id, match_id)
-
             safe_answer_callback_query(bot,call.id)
             return
 
@@ -3304,41 +3285,19 @@ def callback_handler(call):
         return
 
     safe_answer_callback_query(bot,call.id, "Unknown action")
-
-
-@bot.callback_query_handler(func=lambda call: call.data.startswith("reply_"))
-def handle_reply_button(call):
-    try:
-        data = call.data.replace("reply_", "")
-        user_id, match_id = map(int, data.split("_"))
-        admin_id = call.message.chat.id
-
-        # 🔥 ACTIVE CHAT SET
-        admin_active_chat[admin_id] = {
-            "user_id": user_id,
-            "match_id": match_id
-        }
-
-        # 🔥 NOTIFICATION REMOVE
-        key = (admin_id, user_id)
-        if key in admin_notifications:
-            del admin_notifications[key]
-
-        bot.send_message(
-            admin_id,
-            f"💬 Chat opened with user {user_id}\nअब reply करो"
-        )
-
-        safe_answer_callback_query(bot,call.id)
-
-    except Exception as e:
-        print("Reply handler error:", e)
-        safe_answer_callback_query(bot,call.id, "Error")    
+  
 
 
 @bot.message_handler(func=lambda message: message.chat.id not in CHAT_ADMINS, content_types=["text"])
 def text_handler(message):
     user_id = message.chat.id
+
+    # 🔥 ANTI-SPAM: Agar user 1.0 second ke andar lagataar message bhej raha hai (double click), toh ignore karo
+    now = time.time()
+    if now - LAST_ACTION_TIME.get(user_id, 0) < 1.0:
+        return
+    LAST_ACTION_TIME[user_id] = now
+
     touch_user_activity(user_id)
     text = message.text.strip()
     user = get_user(user_id)
