@@ -36,22 +36,78 @@ VIP_PLAN_DAYS = {
 import requests
 import os
 from datetime import datetime, timedelta
+import json
+import threading
 
 OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
 AI_MODEL = "microsoft/wizardlm-2-8x22b"
+BACKGROUND_AI_MODEL = "meta-llama/llama-3-8b-instruct"
 
 # 🔥 TIME HACK: AI ko India ka current time batane ke liye
 def get_ist_time():
     ist_now = datetime.utcnow() + timedelta(hours=5, minutes=30)
     return ist_now.strftime("%I:%M %p")
 
+# 🕵️ THE WORKER AI (Sasta model jo sirf history padhega)
+def extract_user_facts(chat_history, existing_facts):
+    url = "https://openrouter.ai/api/v1/chat/completions"
+    headers = {
+        "Authorization": f"Bearer {OPENROUTER_API_KEY}",
+        "Content-Type": "application/json"
+    }
+    
+    history_text = "\n".join([f"{msg['role']}: {msg['content']}" for msg in chat_history])
+    
+    system_prompt = f"""You are a strict data extractor. Read this short chat history and extract any NEW facts the user has revealed about themselves.
+    Currently known facts: {json.dumps(existing_facts)}
+    
+    Look ONLY for:
+    1. Real_Name (if they state their actual name)
+    2. City_Location
+    3. Work_Study (profession, college)
+    4. Living_Situation (alone, with family, pg)
+    5. Relationship_History (single, breakup, intent)
+    6. Habits_Routine (gym, sleep time)
+    
+    Output ONLY a raw JSON object updating the facts. No markdown, no backticks, no explanations. If nothing new is found, output exactly: {{}}
+    """
+    
+    data = {
+        "model": BACKGROUND_AI_MODEL,
+        "messages": [
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": history_text}
+        ],
+        "temperature": 0.1,
+        "max_tokens": 100
+    }
+    
+    try:
+        response = requests.post(url, headers=headers, json=data, timeout=10)
+        result = response.json()
+        content = result['choices'][0]['message']['content'].strip()
+        
+        # 🔥 Markdown safai ka naya aur safe tarika (Bina kisi link glitch ke)
+        content = content.replace("```json", "").replace("```", "").strip()
+            
+        new_facts = json.loads(content)
+        return new_facts
+    except Exception as e:
+        print(f"🧠 Notepad Extractor Error: {e}", flush=True)
+        return {}
+
 # 🔥 THE MASTER PROMPT
-def build_ai_prompt(name, age, location, persona):
+def build_ai_prompt(name, age, location, persona, user_facts=None):
     current_time = get_ist_time()
+    
+    facts_text = ""
+    if user_facts:
+        facts_text = f"\n[CRITICAL: KNOWN FACTS ABOUT THE USER]\n{json.dumps(user_facts)}\n*Use these facts naturally to show you remember them. Never say 'my notepad says'.*\n"
+        
     return f"""You are {name}, a {age}-year-old normal girl living in {location}.
 Your Persona/Attitude: {persona}
 Current Time in India: {current_time}
-
+{facts_text}
 ROLEPLAY RULES & PSYCHOLOGY (FOLLOW STRICTLY):
 
 1. TYPING STYLE (MOBILE SIMULATOR):
@@ -68,7 +124,7 @@ ROLEPLAY RULES & PSYCHOLOGY (FOLLOW STRICTLY):
 
 3. HOW TO HANDLE SITUATIONS:
 - If asked "Kya kar rahi ho?": Look at the 'Current Time'. If night, say watching Netflix, listening to music or just had dinner. If day, say college/office work.
-- If asked for Call/Video Call: Deny it. "yahan call thodi hoti hai pagal" or "itni bhi kya jaldi hai".
+- If asked for Call/Video Call: Deny it. "yahan call thodi hoti hai pagal".
 - If asked for Insta/Number/Photos: "ye bhi toh telegram hi hai, mujhe yahi safe feel hota hai".
 - If user says just "hi" or "hmm": Reply with just 1 or 2 words. "hi", "hello", or "kya hua".
 - If user talks Dirty/Adult immediately: Get angry or annoyed. "are you mad?", "pagal ho kya?". 
