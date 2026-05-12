@@ -35,20 +35,21 @@ VIP_PLAN_DAYS = {
 # --- AI SETUP START ---
 import requests
 import os
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 import json
 import threading
 
 OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
 AI_MODEL = "microsoft/wizardlm-2-8x22b"
-BACKGROUND_AI_MODEL = "meta-llama/llama-3-8b-instruct"
+# Sasta aur free model pichhe ka kaam karne ke liye
+BACKGROUND_AI_MODEL = "meta-llama/llama-3-8b-instruct:free"
 
-# 🔥 TIME HACK: AI ko India ka current time batane ke liye
+# 🔥 TIME HACK (Warning fixed permanently)
 def get_ist_time():
-    ist_now = datetime.utcnow() + timedelta(hours=5, minutes=30)
+    ist_now = datetime.now(timezone.utc) + timedelta(hours=5, minutes=30)
     return ist_now.strftime("%I:%M %p")
 
-# 🕵️ THE WORKER AI (Sasta model jo sirf history padhega)
+# 🕵️ THE WORKER AI
 def extract_user_facts(chat_history, existing_facts):
     url = "https://openrouter.ai/api/v1/chat/completions"
     headers = {
@@ -87,7 +88,6 @@ def extract_user_facts(chat_history, existing_facts):
         result = response.json()
         content = result['choices'][0]['message']['content'].strip()
         
-        # 🔥 Markdown safai ka naya aur safe tarika (Bina kisi link glitch ke)
         content = content.replace("```json", "").replace("```", "").strip()
             
         new_facts = json.loads(content)
@@ -2564,28 +2564,46 @@ def stop_ai_test(message):
 @bot.message_handler(func=lambda message: message.chat.id in ai_test_mode_users, content_types=["text"])
 def ai_test_chat_handler(message):
     user_id = message.chat.id
+    user = get_user(user_id)
+    
+    if "user_facts" not in user:
+        user["user_facts"] = {}
+        
     profile_id = ai_test_mode_users[user_id]
     profile = get_profile(profile_id)
     
     safe_send_chat_action(bot, user_id, 'typing')
     
     persona = profile.get("ai_persona", "Tum ek casual ladki ho.")
-    prompt = build_ai_prompt(profile['name'], profile['age'], profile['location'], persona)
+    prompt = build_ai_prompt(profile['name'], profile['age'], profile['location'], persona, user.get("user_facts"))
     
     if user_id not in test_chat_history:
         test_chat_history[user_id] = []
         
     test_chat_history[user_id].append({"role": "user", "content": message.text})
-    test_chat_history[user_id] = test_chat_history[user_id][-10:]
+    test_chat_history[user_id] = test_chat_history[user_id][-20:]
+    
+    # 🕵️ THE BACKGROUND SPY
+    user_msgs_count = sum(1 for m in test_chat_history[user_id] if m["role"] == "user")
+    
+    # Har 4 message par check hoga aur logs mein chhapega
+    if user_msgs_count % 4 == 0 and len(test_chat_history[user_id]) >= 4:
+        print(f"🔍 [SPY] Checking chat history for {user_id} facts...", flush=True)
+        def run_extraction():
+            new_facts = extract_user_facts(test_chat_history[user_id][-8:], user.get("user_facts", {}))
+            print(f"🕵️ [SPY] Extraction Result: {new_facts}", flush=True)
+            
+            if new_facts:
+                user["user_facts"].update(new_facts)
+                save_user_data(user_id, user) # 🔥 DB MEIN FORCE SAVE KAREGA
+                print(f"🧠 [NOTEPAD] Saved to DB for {user_id}: {user['user_facts']}", flush=True)
+        
+        threading.Thread(target=run_extraction, daemon=True).start()
     
     ai_response = get_ai_reply(prompt, test_chat_history[user_id])
     
-    # 🔥 CLEANING MAGIC: Faltu spaces, new lines, aur AI ka khud ka likha naam yahan saaf hoga
     if ai_response:
-        # Agar usne galti se 'Aisha: ' ya 'Aisha - ' likha hai toh use hata do
-        ai_response = ai_response.replace(f"{profile['name']}:", "").replace(f"{profile['name']} -", "")
-        # Aage-peechhe ke saare faltu gaps (spaces) hata do
-        ai_response = ai_response.strip()
+        ai_response = ai_response.replace(f"{profile['name']}:", "").replace(f"{profile['name']} -", "").strip()
     else:
         ai_response = "hmm"
         
