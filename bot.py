@@ -36,102 +36,40 @@ VIP_PLAN_DAYS = {
 import requests
 import os
 from datetime import datetime, timedelta, timezone
-import json
-import threading
 
 OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
 AI_MODEL = "microsoft/wizardlm-2-8x22b"
-# 🔥 Asli sasta aur 100% reliable paid model (Bina :free tag ke)
-BACKGROUND_AI_MODEL = "meta-llama/llama-3.1-8b-instruct"
 
 def get_ist_time():
     ist_now = datetime.now(timezone.utc) + timedelta(hours=5, minutes=30)
     return ist_now.strftime("%I:%M %p")
 
-# 🕵️ THE WORKER AI
-def extract_user_facts(chat_history, existing_facts):
-    url = "https://openrouter.ai/api/v1/chat/completions"
-    headers = {
-        "Authorization": f"Bearer {OPENROUTER_API_KEY}",
-        "Content-Type": "application/json"
-    }
-    
-    history_text = "\n".join([f"{msg['role']}: {msg['content']}" for msg in chat_history])
-    
-    system_prompt = f"""You are a smart data extractor. Read this short chat history and extract any NEW facts the user has revealed about themselves.
-    Currently known facts: {json.dumps(existing_facts)}
-    
-    CRITICAL RULE: Save the facts as short, complete, natural English sentences, NOT single keywords.
-    Example Bad: {{"Relationship": "intent", "Living": "pg"}}
-    Example Good: {{"Relationship": "User recently had a breakup.", "Living": "User lives alone in a PG."}}
-    
-    Look ONLY for:
-    1. Real_Name 
-    2. City_Location
-    3. Work_Study
-    4. Living_Situation
-    5. Relationship_History (single, past breakups, what they are looking for)
-    6. Habits_Routine 
-    
-    Output ONLY a raw JSON object updating the facts. No markdown, no backticks. If nothing new is found, output exactly: {{}}
-    """
-    
-    data = {
-        "model": BACKGROUND_AI_MODEL,
-        "messages": [
-            {"role": "system", "content": system_prompt},
-            {"role": "user", "content": history_text}
-        ],
-        "temperature": 0.1,
-        "max_tokens": 150
-    }
-    
-    try:
-        response = requests.post(url, headers=headers, json=data, timeout=10)
-        result = response.json()
-        
-        if "error" in result:
-            print(f"🚨 Spy API Error: {result['error']}", flush=True)
-            return {}
-            
-        content = result['choices'][0]['message']['content'].strip()
-        content = content.replace("```json", "").replace("```", "").strip()
-        return json.loads(content)
-    except Exception as e:
-        print(f"🧠 Notepad Extractor Code Error: {e}", flush=True)
-        return {}
-
-# 🔥 THE MASTER PROMPT
-def build_ai_prompt(name, age, location, persona, user_facts=None):
+# 🔥 THE CLEAN SYSTEM WRAPPER (No hardcoded persona)
+def build_ai_prompt(name, age, location, character_prompt, user_real_name=None, user_city=None):
     current_time = get_ist_time()
     
-    facts_text = ""
-    if user_facts:
-        facts_text = f"\n[CRITICAL: KNOWN FACTS ABOUT THE USER]\n{json.dumps(user_facts)}\n*Use this knowledge naturally. NEVER repeat the exact phrasing from this list, and NEVER say 'my notepad says'.*\n"
+    # 🧠 SMART MEMORY: User ke database facts
+    user_context = ""
+    if user_real_name and user_real_name.strip() and user_real_name.lower() != "user":
+        user_context += f"- User's Name: {user_real_name}\n"
+    if user_city and user_city.strip():
+        user_context += f"- User's City: {user_city}\n"
         
-    return f"""You are {name}, a {age}-year-old normal girl living in {location}.
-Your Persona/Background: {persona}
+    if user_context:
+        user_context = f"\n[CRITICAL: KNOWN FACTS ABOUT THE USER]\n{user_context}*Use this naturally. Always prefer their Real Name over Telegram name.*\n"
+        
+    return f"""You are {name}, a {age}-year-old girl from {location}.
+
+[YOUR CHARACTER & PERSONA]
+{character_prompt}
+
 Current Time in India: {current_time}
-{facts_text}
-ROLEPLAY RULES & PSYCHOLOGY (FOLLOW STRICTLY):
+{user_context}
 
-1. STRICT OUTPUT FORMAT:
-- NEVER output your internal thoughts, reasoning, or tags like [ASSISTANT INTERNAL THOUGHTS].
-- Output ONLY the exact text message you want to send to the user.
-
-2. TYPING STYLE (MOBILE SIMULATOR):
-- Always type like a lazy Gen-Z on WhatsApp. Small letters, NO full stops, NO commas.
-- Keep replies super short (2 to 12 words max). Do NOT info-dump multiple facts in one message.
-- Use natural slangs: yaar, hmm, lol, achha, pagal, uff.
-
-3. CONSISTENCY & BACKSTORY:
-- Stick strictly to your Persona ({persona}). If your persona says you are a student, NEVER say you work in an office or have a part-time job.
-- You got 1 free chat, the previous guy was boring, so you bought VIP today.
-
-4. HOW TO HANDLE SITUATIONS:
-- If asked "Kya kar rahi ho?": Answer based on 'Current Time' and your Persona. If night, say chill/Netflix/music. If day, mention doing something related to your persona.
-- If user talks about their breakup or past: Be empathetic but casual ("oh sad yaar", "koi na move on kar"). Do NOT use weird robotic words like 'intent' or 'serious relationship'.
-- If user talks Dirty/Adult immediately: Get annoyed. "are you mad?". 
+[TECHNICAL RULES]
+1. Output ONLY the text message to be sent. No tags, no internal thoughts, no reasoning.
+2. Keep replies natural and conversational, as if chatting on WhatsApp/Telegram.
+3. Be consistent with the character described above. 
 
 NEVER break character. NEVER sound like an AI assistant."""
 
@@ -2526,7 +2464,7 @@ def open_match_chat(user_id, match_id, show_history=True):
 
 # --- AI TESTING SWITCH START ---
 ai_test_mode_users = {}
-test_chat_history = {}  # 🔥 NAYA: AI ki temporary memory ke liye
+test_chat_history = {}  # 🔥 AI ki Deep Memory
 
 @bot.message_handler(commands=['test_ai'])
 def start_ai_test(message):
@@ -2545,8 +2483,7 @@ def start_ai_test(message):
             ai_test_mode_users[message.chat.id] = profile_id
             test_chat_history[message.chat.id] = [] 
             
-            # 🔥 FIX: message.message_id ki jagah message.chat.id lagaya
-            safe_send_message(bot, message.chat.id, f"🤖 <b>AI Test Mode ON for {profile['name']}!</b>\nAb memory bhi ON hai. Band karne ke liye /stop_ai type karo.", parse_mode="HTML")
+            safe_send_message(bot, message.chat.id, f"🤖 <b>AI Test Mode ON for {profile['name']}!</b>\nAb 100-messages deep memory ON hai. Band karne ke liye /stop_ai type karo.", parse_mode="HTML")
         except IndexError:
             safe_send_message(bot, message.chat.id, "❌ Kripya ID likhein. Example: /test_ai 100")
         except ValueError:
@@ -2557,52 +2494,49 @@ def stop_ai_test(message):
     if message.chat.id in ai_test_mode_users:
         del ai_test_mode_users[message.chat.id]
         if message.chat.id in test_chat_history:
-            del test_chat_history[message.chat.id] # Memory hata do
+            del test_chat_history[message.chat.id] # Memory delete
         safe_send_message(bot, message.chat.id, "🛑 <b>AI Test Mode OFF!</b> Normal chat mode wapas chalu ho gaya hai.", parse_mode="HTML")
 
-# 🔥 THE SAFEST INTERCEPTOR
+# 🔥 THE DEEP MEMORY INTERCEPTOR (No Background Spy)
 @bot.message_handler(func=lambda message: message.chat.id in ai_test_mode_users, content_types=["text"])
 def ai_test_chat_handler(message):
     user_id = message.chat.id
     user = get_user(user_id)
     
-    if "user_facts" not in user:
-        user["user_facts"] = {}
-        
     profile_id = ai_test_mode_users[user_id]
     profile = get_profile(profile_id)
     
     safe_send_chat_action(bot, user_id, 'typing')
     
-    persona = profile.get("ai_persona", "Tum ek casual ladki ho.")
-    prompt = build_ai_prompt(profile['name'], profile['age'], profile['location'], persona, user.get("user_facts"))
+    # 🧠 JSON List ko paragraph mein badalna
+    raw_prompt = profile.get("character_prompt", ["Tum ek casual ladki ho."])
+    if isinstance(raw_prompt, list):
+        character_prompt = "\n".join(raw_prompt)
+    else:
+        character_prompt = str(raw_prompt)
+        
+    # User ka asli naam aur city jo onboarding me liya tha, wo direct AI ko do
+    prompt = build_ai_prompt(
+        profile['name'], 
+        profile['age'], 
+        profile['location'], 
+        character_prompt, 
+        user.get("name"), 
+        user.get("city")
+    )
     
     if user_id not in test_chat_history:
         test_chat_history[user_id] = []
         
     test_chat_history[user_id].append({"role": "user", "content": message.text})
-    test_chat_history[user_id] = test_chat_history[user_id][-20:]
     
-    # 🕵️ THE BACKGROUND SPY
-    user_msgs_count = sum(1 for m in test_chat_history[user_id] if m["role"] == "user")
-    
-    # Har 4 message par check hoga aur logs mein chhapega
-    if user_msgs_count % 4 == 0 and len(test_chat_history[user_id]) >= 4:
-        print(f"🔍 [SPY] Checking chat history for {user_id} facts...", flush=True)
-        def run_extraction():
-            new_facts = extract_user_facts(test_chat_history[user_id][-8:], user.get("user_facts", {}))
-            print(f"🕵️ [SPY] Extraction Result: {new_facts}", flush=True)
-            
-            if new_facts:
-                user["user_facts"].update(new_facts)
-                save_user_data(user_id, user) # 🔥 DB MEIN FORCE SAVE KAREGA
-                print(f"🧠 [NOTEPAD] Saved to DB for {user_id}: {user['user_facts']}", flush=True)
-        
-        threading.Thread(target=run_extraction, daemon=True).start()
+    # 🚀 THE UPGRADE: Ab aakhiri 100 messages (50 tumhare, 50 AI ke) yaad rakhega
+    test_chat_history[user_id] = test_chat_history[user_id][-100:]
     
     ai_response = get_ai_reply(prompt, test_chat_history[user_id])
     
     if ai_response:
+        # Tidy up any accidental name prefixes the AI might generate
         ai_response = ai_response.replace(f"{profile['name']}:", "").replace(f"{profile['name']} -", "").strip()
     else:
         ai_response = "hmm"
