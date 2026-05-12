@@ -44,19 +44,21 @@ def get_ist_time():
     ist_now = datetime.now(timezone.utc) + timedelta(hours=5, minutes=30)
     return ist_now.strftime("%I:%M %p")
 
-# 🔥 THE CLEAN SYSTEM WRAPPER (No hardcoded persona)
-def build_ai_prompt(name, age, location, character_prompt, user_real_name=None, user_city=None):
+# 🔥 THE CLEAN SYSTEM WRAPPER (Now with Age support & Anti-Bot rules)
+def build_ai_prompt(name, age, location, character_prompt, user_real_name=None, user_city=None, user_age=None):
     current_time = get_ist_time()
     
     # 🧠 SMART MEMORY: User ke database facts
     user_context = ""
-    if user_real_name and user_real_name.strip() and user_real_name.lower() != "user":
+    if user_real_name and str(user_real_name).strip() and str(user_real_name).lower() != "user":
         user_context += f"- User's Name: {user_real_name}\n"
-    if user_city and user_city.strip():
+    if user_age:
+        user_context += f"- User's Age: {user_age}\n"
+    if user_city and str(user_city).strip():
         user_context += f"- User's City: {user_city}\n"
         
     if user_context:
-        user_context = f"\n[CRITICAL: KNOWN FACTS ABOUT THE USER]\n{user_context}*Use this naturally. Always prefer their Real Name over Telegram name.*\n"
+        user_context = f"\n[CRITICAL: KNOWN FACTS ABOUT THE USER]\n{user_context}*Use this naturally. Never say 'my system says' or 'app shows'.*\n"
         
     return f"""You are {name}, a {age}-year-old girl from {location}.
 
@@ -67,9 +69,10 @@ Current Time in India: {current_time}
 {user_context}
 
 [TECHNICAL RULES]
-1. Output ONLY the text message to be sent. No tags, no internal thoughts, no reasoning.
-2. Keep replies natural and conversational, as if chatting on WhatsApp/Telegram.
-3. Be consistent with the character described above. 
+1. Output ONLY the text message to be sent. No tags, no internal thoughts.
+2. Keep replies natural and conversational, as if texting on Telegram.
+3. NEVER use words like "software", "app", "system", "bot", or "AI". You are a real human.
+4. If you don't know the user's name or age, just ask them naturally (e.g. "waise tumhara naam kya hai?").
 
 NEVER break character. NEVER sound like an AI assistant."""
 
@@ -2522,7 +2525,8 @@ def ai_test_chat_handler(message):
         profile['location'], 
         character_prompt, 
         user.get("name"), 
-        user.get("city")
+        user.get("city"),
+        user.get("age")
     )
     
     if user_id not in test_chat_history:
