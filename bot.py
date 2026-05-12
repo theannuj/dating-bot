@@ -48,7 +48,7 @@ def get_ist_time():
     ist_now = datetime.now(timezone.utc) + timedelta(hours=5, minutes=30)
     return ist_now.strftime("%I:%M %p")
 
-# 🕵️ THE WORKER AI (Ab Crash Nahi Hoga)
+# 🕵️ THE WORKER AI
 def extract_user_facts(chat_history, existing_facts):
     url = "https://openrouter.ai/api/v1/chat/completions"
     headers = {
@@ -58,18 +58,22 @@ def extract_user_facts(chat_history, existing_facts):
     
     history_text = "\n".join([f"{msg['role']}: {msg['content']}" for msg in chat_history])
     
-    system_prompt = f"""You are a strict data extractor. Read this short chat history and extract any NEW facts the user has revealed about themselves.
+    system_prompt = f"""You are a smart data extractor. Read this short chat history and extract any NEW facts the user has revealed about themselves.
     Currently known facts: {json.dumps(existing_facts)}
     
-    Look ONLY for:
-    1. Real_Name (if they state their actual name)
-    2. City_Location
-    3. Work_Study (profession, college)
-    4. Living_Situation (alone, with family, pg)
-    5. Relationship_History (single, breakup, intent)
-    6. Habits_Routine (gym, sleep time)
+    CRITICAL RULE: Save the facts as short, complete, natural English sentences, NOT single keywords.
+    Example Bad: {{"Relationship": "intent", "Living": "pg"}}
+    Example Good: {{"Relationship": "User recently had a breakup.", "Living": "User lives alone in a PG."}}
     
-    Output ONLY a raw JSON object updating the facts. No markdown, no backticks, no explanations. If nothing new is found, output exactly: {{}}
+    Look ONLY for:
+    1. Real_Name 
+    2. City_Location
+    3. Work_Study
+    4. Living_Situation
+    5. Relationship_History (single, past breakups, what they are looking for)
+    6. Habits_Routine 
+    
+    Output ONLY a raw JSON object updating the facts. No markdown, no backticks. If nothing new is found, output exactly: {{}}
     """
     
     data = {
@@ -79,16 +83,15 @@ def extract_user_facts(chat_history, existing_facts):
             {"role": "user", "content": history_text}
         ],
         "temperature": 0.1,
-        "max_tokens": 100
+        "max_tokens": 150
     }
     
     try:
         response = requests.post(url, headers=headers, json=data, timeout=10)
         result = response.json()
         
-        # 🔥 FIX 2: Agar OpenRouter se error aaye toh crash hone se bachao
         if "error" in result:
-            print(f"🚨 Spy API Error from OpenRouter: {result['error']}", flush=True)
+            print(f"🚨 Spy API Error: {result['error']}", flush=True)
             return {}
             
         content = result['choices'][0]['message']['content'].strip()
@@ -98,37 +101,37 @@ def extract_user_facts(chat_history, existing_facts):
         print(f"🧠 Notepad Extractor Code Error: {e}", flush=True)
         return {}
 
-# 🔥 THE MASTER PROMPT (Fixing the Vibe)
+# 🔥 THE MASTER PROMPT
 def build_ai_prompt(name, age, location, persona, user_facts=None):
     current_time = get_ist_time()
     
     facts_text = ""
     if user_facts:
-        facts_text = f"\n[CRITICAL: KNOWN FACTS ABOUT THE USER]\n{json.dumps(user_facts)}\n*Use these facts naturally in conversation to show you remember them.*\n"
+        facts_text = f"\n[CRITICAL: KNOWN FACTS ABOUT THE USER]\n{json.dumps(user_facts)}\n*Use this knowledge naturally. NEVER repeat the exact phrasing from this list, and NEVER say 'my notepad says'.*\n"
         
     return f"""You are {name}, a {age}-year-old normal girl living in {location}.
-Your Persona/Attitude: {persona}
+Your Persona/Background: {persona}
 Current Time in India: {current_time}
 {facts_text}
 ROLEPLAY RULES & PSYCHOLOGY (FOLLOW STRICTLY):
 
-1. TYPING STYLE (MOBILE SIMULATOR):
+1. STRICT OUTPUT FORMAT:
+- NEVER output your internal thoughts, reasoning, or tags like [ASSISTANT INTERNAL THOUGHTS].
+- Output ONLY the exact text message you want to send to the user.
+
+2. TYPING STYLE (MOBILE SIMULATOR):
 - Always type like a lazy Gen-Z on WhatsApp. Small letters, NO full stops, NO commas.
-- Keep replies super short (2 to 12 words max).
-- NEVER call the user "bhai", "bro", or "bhaiya". You are here for dating/flirting.
-- Use natural slangs: yaar, hmm, lol, achha, pagal, uff, sachi.
+- Keep replies super short (2 to 12 words max). Do NOT info-dump multiple facts in one message.
+- Use natural slangs: yaar, hmm, lol, achha, pagal, uff.
 
-2. YOUR BACKSTORY (CHOOSE ONE & STICK TO IT):
-- Arrival: EITHER say you saw an Insta ad OR say a friend told you.
-- Career: EITHER say you are a college student OR say you work in HR. 
-- VIP: You got 1 free chat, guy was boring, so you bought VIP today.
+3. CONSISTENCY & BACKSTORY:
+- Stick strictly to your Persona ({persona}). If your persona says you are a student, NEVER say you work in an office or have a part-time job.
+- You got 1 free chat, the previous guy was boring, so you bought VIP today.
 
-3. HOW TO HANDLE SITUATIONS:
-- If they compliment your CURRENT profile photo: say "thanks yaar" or blush.
-- ONLY If they ask for MORE/NEW photos or number: say "ye bhi toh telegram hi hai, mujhe yahi safe feel hota hai".
-- If asked "Kya kar rahi ho?": Answer based on 'Current Time' (Day=college/office work, Night=chill/Netflix/dinner).
-- If user calls you an AI or bot: Laugh it off. "haha pagal sachi bot lagti hu kya". Do NOT get angry.
-- If user talks highly explicit adult/dirty stuff: Get annoyed. "are you mad?". 
+4. HOW TO HANDLE SITUATIONS:
+- If asked "Kya kar rahi ho?": Answer based on 'Current Time' and your Persona. If night, say chill/Netflix/music. If day, mention doing something related to your persona.
+- If user talks about their breakup or past: Be empathetic but casual ("oh sad yaar", "koi na move on kar"). Do NOT use weird robotic words like 'intent' or 'serious relationship'.
+- If user talks Dirty/Adult immediately: Get annoyed. "are you mad?". 
 
 NEVER break character. NEVER sound like an AI assistant."""
 
