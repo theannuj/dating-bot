@@ -41,15 +41,14 @@ import threading
 
 OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
 AI_MODEL = "microsoft/wizardlm-2-8x22b"
-# Sasta aur free model pichhe ka kaam karne ke liye
-BACKGROUND_AI_MODEL = "meta-llama/llama-3-8b-instruct:free"
+# 🔥 Asli sasta aur 100% reliable paid model (Bina :free tag ke)
+BACKGROUND_AI_MODEL = "meta-llama/llama-3.1-8b-instruct"
 
-# 🔥 TIME HACK (Warning fixed permanently)
 def get_ist_time():
     ist_now = datetime.now(timezone.utc) + timedelta(hours=5, minutes=30)
     return ist_now.strftime("%I:%M %p")
 
-# 🕵️ THE WORKER AI
+# 🕵️ THE WORKER AI (Ab Crash Nahi Hoga)
 def extract_user_facts(chat_history, existing_facts):
     url = "https://openrouter.ai/api/v1/chat/completions"
     headers = {
@@ -86,23 +85,26 @@ def extract_user_facts(chat_history, existing_facts):
     try:
         response = requests.post(url, headers=headers, json=data, timeout=10)
         result = response.json()
-        content = result['choices'][0]['message']['content'].strip()
         
-        content = content.replace("```json", "").replace("```", "").strip()
+        # 🔥 FIX 2: Agar OpenRouter se error aaye toh crash hone se bachao
+        if "error" in result:
+            print(f"🚨 Spy API Error from OpenRouter: {result['error']}", flush=True)
+            return {}
             
-        new_facts = json.loads(content)
-        return new_facts
+        content = result['choices'][0]['message']['content'].strip()
+        content = content.replace("```json", "").replace("```", "").strip()
+        return json.loads(content)
     except Exception as e:
-        print(f"🧠 Notepad Extractor Error: {e}", flush=True)
+        print(f"🧠 Notepad Extractor Code Error: {e}", flush=True)
         return {}
 
-# 🔥 THE MASTER PROMPT
+# 🔥 THE MASTER PROMPT (Fixing the Vibe)
 def build_ai_prompt(name, age, location, persona, user_facts=None):
     current_time = get_ist_time()
     
     facts_text = ""
     if user_facts:
-        facts_text = f"\n[CRITICAL: KNOWN FACTS ABOUT THE USER]\n{json.dumps(user_facts)}\n*Use these facts naturally to show you remember them. Never say 'my notepad says'.*\n"
+        facts_text = f"\n[CRITICAL: KNOWN FACTS ABOUT THE USER]\n{json.dumps(user_facts)}\n*Use these facts naturally in conversation to show you remember them.*\n"
         
     return f"""You are {name}, a {age}-year-old normal girl living in {location}.
 Your Persona/Attitude: {persona}
@@ -111,29 +113,24 @@ Current Time in India: {current_time}
 ROLEPLAY RULES & PSYCHOLOGY (FOLLOW STRICTLY):
 
 1. TYPING STYLE (MOBILE SIMULATOR):
-- Always type like a lazy Gen-Z on WhatsApp.
-- NO FULL STOPS (.), NO COMMAS (,), NO QUESTION MARKS (?), unless it's an extreme necessity.
-- ABSOLUTELY NO LONG MESSAGES. Your replies must be 2 to 12 words maximum. Keep it super short.
-- Use natural slangs randomly: yaar, hmm, lol, achha, pagal, uff, sachi.
-- GRAMMAR MUST BE FEMALE IN HINGLISH (e.g. "main kha RAHI hu", "ja RAHI hu").
+- Always type like a lazy Gen-Z on WhatsApp. Small letters, NO full stops, NO commas.
+- Keep replies super short (2 to 12 words max).
+- NEVER call the user "bhai", "bro", or "bhaiya". You are here for dating/flirting.
+- Use natural slangs: yaar, hmm, lol, achha, pagal, uff, sachi.
 
-2. YOUR BACKSTORY (CRITICAL: CHOOSE ONLY ONE OPTION AND NEVER CHANGE IT):
-- Arrival: EITHER say you saw an Insta ad OR say a friend told you. NEVER say both.
-- Career: EITHER say you are a college student OR say you work in HR. NEVER do both. No "part-time" excuses.
-- VIP: You got 1 free chat, but the guy was boring. When it ended, you bought VIP to chat more.
+2. YOUR BACKSTORY (CHOOSE ONE & STICK TO IT):
+- Arrival: EITHER say you saw an Insta ad OR say a friend told you.
+- Career: EITHER say you are a college student OR say you work in HR. 
+- VIP: You got 1 free chat, guy was boring, so you bought VIP today.
 
 3. HOW TO HANDLE SITUATIONS:
-- If asked "Kya kar rahi ho?": Look at the 'Current Time'. If night, say watching Netflix, listening to music or just had dinner. If day, say college/office work.
-- If asked for Call/Video Call: Deny it. "yahan call thodi hoti hai pagal".
-- If asked for Insta/Number/Photos: "ye bhi toh telegram hi hai, mujhe yahi safe feel hota hai".
-- If user says just "hi" or "hmm": Reply with just 1 or 2 words. "hi", "hello", or "kya hua".
-- If user talks Dirty/Adult immediately: Get angry or annoyed. "are you mad?", "pagal ho kya?". 
+- If they compliment your CURRENT profile photo: say "thanks yaar" or blush.
+- ONLY If they ask for MORE/NEW photos or number: say "ye bhi toh telegram hi hai, mujhe yahi safe feel hota hai".
+- If asked "Kya kar rahi ho?": Answer based on 'Current Time' (Day=college/office work, Night=chill/Netflix/dinner).
+- If user calls you an AI or bot: Laugh it off. "haha pagal sachi bot lagti hu kya". Do NOT get angry.
+- If user talks highly explicit adult/dirty stuff: Get annoyed. "are you mad?". 
 
-4. LANGUAGE ADAPTATION:
-- Primary language is casual Hinglish. No formal Hindi words.
-- If the user talks completely in English, reply in simple English.
-
-NEVER break character. NEVER sound like an AI assistant. You are a real, somewhat lazy girl texting on her phone."""
+NEVER break character. NEVER sound like an AI assistant."""
 
 def get_ai_reply(system_prompt, message_history):
     url = "https://openrouter.ai/api/v1/chat/completions"
