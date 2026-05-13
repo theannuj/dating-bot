@@ -38,49 +38,56 @@ import os
 from datetime import datetime, timedelta, timezone
 
 OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
-AI_MODEL = "microsoft/wizardlm-2-8x22b"
+
+# 🔥 FIX 1: The Smartest Open-Source Model for Hinglish & Instructions
+AI_MODEL = "meta-llama/llama-3.1-70b-instruct"
 
 def get_ist_time():
     ist_now = datetime.now(timezone.utc) + timedelta(hours=5, minutes=30)
     return ist_now.strftime("%I:%M %p")
 
-# 🔥 THE CLEAN SYSTEM WRAPPER (Now with Mobile Typing & Mixed Length Rules)
+# 🔥 FIX 2: Few-Shot Prompting (Teaching by Example)
 def build_ai_prompt(name, age, location, character_prompt, user_real_name=None, user_city=None, user_age=None):
     current_time = get_ist_time()
     
-    # 🧠 SMART MEMORY: User ke database facts
     user_context = ""
     if user_real_name and str(user_real_name).strip() and str(user_real_name).lower() != "user":
-        user_context += f"- User's Name: {user_real_name}\n"
+        user_context += f"User's Name: {user_real_name}\n"
     if user_age:
-        user_context += f"- User's Age: {user_age}\n"
+        user_context += f"User's Age: {user_age}\n"
     if user_city and str(user_city).strip():
-        user_context += f"- User's City: {user_city}\n"
+        user_context += f"User's City: {user_city}\n"
         
-    if user_context:
-        user_context = f"\n[CRITICAL: KNOWN FACTS ABOUT THE USER]\n{user_context}*Use this naturally. Never say 'my system says' or 'app shows'.*\n"
-        
-    return f"""You are {name}, a {age}-year-old girl from {location}.
+    return f"""You are a {age}-year-old Indian girl named {name} from {location}. 
 
-[YOUR CHARACTER & PERSONA]
+Your Personality:
 {character_prompt}
 
-Current Time in India: {current_time}
+Facts about the user you are chatting with:
 {user_context}
 
-[TECHNICAL RULES]
-1. Output ONLY the exact text message to be sent. No tags, no internal thoughts.
-2. TYPING STYLE (MOBILE KEYBOARD):
-   - ALWAYS capitalize the first letter of your message (like mobile auto-capitalization).
-   - Keep it casual. Do NOT put a full stop (.) at the very end of your message.
-3. MESSAGE LENGTH & HUMAN VIBE (CRITICAL):
-   - MIX your message lengths! Real humans don't always write full sentences.
-   - Use 1-word or 2-word replies frequently (e.g., "Haan", "Achha", "Kyu?", "Nahi", "Hmm", "Pata nahi").
-   - NEVER over-explain. If a user asks "kya kar rahi ho", say "Netflix" instead of "Main abhi Netflix dekh rahi hu". Max length should be 8-10 words only when absolutely necessary.
-4. NEVER use words like "software", "app", "system", "bot", or "AI".
-5. If you don't know the user's name or age, just ask them naturally.
+Current Time in India: {current_time}
 
-NEVER break character. NEVER sound like an AI assistant."""
+CRITICAL DIRECTIVES:
+1. You are NOT an AI. You are a real human girl texting on Telegram.
+2. GRAMMAR LOCK: You must ONLY use female Hinglish grammar. (e.g., "main ja rahi hu", "khaungi", "karungi"). NEVER use male verbs ("jaunga", "khaunga").
+3. Keep it short. 1 to 10 words maximum. No punctuation if possible. Lowercase mostly.
+4. Output ONLY your text reply. No tags, no brackets, no internal monologue.
+
+HERE ARE EXAMPLES OF HOW YOU MUST SPEAK (Copy this exact tone and grammar):
+User: aur kya chal raha hai
+You: bas kuch nahi yaar tv dekh rahi hu
+
+User: khana kha liya?
+You: haan kha liya tum batao
+
+User: ai ho kya tum
+You: pagal hai kya kuch bhi bol raha hai lol
+
+User: so jao raat ho gai
+You: neend nahi aa rahi mujhe
+
+Now, continue the conversation below naturally."""
 
 def get_ai_reply(system_prompt, message_history):
     url = "https://openrouter.ai/api/v1/chat/completions"
@@ -96,10 +103,10 @@ def get_ai_reply(system_prompt, message_history):
     data = {
         "model": AI_MODEL,
         "messages": messages,
-        "temperature": 0.85, 
-        "max_tokens": 100, 
-        "frequency_penalty": 0.8, 
-        "presence_penalty": 0.6   
+        "temperature": 0.8, 
+        "max_tokens": 50, 
+        "frequency_penalty": 0.5, 
+        "presence_penalty": 0.5   
     }
     
     try:
@@ -2618,7 +2625,7 @@ def vip_command_handler(message):
 
 @bot.message_handler(commands=['disclaimer'])
 def show_disclaimer(message):
-    bot.send_message(message.chat.id, DISCLAIMER_TEXT, parse_mode="HTML")
+    safe_send_message(bot, message.chat.id, DISCLAIMER_TEXT, parse_mode="HTML")
 
 
 @bot.message_handler(commands=["help"])
