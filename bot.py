@@ -40,7 +40,7 @@ from datetime import datetime, timedelta, timezone
 OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
 
 # 🔥 THE ROLEPLAY KING: Hermes 3 (Uncensored & Steerable)
-AI_MODEL = "nousresearch/hermes-3-llama-3.1-8b"
+AI_MODEL = "nousresearch/hermes-2-pro-llama-3-8b"
 
 def get_ist_time():
     ist_now = datetime.now(timezone.utc) + timedelta(hours=5, minutes=30)
