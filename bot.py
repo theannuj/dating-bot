@@ -2546,7 +2546,7 @@ def support_command_handler(message):
     if has_open_ticket(user_id):
         safe_send_message(bot, 
             user_id, 
-            "⚠️ <b>Ticket Already Open</b>\nYou currently have a ticket <b>🟡 Under Review</b>.\n\nPlease wait for the admin's reply before sending a new message.", 
+            "⚠️ <b>Ticket Already Open</b>\nYou currently have a ticket \n<b>🟡 Under Review</b>.\n\nPlease wait for the admin's reply before sending a new message.", 
             parse_mode="HTML"
         )
         return
@@ -2713,7 +2713,7 @@ def send_admin_support_tickets(admin_id):
                 
             markup.row(InlineKeyboardButton(f"🎫 #{ticket_id} | {preview}", callback_data=f"viewticket_{ticket_id}"))
         
-        safe_send_message(bot, admin_id, "📩 **Open Support Tickets:**\nSelect a ticket to view and reply.", reply_markup=markup, parse_mode="HTML")
+        safe_send_message(bot, admin_id, "📩 <b>Open Support Tickets:</b>\nSelect a ticket to view and reply.", reply_markup=markup, parse_mode="HTML")
     except Exception as e:
         print(f"Fetch tickets error: {e}")
     finally:
