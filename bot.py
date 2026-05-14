@@ -2546,7 +2546,7 @@ def support_command_handler(message):
     if has_open_ticket(user_id):
         safe_send_message(bot, 
             user_id, 
-            "⚠️ **Ticket Already Open**\nYou currently have a ticket **🟡 Under Review**.\n\nPlease wait for the admin's reply before sending a new message.", 
+            "⚠️ <b>Ticket Already Open</b>\nYou currently have a ticket <b>🟡 Under Review</b>.\n\nPlease wait for the admin's reply before sending a new message.", 
             parse_mode="HTML"
         )
         return
@@ -2558,7 +2558,7 @@ def support_command_handler(message):
 
     safe_send_message(bot, 
         user_id, 
-        "🛠 **Help & Support**\nYou are connected to the Admin.\n\nPlease describe your issue or send a screenshot in a single message 👇", 
+        "🛠 <b>Help & Support</b>\nYou are connected to the Admin.\n\nPlease describe your issue or send a screenshot in a single message 👇", 
         parse_mode="HTML"
     )
 
@@ -2754,7 +2754,7 @@ def process_ticket_reply(message, ticket_id, target_user_id):
         release_db_connection(conn)
 
 
-@bot.message_handler(func=lambda message: message.chat.id in CHAT_ADMINS and not message.reply_to_message and message.text.strip() not in {BTN_ADMIN_CHATS, BTN_ADMIN_REFRESH, BTN_ADMIN_UNREAD, BTN_ADMIN_PANEL, BTN_ADMIN_STATS, BTN_ADMIN_PENDING, BTN_ADMIN_BACK}, content_types=["text"])
+@bot.message_handler(func=lambda message: message.chat.id in CHAT_ADMINS and not message.reply_to_message and message.text.strip() not in {BTN_ADMIN_CHATS, BTN_ADMIN_REFRESH, BTN_ADMIN_UNREAD, BTN_ADMIN_PANEL, BTN_ADMIN_STATS, BTN_ADMIN_PENDING, BTN_ADMIN_BACK, BTN_ADMIN_SUPPORT}, content_types=["text"])
 def admin_direct_reply(message):
     admin_id = message.chat.id
 
@@ -2908,7 +2908,7 @@ def photo_handler(message):
         create_support_ticket(user_id, query_text)
         user["step"] = "menu"
         flush_loaded_users()
-        safe_send_message(bot, user_id, "✅ **Ticket Submitted!**\nYour issue has been sent to the admin.\n\n**Status:** 🟡 Under Review\n\nPlease wait, we will reply to you here shortly.", parse_mode="HTML")
+        safe_send_message(bot, user_id, "✅ <b>Ticket Submitted!</b>\nYour issue has been sent to the admin.\n\n<b>Status:</b> 🟡 Under Review\n\nPlease wait, we will reply to you here shortly.", parse_mode="HTML")
         safe_send_message(bot, MAIN_ADMIN_ID, f"🎫 New Support Ticket (Photo) from User ID: {user_id}")
         return
 
@@ -3483,7 +3483,7 @@ def text_handler(message):
         create_support_ticket(user_id, text)
         user["step"] = "menu"
         flush_loaded_users()
-        safe_send_message(bot, user_id, "✅ **Ticket Submitted!**\nYour issue has been sent to the admin.\n\n**Status:** 🟡 Under Review\n\nPlease wait, we will reply to you here shortly.", parse_mode="HTML")
+        safe_send_message(bot, user_id, "✅ <b>Ticket Submitted!</b>\nYour issue has been sent to the admin.\n\n<b>Status:</b> 🟡 Under Review\n\nPlease wait, we will reply to you here shortly.", parse_mode="HTML")
         safe_send_message(bot, MAIN_ADMIN_ID, f"🎫 New Support Ticket from User ID: {user_id}")
         return
 
