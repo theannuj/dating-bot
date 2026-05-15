@@ -3260,6 +3260,9 @@ def callback_handler(call):
                 set_chat_state(user_id, match_id, "locked")
                 append_system_message(user_id, match_id, "She was about to say something…\n\nUnlock to continue 🔓")
                 safe_send_message(bot, user_id, "<b>She was about to say something…</b>\n\nUnlock to continue 🔓", reply_markup=likes_locked_keyboard(), parse_mode="HTML")
+                
+                # 🔥 FEEDBACK FOR ADMIN: Buttons hatao aur confirmation likho
+                bot.edit_message_text(f"✅ <b>Chat Locked!</b>\nUser {user_id} can no longer message in this chat.", call.message.chat.id, call.message.message_id, parse_mode="HTML")
                 safe_answer_callback_query(bot,call.id, "Chat locked")
                 return
 
@@ -3276,6 +3279,9 @@ def callback_handler(call):
                     reply_markup=main_menu_keyboard(user_id),
                     parse_mode="HTML",
                 )
+                
+                # 🔥 FEEDBACK FOR ADMIN
+                bot.edit_message_text(f"✅ <b>Chat Ended!</b>\nThe chat has been successfully closed.", call.message.chat.id, call.message.message_id, parse_mode="HTML")
                 safe_answer_callback_query(bot,call.id, "Chat ended")
                 return
 
@@ -3287,6 +3293,9 @@ def callback_handler(call):
                 append_system_message(user_id, match_id, "This chat is no longer available.")
                 remove_match_from_inbox(user_id, match_id)
                 safe_send_message(bot, user_id, "<b>This chat is no longer available.</b>", reply_markup=main_menu_keyboard(user_id), parse_mode="HTML")
+                
+                # 🔥 FEEDBACK FOR ADMIN
+                bot.edit_message_text(f"🚫 <b>Chat Blocked!</b>\nThis match has been removed from user's inbox.", call.message.chat.id, call.message.message_id, parse_mode="HTML")
                 safe_answer_callback_query(bot,call.id, "Chat blocked")
                 return
 
