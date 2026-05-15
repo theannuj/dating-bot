@@ -1,4 +1,4 @@
-﻿# -*- coding: utf-8 -*-
+# -*- coding: utf-8 -*-
 import html 
 import json
 import os
@@ -3100,12 +3100,16 @@ def callback_handler(call):
         m_data = get_profile(mid)
         if m_data:
             loc = m_data.get("location", "Not Set")
+            # 🔥 Naya Bio fetch karne ka logic
+            bio = m_data.get("bio", "Koi bio set nahi hai.") 
+            
             caption = (
                 f"👩 <b>Match Profile (Bot)</b>\n\n"
                 f"Name: {m_data['name']}\n"
                 f"Age: {m_data['age']}\n"
                 f"📍 Location: {loc}\n"
-                f"ID: {mid}"
+                f"ID: {mid}\n\n"
+                f"📝 <b>Admin Context:</b>\n{bio}"
             )
             safe_send_photo(bot, call.message.chat.id, m_data["photo"], caption=caption, parse_mode="HTML")
         else:

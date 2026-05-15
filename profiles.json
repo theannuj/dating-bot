@@ -5,8 +5,7 @@
     "age": 23,
     "location": "Lucknow",
     "photo": "AgACAgUAAxkBAAPCaczZkRcIOSOGs5WYZrump-Rmp-IAAoEPaxtAq2hWTRntxsnrxUoBAAMCAAN5AAM6BA",
-    "ai_mode": "off",
-    "character_prompt": []
+    "bio": ""
   },
   {
     "id": 2,
@@ -14,8 +13,7 @@
     "age": 26,
     "location": "Pune",
     "photo": "AgACAgUAAxkBAAPFaczaSJylPxhJhAhAZF_VxTdYL-AAAoUPaxtAq2hWLs9B4DfrQnoBAAMCAAN4AAM6BA",
-    "ai_mode": "off",
-    "character_prompt": []
+    "bio": ""
   },
   {
     "id": 3,
@@ -23,8 +21,7 @@
     "age": 27,
     "location": "Delhi",
     "photo": "AgACAgUAAxkBAAPIaczaaLpbMAGJS_A_sZqn_-OsGJIAAoYPaxtAq2hWFNaYtazRzg0BAAMCAAN5AAM6BA",
-    "ai_mode": "off",
-    "character_prompt": []
+    "bio": ""
   },
   {
     "id": 4,
@@ -32,8 +29,7 @@
     "age": 21,
     "location": "Kanpur",
     "photo": "AgACAgUAAxkBAAPLaczaeFPI4fbPdEOdrQr5S25_HOcAAocPaxtAq2hW9sCwXQGhLY0BAAMCAAN5AAM7BA",
-    "ai_mode": "off",
-    "character_prompt": []
+    "bio": ""
   },
   {
     "id": 5,
@@ -41,8 +37,7 @@
     "age": 19,
     "location": "Mumbai",
     "photo": "AgACAgUAAxkBAAPOaczahyEfiRCrs9yWTQkkBlPgzmQAAokPaxtAq2hWQpmWPvtu2BsBAAMCAAN5AAM6BA",
-    "ai_mode": "off",
-    "character_prompt": []
+    "bio": ""
   },
   {
     "id": 6,
@@ -50,8 +45,7 @@
     "age": 26,
     "location": "Chandigarh",
     "photo": "AgACAgUAAxkBAAPRaczanLU7nf9GFqRWOce6IG9BMq0AAooPaxtAq2hWCrD-zSsqL58BAAMCAAN5AAM6BA",
-    "ai_mode": "off",
-    "character_prompt": []
+    "bio": ""
   },
   {
     "id": 7,
@@ -59,8 +53,7 @@
     "age": 23,
     "location": "Kolkata",
     "photo": "AgACAgUAAxkBAAPUaczarv9wUrxTN61-nzdqiV4gKycAAosPaxtAq2hWdJmeWY-s5pEBAAMCAAN4AAM6BA",
-    "ai_mode": "off",
-    "character_prompt": []
+    "bio": ""
   },
   {
     "id": 8,
@@ -68,8 +61,7 @@
     "age": 29,
     "location": "Gurugram",
     "photo": "AgACAgUAAxkBAAPXaczawDqGlduaSnFtmi09hbg1cAoAAo0PaxtAq2hWC5KP5wAB20QlAQADAgADeQADOgQ",
-    "ai_mode": "off",
-    "character_prompt": []
+    "bio": ""
   },
   {
     "id": 9,
@@ -77,8 +69,7 @@
     "age": 23,
     "location": "Pune",
     "photo": "AgACAgUAAxkBAAPaaczbCfrRnVfQ2NV0Au9c1Rg9QsUAApAPaxtAq2hWtOZeZ6hattwBAAMCAAN5AAM6BA",
-    "ai_mode": "off",
-    "character_prompt": []
+    "bio": ""
   },
   {
     "id": 10,
@@ -86,8 +77,7 @@
     "age": 25,
     "location": "Varanasi",
     "photo": "AgACAgUAAxkBAAPgaczbNbkIYWOCP1ss8NfgLXipTMUAApEPaxtAq2hWl19T8H49o7UBAAMCAAN4AAM6BA",
-    "ai_mode": "off",
-    "character_prompt": []
+    "bio": ""
   },
   {
     "id": 11,
@@ -95,8 +85,7 @@
     "age": 29,
     "location": "Jaipur",
     "photo": "AgACAgUAAxkBAAISymnXdOKFK-e87xHPTvniCkSD2JfPAAL4DWsbrhzAVkg9HN6nOXGrAQADAgADeAADOwQ",
-    "ai_mode": "off",
-    "character_prompt": []
+    "bio": ""
   },
   {
     "id": 12,
@@ -104,8 +93,7 @@
     "age": 31,
     "location": "Goa",
     "photo": "AgACAgUAAxkBAAISz2nXdPx4jIvJksPAQSROMmXKE2zZAAL5DWsbrhzAVhGiWR_ymopqAQADAgADeQADOwQ",
-    "ai_mode": "off",
-    "character_prompt": []
+    "bio": ""
   },
   {
     "id": 13,
@@ -113,8 +101,7 @@
     "age": 24,
     "location": "Kanpur",
     "photo": "AgACAgUAAxkBAAIS0mnXdf5EZNCL3cdJ-GpwZXEL1x42AAKzD2sbY2W5VlbzavqTwE4iAQADAgADeQADOwQ",
-    "ai_mode": "off",
-    "character_prompt": []
+    "bio": ""
   },
   {
     "id": 14,
@@ -122,8 +109,7 @@
     "age": 33,
     "location": "Bangalore",
     "photo": "AgACAgUAAxkBAAIS1WnXdixl9RhNs1KKamri15bM0HDAAAK1D2sbY2W5VjJqSprbbbeQAQADAgADeQADOwQ",
-    "ai_mode": "off",
-    "character_prompt": []
+    "bio": ""
   },
   {
     "id": 15,
@@ -131,8 +117,7 @@
     "age": 25,
     "location": "Noida",
     "photo": "AgACAgUAAxkBAAIS3GnXd8Nr4jmeDEdpvpCejHVImk0oAALsD2sbY2W5VhXhkPukucSbAQADAgADeQADOwQ",
-    "ai_mode": "off",
-    "character_prompt": []
+    "bio": ""
   },
   {
     "id": 16,
@@ -140,8 +125,7 @@
     "age": 29,
     "location": "Delhi",
     "photo": "AgACAgUAAxkBAAIS4GnXd_6RDSDetfW4Y1aGOCHnEBNlAALtD2sbY2W5VrNLJZqCXpQzAQADAgADeQADOwQ",
-    "ai_mode": "off",
-    "character_prompt": []
+    "bio": ""
   },
   {
     "id": 17,
@@ -149,8 +133,7 @@
     "age": 31,
     "location": "Patna",
     "photo": "AgACAgUAAxkBAAIS5GnXeD5DLTdAXZu7HfE0whSnrG_nAALuD2sbY2W5Vhtt2rLjjzo1AQADAgADeAADOwQ",
-    "ai_mode": "off",
-    "character_prompt": []
+    "bio": ""
   },
   {
     "id": 18,
@@ -158,8 +141,7 @@
     "age": 25,
     "location": "Ahmedabad",
     "photo": "AgACAgUAAxkBAAIS6GnXeH_gkfoGqDEt8P-yHSnH5dzMAALvD2sbY2W5Vio7MXXCRk1mAQADAgADeQADOwQ",
-    "ai_mode": "off",
-    "character_prompt": []
+    "bio": ""
   },
   {
     "id": 19,
@@ -167,8 +149,7 @@
     "age": 27,
     "location": "Lucknow",
     "photo": "AgACAgUAAxkBAAIS7GnXeLco0VJy1PxXImXsCjH2Ia7pAALwD2sbY2W5VklRYlINyJswAQADAgADeQADOwQ",
-    "ai_mode": "off",
-    "character_prompt": []
+    "bio": ""
   },
   {
     "id": 20,
@@ -176,8 +157,7 @@
     "age": 30,
     "location": "Kolkata",
     "photo": "AgACAgUAAxkBAAIS8GnXeOj0cat3EhopXDh0Eq6-I0nsAAICEGsbY2W5VmtxBVFAydJvAQADAgADeQADOwQ",
-    "ai_mode": "off",
-    "character_prompt": []
+    "bio": ""
   },
   {
     "id": 21,
@@ -185,8 +165,7 @@
     "age": 33,
     "location": "Jaipur",
     "photo": "AgACAgUAAxkBAAIS9GnXepYQZMG8-c9yxeYMypLdIMWlAAIqEGsbY2W5Vk2uYC4MWcpvAQADAgADeQADOwQ",
-    "ai_mode": "off",
-    "character_prompt": []
+    "bio": ""
   },
   {
     "id": 22,
@@ -194,8 +173,7 @@
     "age": 31,
     "location": "Hyderabad",
     "photo": "AgACAgUAAxkBAAIS-GnXerxJG-TboptHCz5wqc0S40WJAAJAEGsbY2W5VqLINjUIiQizAQADAgADeQADOwQ",
-    "ai_mode": "off",
-    "character_prompt": []
+    "bio": ""
   },
   {
     "id": 23,
@@ -203,8 +181,7 @@
     "age": 29,
     "location": "Delhi",
     "photo": "AgACAgUAAxkBAAIS_GnXeuHCT0DTYHmcLnmn98U6s5-uAAJBEGsbY2W5VpE4oMXw3WGbAQADAgADeQADOwQ",
-    "ai_mode": "off",
-    "character_prompt": []
+    "bio": ""
   },
   {
     "id": 24,
@@ -212,8 +189,7 @@
     "age": 32,
     "location": "Kanpur",
     "photo": "AgACAgUAAxkBAAITAAFp13vuJWEV1vWnjhFJeYFNH01DiQACVBBrG2NluVZYsQndkFk1rAEAAwIAA3kAAzsE",
-    "ai_mode": "off",
-    "character_prompt": []
+    "bio": ""
   },
   {
     "id": 25,
@@ -221,8 +197,7 @@
     "age": 41,
     "location": "Lucknow",
     "photo": "AgACAgUAAxkBAAITBGnXfBVxK_CbTe8tnv-d668hmGlDAAJWEGsbY2W5Vts4Y2f6eGeDAQADAgADeAADOwQ",
-    "ai_mode": "off",
-    "character_prompt": []
+    "bio": ""
   },
   {
     "id": 26,
@@ -230,8 +205,7 @@
     "age": 29,
     "location": "Indore",
     "photo": "AgACAgUAAxkBAAITCGnXfEOlkTvsLxNbvKpwCjPED77xAAJXEGsbY2W5Vg-OrUIbE0I5AQADAgADeQADOwQ",
-    "ai_mode": "off",
-    "character_prompt": []
+    "bio": ""
   },
   {
     "id": 27,
@@ -239,8 +213,7 @@
     "age": 35,
     "location": "Patna",
     "photo": "AgACAgUAAxkBAAITDGnXfIRI681DPTPTXpxy0FmQhEw6AAJYEGsbY2W5VlEfx4_v7dOJAQADAgADeQADOwQ",
-    "ai_mode": "off",
-    "character_prompt": []
+    "bio": ""
   },
   {
     "id": 28,
@@ -248,8 +221,7 @@
     "age": 38,
     "location": "Kanpur",
     "photo": "AgACAgUAAxkBAAITEGnXfLFbgif-hmRi1jzUMKrsuhskAAJaEGsbY2W5Vkvj8NB2ZNjuAQADAgADeQADOwQ",
-    "ai_mode": "off",
-    "character_prompt": []
+    "bio": ""
   },
   {
     "id": 29,
@@ -257,8 +229,7 @@
     "age": 24,
     "location": "Lucknow",
     "photo": "AgACAgUAAxkBAAITFGnXfNPFz8ONpnNM-LKvdh7gbMpCAAJbEGsbY2W5VrHs1ulpPN0ZAQADAgADeAADOwQ",
-    "ai_mode": "off",
-    "character_prompt": []
+    "bio": ""
   },
   {
     "id": 30,
@@ -266,8 +237,7 @@
     "age": 37,
     "location": "Prayagraj",
     "photo": "AgACAgUAAxkBAAITGGnXfP3Dqvu5mBiP1lqIk3UafXapAAJcEGsbY2W5VvRup7wNauCaAQADAgADeQADOwQ",
-    "ai_mode": "off",
-    "character_prompt": []
+    "bio": ""
   },
   {
     "id": 31,
@@ -275,8 +245,7 @@
     "age": 28,
     "location": "Delhi",
     "photo": "AgACAgUAAxkBAAITHGnXfULOgiwSVuAgWvMccqSMSm2sAAJhEGsbY2W5VvCTZA1BsPjTAQADAgADeQADOwQ",
-    "ai_mode": "off",
-    "character_prompt": []
+    "bio": ""
   },
   {
     "id": 32,
@@ -284,8 +253,7 @@
     "age": 29,
     "location": "Chandigarh",
     "photo": "AgACAgUAAxkBAAITIGnXfXRfiepxNIrxkSjvnG4cz2JXAAJjEGsbY2W5Vm5rp_yKQnltAQADAgADeQADOwQ",
-    "ai_mode": "off",
-    "character_prompt": []
+    "bio": ""
   },
   {
     "id": 33,
@@ -293,8 +261,7 @@
     "age": 31,
     "location": "Faridabad",
     "photo": "AgACAgUAAxkBAAITJGnXfbTSmPnvUAW93MqcmGrYHhohAAJkEGsbY2W5VnP2omM-nZC3AQADAgADeAADOwQ",
-    "ai_mode": "off",
-    "character_prompt": []
+    "bio": ""
   },
   {
     "id": 34,
@@ -302,8 +269,7 @@
     "age": 26,
     "location": "Kanpur",
     "photo": "AgACAgUAAxkBAAITKGnXfd-e6ZTNPVklmUCUWLOZzeGkAAJlEGsbY2W5VoQXmETONg8gAQADAgADeQADOwQ",
-    "ai_mode": "off",
-    "character_prompt": []
+    "bio": ""
   },
   {
     "id": 35,
@@ -311,8 +277,7 @@
     "age": 21,
     "location": "Ranchi",
     "photo": "AgACAgUAAxkBAAITLGnXfgkr0Lv--pIgKUHZNFw4E4FtAAJmEGsbY2W5VpPRgBjXYMiqAQADAgADeQADOwQ",
-    "ai_mode": "off",
-    "character_prompt": []
+    "bio": ""
   },
   {
     "id": 36,
@@ -320,8 +285,7 @@
     "age": 24,
     "location": "Varanasi",
     "photo": "AgACAgUAAxkBAAITMGnXfj7XadS2iQftp_p5rIKsFn_DAAJnEGsbY2W5Vs7lY6ykqbyUAQADAgADeQADOwQ",
-    "ai_mode": "off",
-    "character_prompt": []
+    "bio": ""
   },
   {
     "id": 37,
@@ -329,8 +293,7 @@
     "age": 19,
     "location": "Mumbai",
     "photo": "AgACAgUAAxkBAAITNGnXfpVlBClkC2WPZonl7qLLBw34AAJpEGsbY2W5VkIrLohgDwI3AQADAgADeAADOwQ",
-    "ai_mode": "off",
-    "character_prompt": []
+    "bio": ""
   },
   {
     "id": 38,
@@ -338,8 +301,7 @@
     "age": 31,
     "location": "Lucknow",
     "photo": "AgACAgUAAxkBAAITOGnXftKRDH2Oy6rQh4F5HkZ18CouAAJqEGsbY2W5Vl4Z13asT-OIAQADAgADeQADOwQ",
-    "ai_mode": "off",
-    "character_prompt": []
+    "bio": ""
   },
   {
     "id": 39,
@@ -347,8 +309,7 @@
     "age": 27,
     "location": "Bhopal",
     "photo": "AgACAgUAAxkBAAITPGnXfvvUBLR-GC3gAkE4HwQquVH4AAJsEGsbY2W5VuRe0Nu3lspsAQADAgADeQADOwQ",
-    "ai_mode": "off",
-    "character_prompt": []
+    "bio": ""
   },
   {
     "id": 40,
@@ -356,8 +317,7 @@
     "age": 28,
     "location": "Delhi",
     "photo": "AgACAgUAAxkBAAITQGnXf0o9-soxeXJTHQjCwZhtFQ-zAAJvEGsbY2W5VmxlFKqVvUpIAQADAgADeQADOwQ",
-    "ai_mode": "off",
-    "character_prompt": []
+    "bio": ""
   },
   {
     "id": 41,
@@ -365,8 +325,7 @@
     "age": 26,
     "location": "Surat",
     "photo": "AgACAgUAAxkBAAITRGnXf3QWlMmFDgj6wBoO3ebGdPFgAAJwEGsbY2W5VoqFDEpR8xflAQADAgADeQADOwQ",
-    "ai_mode": "off",
-    "character_prompt": []
+    "bio": ""
   },
   {
     "id": 42,
@@ -374,8 +333,7 @@
     "age": 31,
     "location": "Hyderabad",
     "photo": "AgACAgUAAxkBAAITSGnXf5zzdNgOvaGxVGUaSEcUkqUXAAJxEGsbY2W5Vgq7G6NWJZkJAQADAgADeQADOwQ",
-    "ai_mode": "off",
-    "character_prompt": []
+    "bio": ""
   },
   {
     "id": 43,
@@ -383,8 +341,7 @@
     "age": 29,
     "location": "Delhi",
     "photo": "AgACAgUAAxkBAAITTGnXf7uOfgJ8rnQXhFhW2tJaatiRAAJyEGsbY2W5VsL7uMnws_QjAQADAgADeQADOwQ",
-    "ai_mode": "off",
-    "character_prompt": []
+    "bio": ""
   },
   {
     "id": 44,
@@ -392,48 +349,47 @@
     "age": 26,
     "location": "Amritsar",
     "photo": "AgACAgUAAxkBAAITUGnXf_fOFiTnVMVEeCurNqwrbufyAAJzEGsbY2W5VrrRg3scHIgfAQADAgADdwADOwQ",
-    "ai_mode": "off",
-    "character_prompt": []
+    "bio": ""
   },
   {
-    "id": 45, "name": "Muskan Singh",
+    "id": 45,
+    "name": "Muskan Singh",
     "age": 21,
     "location": "Lucknow",
     "photo": "AgACAgUAAxkBAAITVGnXgBMUxAfKgr96s644-ZDeAVIKAAJ0EGsbY2W5VtaEOI3-drNAAQADAgADeAADOwQ",
-    "ai_mode": "off",
-    "character_prompt": []
+    "bio": ""
   },
   {
-    "id": 46, "name": "Nisha Verma",
+    "id": 46,
+    "name": "Nisha Verma",
     "age": 31,
     "location": "Kanpur",
     "photo": "AgACAgUAAxkBAAITWGnXgDxIhQec_Iun555NqOnJTmxfAAJ1EGsbY2W5Vg2Duhl2slG0AQADAgADeQADOwQ",
-    "ai_mode": "off",
-    "character_prompt": []
+    "bio": ""
   },
   {
-    "id": 47, "name": "Ritu Sharma",
+    "id": 47,
+    "name": "Ritu Sharma",
     "age": 22,
     "location": "Jaipur",
     "photo": "AgACAgUAAxkBAAITXGnXgHTuyZ2xEnF2fQXn4-c_j8bsAAJ2EGsbY2W5VltzJqMJmTscAQADAgADeQADOwQ",
-    "ai_mode": "off",
-    "character_prompt": []
+    "bio": ""
   },
   {
-    "id": 48, "name": "Pooja Rani",
+    "id": 48,
+    "name": "Pooja Rani",
     "age": 35,
     "location": "Ludhiana",
     "photo": "AgACAgUAAxkBAAITYGnXgQa0GMPgQRhJ20NfUlWClnd9AAJ3EGsbY2W5VoWRsapx4N-_AQADAgADeQADOwQ",
-    "ai_mode": "off",
-    "character_prompt": []
+    "bio": ""
   },
   {
-    "id": 49, "name": "Garima Jain",
+    "id": 49,
+    "name": "Garima Jain",
     "age": 25,
     "location": "Surat",
     "photo": "AgACAgUAAxkBAAEBTtdp-4htQ5VPzH59Yzc_VyAacYpSIwACexBrG2W-4VeMVN3vx7B92QEAAwIAA3kAAzsE",
-    "ai_mode": "off",
-    "character_prompt": []
+    "bio": ""
   },
   {
     "id": 50,
@@ -441,8 +397,7 @@
     "age": 25,
     "location": "Delhi",
     "photo": "AgACAgUAAxkBAAKx4Wnw6-PWGkIeFsg0q2QxQWj7uUdYAAIID2sbH9KJVzbKTYRNGSQCAQADAgADeQADOwQ",
-    "ai_mode": "off",
-    "character_prompt": []
+    "bio": ""
   },
   {
     "id": 51,
@@ -450,8 +405,7 @@
     "age": 20,
     "location": "Lucknow",
     "photo": "AgACAgUAAxkBAAEBQBdp-1UuSf4WKmMtAAE2bEPosNnwcP4AAv8PaxtlvuFXsJe3zrfXEEgBAAMCAAN4AAM7BA",
-    "ai_mode": "off",
-    "character_prompt": []
+    "bio": ""
   },
   {
     "id": 52,
@@ -459,8 +413,7 @@
     "age": 29,
     "location": "Mumbai",
     "photo": "AgACAgUAAxkBAAEBQBlp-1VUUmTjoHgpSmuGvP3tV79MPwADEGsbZb7hVwS3IdRLjug7AQADAgADeQADOwQ",
-    "ai_mode": "off",
-    "character_prompt": []
+    "bio": ""
   },
   {
     "id": 53,
@@ -468,8 +421,7 @@
     "age": 27,
     "location": "Pune",
     "photo": "AgACAgUAAxkBAAEBQB9p-1WIi-PyfnBwLhbICKkeI3bdKgACARBrG2W-4VewfeYNSwSt9gEAAwIAA3kAAzsE",
-    "ai_mode": "off",
-    "character_prompt": []
+    "bio": ""
   },
   {
     "id": 54,
@@ -477,8 +429,7 @@
     "age": 24,
     "location": "Delhi",
     "photo": "AgACAgUAAxkBAAEBQCdp-1XJgHd0kV1DOXOvvdfj29pYCAACAhBrG2W-4VcPbxW_e3X6xgEAAwIAA3kAAzsE",
-    "ai_mode": "off",
-    "character_prompt": []
+    "bio": ""
   },
   {
     "id": 55,
@@ -486,8 +437,7 @@
     "age": 33,
     "location": "Kanpur",
     "photo": "AgACAgUAAxkBAAEBQDZp-1YEH5b-pbf0F2NKqX28BmLkfQACBBBrG2W-4VcfEUKB62rKDgEAAwIAA3kAAzsE",
-    "ai_mode": "off",
-    "character_prompt": []
+    "bio": ""
   },
   {
     "id": 56,
@@ -495,8 +445,7 @@
     "age": 23,
     "location": "Indore",
     "photo": "AgACAgUAAxkBAAEBQFRp-1ZVCjHhNiZZcHkWCGJtrsYh6QACCBBrG2W-4VfKp3LPxURPMgEAAwIAA3gAAzsE",
-    "ai_mode": "off",
-    "character_prompt": []
+    "bio": ""
   },
   {
     "id": 57,
@@ -504,8 +453,7 @@
     "age": 27,
     "location": "Patna",
     "photo": "AgACAgUAAxkBAAEBQKxp-1cOQkaX2j8KE7Czfek0WiolagACDxBrG2W-4VeA3ZC42ViOnAEAAwIAA3kAAzsE",
-    "ai_mode": "off",
-    "character_prompt": []
+    "bio": ""
   },
   {
     "id": 58,
@@ -513,8 +461,7 @@
     "age": 28,
     "location": "Gurugram",
     "photo": "AgACAgUAAxkBAAEBQLBp-1c9uS4WCaqhW5IVK8_lqccmvwACEhBrG2W-4VexUg2XkSGD1wEAAwIAA3kAAzsE",
-    "ai_mode": "off",
-    "character_prompt": []
+    "bio": ""
   },
   {
     "id": 59,
@@ -522,8 +469,7 @@
     "age": 26,
     "location": "Noida",
     "photo": "AgACAgUAAxkBAAEBQLNp-1dtvD1mDXgc08otd463DJefhAACFBBrG2W-4VelU-xEVLcHzgEAAwIAA3gAAzsE",
-    "ai_mode": "off",
-    "character_prompt": []
+    "bio": ""
   },
   {
     "id": 60,
@@ -531,8 +477,7 @@
     "age": 27,
     "location": "Prayagraj",
     "photo": "AgACAgUAAxkBAAEBQLVp-1e00rljtEF4mWYmzQmVM5WULgACFRBrG2W-4VfFjsAKGfUuIQEAAwIAA3kAAzsE",
-    "ai_mode": "off",
-    "character_prompt": []
+    "bio": ""
   },
   {
     "id": 61,
@@ -540,8 +485,7 @@
     "age": 26,
     "location": "Lucknow",
     "photo": "AgACAgUAAxkBAAEBQLhp-1gZnInn5lihxHccpvDO5OFuTAACGBBrG2W-4VdABkiKHv3KsQEAAwIAA3gAAzsE",
-    "ai_mode": "off",
-    "character_prompt": []
+    "bio": ""
   },
   {
     "id": 62,
@@ -549,8 +493,7 @@
     "age": 30,
     "location": "Bangalore",
     "photo": "AgACAgUAAxkBAAEBQOdp-1iTw_vneOnctp9ILN3b8lHjFgACGRBrG2W-4VepghwjHcJSZQEAAwIAA3kAAzsE",
-    "ai_mode": "off",
-    "character_prompt": []
+    "bio": ""
   },
   {
     "id": 63,
@@ -558,8 +501,7 @@
     "age": 32,
     "location": "Varanasi",
     "photo": "AgACAgUAAxkBAAEBQPBp-1jaxEgdpWR8PKeVtNCjOOExmQACGxBrG2W-4Vcp21PNaEqc8gEAAwIAA3kAAzsE",
-    "ai_mode": "off",
-    "character_prompt": []
+    "bio": ""
   },
   {
     "id": 64,
@@ -567,8 +509,7 @@
     "age": 22,
     "location": "Kanpur",
     "photo": "AgACAgUAAxkBAAEBQQtp-1kqAnQAAc8Xh1TfJJQjMukEoxUAAh0QaxtlvuFXURpUQ94ksecBAAMCAAN5AAM7BA",
-    "ai_mode": "off",
-    "character_prompt": []
+    "bio": ""
   },
   {
     "id": 65,
@@ -576,8 +517,7 @@
     "age": 28,
     "location": "Delhi",
     "photo": "AgACAgUAAxkBAAEBQSNp-1lhwDoXznR9Ew-YoCuCA03GVQACHxBrG2W-4VcxovPZL9UaAQEAAwIAA3kAAzsE",
-    "ai_mode": "off",
-    "character_prompt": []
+    "bio": ""
   },
   {
     "id": 66,
@@ -585,8 +525,7 @@
     "age": 29,
     "location": "Mumbai",
     "photo": "AgACAgUAAxkBAAEBQT9p-1mxFXgzi0OUmElGb5eGsLXGPwACIBBrG2W-4VcoGtDdDaJPjgEAAwIAA3kAAzsE",
-    "ai_mode": "off",
-    "character_prompt": []
+    "bio": ""
   },
   {
     "id": 67,
@@ -594,8 +533,7 @@
     "age": 24,
     "location": "Jaipur",
     "photo": "AgACAgUAAxkBAAEBQUNp-1n7OLFAhrflci_uC7JQjJF8QgACIhBrG2W-4VeNzU3xEK01ugEAAwIAA3kAAzsE",
-    "ai_mode": "off",
-    "character_prompt": []
+    "bio": ""
   },
   {
     "id": 68,
@@ -603,8 +541,7 @@
     "age": 19,
     "location": "Mumbai",
     "photo": "AgACAgUAAxkBAAEBQU5p-1o9FSq_M1fTid7yjZPH9_8wZgACIxBrG2W-4VdXchidYpWGdAEAAwIAA3kAAzsE",
-    "ai_mode": "off",
-    "character_prompt": []
+    "bio": ""
   },
   {
     "id": 69,
@@ -612,8 +549,7 @@
     "age": 31,
     "location": "Pune",
     "photo": "AgACAgUAAxkBAAEBQXZp-1rNWkKMKnpp7z3xYdia7upJEQACJxBrG2W-4VdsVPJfx2nlyQEAAwIAA3kAAzsE",
-    "ai_mode": "off",
-    "character_prompt": []
+    "bio": ""
   },
   {
     "id": 70,
@@ -621,8 +557,7 @@
     "age": 26,
     "location": "Lucknow",
     "photo": "AgACAgUAAxkBAAEBQYJp-1sONXxAzjnJmS1DkO16p_UGOAACKhBrG2W-4VfDD0ryPDlrtgEAAwIAA3kAAzsE",
-    "ai_mode": "off",
-    "character_prompt": []
+    "bio": ""
   },
   {
     "id": 71,
@@ -630,8 +565,7 @@
     "age": 22,
     "location": "Surat",
     "photo": "AgACAgUAAxkBAAEBQYVp-1s6enNt3WQ9wowprf-z6kVYBwACKxBrG2W-4VdfxEmezHa43QEAAwIAA3kAAzsE",
-    "ai_mode": "off",
-    "character_prompt": []
+    "bio": ""
   },
   {
     "id": 72,
@@ -639,8 +573,7 @@
     "age": 30,
     "location": "Delhi",
     "photo": "AgACAgUAAxkBAAEBQYlp-1uBPPOh-FszO4O7gMDpShs4sgACLBBrG2W-4VclF6uJVewB1QEAAwIAA3gAAzsE",
-    "ai_mode": "off",
-    "character_prompt": []
+    "bio": ""
   },
   {
     "id": 73,
@@ -648,8 +581,7 @@
     "age": 24,
     "location": "Chandigarh",
     "photo": "AgACAgUAAxkBAAEBQm9p-11fvpkYP26-ul5Y6_EPGxijcwACMBBrG2W-4VfmQUkGo9OzEQEAAwIAA3kAAzsE",
-    "ai_mode": "off",
-    "character_prompt": []
+    "bio": ""
   },
   {
     "id": 74,
@@ -657,8 +589,7 @@
     "age": 32,
     "location": "Ahmedabad",
     "photo": "AgACAgUAAxkBAAEBQpBp-12gzeMxVEd2YtftpDUO0NLCmQACMRBrG2W-4Ve12_fJrKkTBwEAAwIAA3kAAzsE",
-    "ai_mode": "off",
-    "character_prompt": []
+    "bio": ""
   },
   {
     "id": 75,
@@ -666,8 +597,7 @@
     "age": 29,
     "location": "Goa",
     "photo": "AgACAgUAAxkBAAEBQppp-131G57wBNy7CYJh-b5WeqBq4AACMhBrG2W-4VdKTQofOVP4kgEAAwIAA3kAAzsE",
-    "ai_mode": "off",
-    "character_prompt": []
+    "bio": ""
   },
   {
     "id": 76,
@@ -675,8 +605,7 @@
     "age": 37,
     "location": "Faridabad",
     "photo": "AgACAgUAAxkBAAEBQr5p-16UKQa0h25RKc41Et0iH3Wy3wACMxBrG2W-4Vcpx1EqBl0DjAEAAwIAA3kAAzsE",
-    "ai_mode": "off",
-    "character_prompt": []
+    "bio": ""
   },
   {
     "id": 77,
@@ -684,8 +613,7 @@
     "age": 26,
     "location": "Kanpur",
     "photo": "AgACAgUAAxkBAAEBQstp-17jbMQgf-74hblNhb8gchyTmgACNBBrG2W-4VdntZTrMyoCRwEAAwIAA3kAAzsE",
-    "ai_mode": "off",
-    "character_prompt": []
+    "bio": ""
   },
   {
     "id": 78,
@@ -693,8 +621,7 @@
     "age": 29,
     "location": "Mumbai",
     "photo": "AgACAgUAAxkBAAEBQtRp-18uqL0H_cm1xHZtrCmynUImNwACNRBrG2W-4VcQQf0F5tCO0wEAAwIAA3kAAzsE",
-    "ai_mode": "off",
-    "character_prompt": []
+    "bio": ""
   },
   {
     "id": 79,
@@ -702,8 +629,7 @@
     "age": 28,
     "location": "Gurugram",
     "photo": "AgACAgUAAxkBAAEBQuFp-19h8SRC8qHaeeWwtP-ahfhFEAACNhBrG2W-4Vf8Q8XKlnXvEQEAAwIAA3kAAzsE",
-    "ai_mode": "off",
-    "character_prompt": []
+    "bio": ""
   },
   {
     "id": 80,
@@ -711,8 +637,7 @@
     "age": 30,
     "location": "Hyderabad",
     "photo": "AgACAgUAAxkBAAEBQuxp-1_Epc9ZRPtuL5by_xUi08PITgACNxBrG2W-4Vemg_BfhuKerAEAAwIAA3kAAzsE",
-    "ai_mode": "off",
-    "character_prompt": []
+    "bio": ""
   },
   {
     "id": 81,
@@ -720,8 +645,7 @@
     "age": 25,
     "location": "Delhi",
     "photo": "AgACAgUAAxkBAAEBQvxp-2A38HHIV3gWnn8u6KceQKKmZQACOBBrG2W-4Vfspef4SzdZaQEAAwIAA3kAAzsE",
-    "ai_mode": "off",
-    "character_prompt": []
+    "bio": ""
   },
   {
     "id": 82,
@@ -729,8 +653,7 @@
     "age": 23,
     "location": "Pune",
     "photo": "AgACAgUAAxkBAAEBQxJp-2DEjP2TBrmyU3RkxAJOPDyYbAACOhBrG2W-4VekOeqRNijOZwEAAwIAA3kAAzsE",
-    "ai_mode": "off",
-    "character_prompt": []
+    "bio": ""
   },
   {
     "id": 83,
@@ -738,8 +661,7 @@
     "age": 33,
     "location": "Kolkata",
     "photo": "AgACAgUAAxkBAAEBQzZp-2EfG6WzVslYTU4VtU0rhPSoNgACPBBrG2W-4VdlWc1N5l1R0AEAAwIAA3cAAzsE",
-    "ai_mode": "off",
-    "character_prompt": []
+    "bio": ""
   },
   {
     "id": 84,
@@ -747,8 +669,7 @@
     "age": 19,
     "location": "Lucknow",
     "photo": "AgACAgUAAxkBAAEBQzhp-2FMbjfCGVrskeYyilY8D6FrxgACPRBrG2W-4Vc6NSVgT8f4JwEAAwIAA3kAAzsE",
-    "ai_mode": "off",
-    "character_prompt": []
+    "bio": ""
   },
   {
     "id": 85,
@@ -756,8 +677,7 @@
     "age": 27,
     "location": "Hyderabad",
     "photo": "AgACAgUAAxkBAAEBQzpp-2GhH6XeYvP7c263PAABNlyuMIgAAj4QaxtlvuFXkzt6vWqGt4sBAAMCAAN5AAM7BA",
-    "ai_mode": "off",
-    "character_prompt": []
+    "bio": ""
   },
   {
     "id": 86,
@@ -765,8 +685,7 @@
     "age": 23,
     "location": "Bangalore",
     "photo": "AgACAgUAAxkBAAEBQzxp-2HYKJi5YVuN9v-5WPFhEsOV4AACPxBrG2W-4VfDBrP9-eJ_MQEAAwIAA3kAAzsE",
-    "ai_mode": "off",
-    "character_prompt": []
+    "bio": ""
   },
   {
     "id": 87,
@@ -774,8 +693,7 @@
     "age": 21,
     "location": "Noida",
     "photo": "AgACAgUAAxkBAAEBQz5p-2IjeFgwFD7J4jblZOcNLhCavAACQBBrG2W-4VdBfp-i_JGtxgEAAwIAA3cAAzsE",
-    "ai_mode": "off",
-    "character_prompt": []
+    "bio": ""
   },
   {
     "id": 88,
@@ -783,8 +701,7 @@
     "age": 29,
     "location": "Jaipur",
     "photo": "AgACAgUAAxkBAAEBQ0Bp-2JkO0BdH67xWzg1tUL4uQT5oAACQRBrG2W-4Vc9yiZWpOmyDQEAAwIAA3gAAzsE",
-    "ai_mode": "off",
-    "character_prompt": []
+    "bio": ""
   },
   {
     "id": 89,
@@ -792,8 +709,7 @@
     "age": 31,
     "location": "Kolkata",
     "photo": "AgACAgUAAxkBAAEBQ0Jp-2Li5bz8EweaaKeo4yjsPXjqAgACQhBrG2W-4Vfh0TeIVQABX7gBAAMCAAN4AAM7BA",
-    "ai_mode": "off",
-    "character_prompt": []
+    "bio": ""
   },
   {
     "id": 90,
@@ -801,8 +717,7 @@
     "age": 26,
     "location": "Delhi",
     "photo": "AgACAgUAAxkBAAEBQ1hp-2NyIf1IPk8kOeRsAd4ma-EUGgACQxBrG2W-4VcpZC0B7P_bPQEAAwIAA3gAAzsE",
-    "ai_mode": "off",
-    "character_prompt": []
+    "bio": ""
   },
   {
     "id": 91,
@@ -810,8 +725,7 @@
     "age": 23,
     "location": "Ahmedabad",
     "photo": "AgACAgUAAxkBAAEBQ2pp-2PWNtMGzd-Ui4G198spTlpH6gACRBBrG2W-4VfZ_cWqESBW2wEAAwIAA3gAAzsE",
-    "ai_mode": "off",
-    "character_prompt": []
+    "bio": ""
   },
   {
     "id": 92,
@@ -819,8 +733,7 @@
     "age": 30,
     "location": "Mumbai",
     "photo": "AgACAgUAAxkBAAEBQ2xp-2P9pNzulpfvkB9uPApuOsZ1jQACRhBrG2W-4VeH69NuFq0XzgEAAwIAA3kAAzsE",
-    "ai_mode": "off",
-    "character_prompt": []
+    "bio": ""
   },
   {
     "id": 93,
@@ -828,8 +741,7 @@
     "age": 31,
     "location": "Pune",
     "photo": "AgACAgUAAxkBAAEBQ3dp-2Q9qmSmGuqo_OSYMJpUWPYBCgACSBBrG2W-4VeJ9dc-GUy8LQEAAwIAA3kAAzsE",
-    "ai_mode": "off",
-    "character_prompt": []
+    "bio": ""
   },
   {
     "id": 94,
@@ -837,8 +749,7 @@
     "age": 28,
     "location": "Indore",
     "photo": "AgACAgUAAxkBAAEBQ5Fp-2SUoDr12LODzI1pyc1rbfIrUwACShBrG2W-4VeVBlX3-56C2wEAAwIAA3cAAzsE",
-    "ai_mode": "off",
-    "character_prompt": []
+    "bio": ""
   },
   {
     "id": 95,
@@ -846,8 +757,7 @@
     "age": 29,
     "location": "Goa",
     "photo": "AgACAgUAAxkBAAEBSkJp-3-nrMrynHNdJgAB4H_x7BPwQWgAAvIVaxsb4NhXBOioT4Io8EQBAAMCAAN5AAM7BA",
-    "ai_mode": "off",
-    "character_prompt": []
+    "bio": ""
   },
   {
     "id": 96,
@@ -855,8 +765,7 @@
     "age": 31,
     "location": "Surat",
     "photo": "AgACAgUAAxkBAAEBSphp-4ANd8stSNzWXamqv-kgmBQMPwACbBBrG2W-4VdBxUh_z8pKEQEAAwIAA3kAAzsE",
-    "ai_mode": "off",
-    "character_prompt": []
+    "bio": ""
   },
   {
     "id": 97,
@@ -864,8 +773,7 @@
     "age": 24,
     "location": "Lucknow",
     "photo": "AgACAgUAAxkBAAEBSxFp-4DhLTjp0npwuxgHW-YCGNZF4AACbRBrG2W-4VebqCft_gmvMAEAAwIAA3gAAzsE",
-    "ai_mode": "off",
-    "character_prompt": []
+    "bio": ""
   },
   {
     "id": 98,
@@ -873,8 +781,7 @@
     "age": 27,
     "location": "Ahmedabad",
     "photo": "AgACAgUAAxkBAAEBSytp-4EN06vzpbSZumSfxGhvtLF_HgACbhBrG2W-4VfDPrShgDxlpgEAAwIAA3kAAzsE",
-    "ai_mode": "off",
-    "character_prompt": []
+    "bio": ""
   },
   {
     "id": 99,
@@ -882,22 +789,6 @@
     "age": 21,
     "location": "Kanpur",
     "photo": "AgACAgUAAxkBAAEBTtJp-4hDmcNmwS-6wbmdSV6IDX5z6QACehBrG2W-4Vcg1Lw0TFo-FAEAAwIAA3gAAzsE",
-    "ai_mode": "off",
-    "character_prompt": []
-  },
-  {
-    "id": 100,
-    "name": "Aisha",
-    "age": 22,
-    "location": "Mumbai",
-    "photo": "AgACAgUAAxkBAAEBQ1hp-2NyIf1IPk8kOeRsAd4ma-EUGgACQxBrG2W-4VcpZC0B7P_bPQEAAwIAA3gAAzsE",
-    "ai_mode": "testing",
-    "character_prompt": [
-      "Tum B.Com final year ki student ho aur Mumbai me rehti ho.",
-      "Tumhara nature chill, lazy aur thoda sarcastic hai.",
-      "Tumhe Netflix par K-dramas aur crime thrillers dekhna pasand hai.",
-      "Tumhari favorite drink cold coffee hai.",
-      "Tum easily impress nahi hoti aur doston ke sath mazaak karna pasand karti ho."
-    ]
+    "bio": ""
   }
 ]
