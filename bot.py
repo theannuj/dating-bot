@@ -3020,20 +3020,45 @@ def callback_handler(call):
                 return
             user_id, query_text = row
             
+            # 🔥 NAYA CODE: User ki saari details fetch karna
+            u_data = get_user(user_id)
+            name = u_data.get("name", "Unknown")
+            city = u_data.get("city", "Not Set")
+            vip_status = "🟢 VIP Active" if u_data.get("paid") else "⚪ Free User"
+            
+            # Telegram username nikalne ki koshish (Agar error aaye toh N/A)
+            try:
+                chat_info = bot.get_chat(user_id)
+                tg_username = f"@{chat_info.username}" if chat_info.username else "N/A"
+            except:
+                tg_username = u_data.get("payment_username", "N/A")
+
             markup = InlineKeyboardMarkup()
             markup.row(InlineKeyboardButton("💬 Reply to User", callback_data=f"replyticket_{ticket_id}_{user_id}"))
             markup.row(InlineKeyboardButton("🔙 Back to List", callback_data="admin_support_back"))
             
+            # Professional Header Design
+            header_text = (
+                f"🎫 <b>Ticket #{ticket_id}</b>\n"
+                f"------------------------------\n"
+                f"👤 <b>User:</b> {html.escape(name)} ({tg_username})\n"
+                f"🆔 <b>ID:</b> <code>{user_id}</code>\n"
+                f"📍 <b>City:</b> {html.escape(city)}\n"
+                f"💎 <b>Status:</b> {vip_status}\n"
+                f"------------------------------\n"
+            )
+
             # Agar user ne photo bheji thi
             if query_text.startswith("[PHOTO:"):
                 parts = query_text.split("] ", 1)
                 file_id = parts[0].replace("[PHOTO:", "")
                 caption_text = parts[1] if len(parts) > 1 else ""
-                msg_text = f"🎫 <b>Ticket #{ticket_id}</b>\n<b>User ID:</b> {user_id}\n\n<b>Message:</b> {html.escape(caption_text)}"
+                msg_text = header_text + f"💬 <b>Message:</b>\n{html.escape(caption_text)}"
                 safe_send_photo(bot, call.message.chat.id, file_id, caption=msg_text, reply_markup=markup, parse_mode="HTML")
             else:
-                msg_text = f"🎫 <b>Ticket #{ticket_id}</b>\n<b>User ID:</b> {user_id}\n\n<b>Message:</b>\n{html.escape(query_text)}"
+                msg_text = header_text + f"💬 <b>Message:</b>\n{html.escape(query_text)}"
                 safe_send_message(bot, call.message.chat.id, msg_text, reply_markup=markup, parse_mode="HTML")
+                
             safe_answer_callback_query(bot, call.id)
         except Exception as e:
             print(f"View ticket error: {e}")
