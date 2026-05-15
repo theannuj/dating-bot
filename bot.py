@@ -3512,18 +3512,31 @@ def text_handler(message):
 
     # SUPPORT SYSTEM: Catch Text Message
     if user["step"] == "awaiting_support_ticket":
-        if text.startswith("/"): # Agar galti se koi command daba de
-            safe_send_message(bot, user_id, "Support request cancelled.")
+        # Check karo ki user ne galti se koi button toh nahi daba diya
+        is_bot_button = text in {
+            BTN_START, BTN_LIKES, BTN_SETTINGS, BTN_BUY, BTN_SEE_LIKES, 
+            BTN_GET_VIP, BTN_MY_PROFILE, BTN_HOW_IT_WORKS, BTN_VIP, 
+            BTN_MAIN_MENU, BTN_CHAT, BTN_SEND_PAYMENT, BTN_NEXT_MATCH, 
+            BTN_PREV_MATCH, BTN_MATCH_NEXT, BTN_END_CHAT, BTN_SKIP, BTN_LIKE,
+            BTN_CONTINUE, BTN_18_YES, BTN_GENDER_MALE, BTN_GENDER_FEMALE,
+            BTN_AGREE_CONTINUE, BTN_READ_AGREEMENT, BTN_SEND_GIFT
+        } or text.startswith("💖 Matches")
+        
+        if text.startswith("/") or is_bot_button:
             user["step"] = "menu"
             flush_loaded_users()
-            return
+            safe_send_message(bot, user_id, "❌ Support request cancelled.", reply_markup=main_menu_keyboard(user_id))
             
-        create_support_ticket(user_id, text)
-        user["step"] = "menu"
-        flush_loaded_users()
-        safe_send_message(bot, user_id, "✅ <b>Ticket Submitted!</b>\nYour issue has been sent to the admin.\n\n<b>Status:</b> 🟡 Under Review\n\nPlease wait, we will reply to you here shortly.", parse_mode="HTML")
-        safe_send_message(bot, MAIN_ADMIN_ID, f"🎫 New Support Ticket from User ID: {user_id}")
-        return
+            # Agar command (/) thi, toh yahin rok do. Agar button tha, toh aage badhne do taaki button ka actual action ho jaye.
+            if text.startswith("/"):
+                return
+        else:
+            create_support_ticket(user_id, text)
+            user["step"] = "menu"
+            flush_loaded_users()
+            safe_send_message(bot, user_id, "✅ <b>Ticket Submitted!</b>\nYour issue has been sent to the admin.\n\n<b>Status:</b> 🟡 Under Review\n\nPlease wait, we will reply to you here shortly.", parse_mode="HTML")
+            safe_send_message(bot, MAIN_ADMIN_ID, f"🎫 New Support Ticket from User ID: {user_id}")
+            return
 
 
     if text == BTN_CONTINUE:
