@@ -409,17 +409,18 @@ BTN_START = "🔥 Start"
 BTN_MATCHES = "💖 Matches"
 BTN_LIKES = "👀 Likes"
 BTN_SETTINGS = "⚙️ Settings"
-BTN_BUY = "🔓 Unlock Chat"
+BTN_BUY = "💎 Get Premium"
 BTN_VIEW_PROFILE = "View profile"
 BTN_LIKE = "💚"
 BTN_SKIP = "❌"
 BTN_MAIN_MENU = "🏠 Main Menu"
 BTN_SEND_GIFT = "🎁 Send gift"
 BTN_SEE_LIKES = "See who likes you"
-BTN_GET_VIP = "💎 Get VIP"
+BTN_GET_VIP = "💎 Get Premium"
 BTN_MY_PROFILE = "👤 My profile"
 BTN_HOW_IT_WORKS = "❓ How it works"
-BTN_VIP = "🔓 Unlock Chat"
+BTN_VIP = "💎 Get Premium"
+BTN_UNLOCK_REPLY = "🔓 Unlock to Reply"
 BTN_CHAT = "💬 Chat"
 BTN_SEND_PAYMENT = "Send payment screenshot"
 BTN_NEXT_MATCH = "➡️ Next Match"
@@ -2181,20 +2182,23 @@ def send_vip_already_message(user_id):
     safe_send_message(bot, user_id, "<b>✅ You already have VIP access.</b>", parse_mode="HTML")
 
 
+def chat_locked_keyboard():
+    return build_keyboard([BTN_UNLOCK_REPLY], [BTN_MAIN_MENU])
+
 def unlock_text():
     return (
         "<b>"
-        "<b>🔒 VIP Access Required</b>\n\n"
+        "🔒 <b>Premium Access Required</b>\n\n"
         "Wait… don't go 😶\n"
         "We were just getting interesting…\n\n"
-        "To continue this chat, unlock chat 👇\n\n"
-        "<b>💳 Secure Payment Link:</b>\n"
+        "To continue this chat, upgrade to Premium 👇\n\n"
+        "💳 <b>Secure Payment Link:</b>\n"
         f"{PAYMENT_LINK}\n\n"
-        "<b>📌 Steps:</b>\n"
+        "📌 <b>Steps:</b>\n"
         "1. Make payment\n"
         "2. Send screenshot\n"
-        "3. Get VIP access\n\n"
-        "⚠️ After payment, send screenshot here to activate VIP"
+        "3. Get Premium access\n\n"
+        "⚠️ After payment, send screenshot here to activate Premium"
         "</b>"
     )
 
@@ -2416,10 +2420,13 @@ def open_match_chat(user_id, match_id, show_history=True):
             profile = get_profile(match_id)
             name = profile["name"] if profile else "your match"
             safe_send_message(bot, user_id, format_chat_history(name, history), parse_mode="HTML")
+            
+        lock_msg = "⏳ <b>Free Chat Limit Reached!</b>\n\nYou've used your free messages for this match. She was just about to say something... don't leave her waiting! 😉\n\nUpgrade your account now to continue this chat and get unlimited access."
+        
         safe_send_message(bot, 
             user_id,
-            "<b>She was about to say something…</b>\n\nUnlock to continue 🔓",
-            reply_markup=likes_locked_keyboard(),
+            lock_msg,
+            reply_markup=chat_locked_keyboard(),
             parse_mode="HTML",
         )
         return
@@ -3258,10 +3265,14 @@ def callback_handler(call):
                     safe_answer_callback_query(bot,call.id, "Chat is not active")
                     return
                 set_chat_state(user_id, match_id, "locked")
-                append_system_message(user_id, match_id, "She was about to say something…\n\nUnlock to continue 🔓")
-                safe_send_message(bot, user_id, "<b>She was about to say something…</b>\n\nUnlock to continue 🔓", reply_markup=likes_locked_keyboard(), parse_mode="HTML")
                 
-                # 🔥 FEEDBACK FOR ADMIN: Buttons hatao aur confirmation likho
+                # 🔥 NAYA HOOK MESSAGE
+                lock_msg = "⏳ <b>Free Chat Limit Reached!</b>\n\nYou've used your free messages for this match. She was just about to say something... don't leave her waiting! 😉\n\nUpgrade your account now to continue this chat and get unlimited access."
+                
+                append_system_message(user_id, match_id, lock_msg.replace("<b>", "").replace("</b>", ""))
+                safe_send_message(bot, user_id, lock_msg, reply_markup=chat_locked_keyboard(), parse_mode="HTML")
+                
+                # FEEDBACK FOR ADMIN
                 bot.edit_message_text(f"✅ <b>Chat Locked!</b>\nUser {user_id} can no longer message in this chat.", call.message.chat.id, call.message.message_id, parse_mode="HTML")
                 safe_answer_callback_query(bot,call.id, "Chat locked")
                 return
@@ -3519,7 +3530,7 @@ def text_handler(message):
             BTN_MAIN_MENU, BTN_CHAT, BTN_SEND_PAYMENT, BTN_NEXT_MATCH, 
             BTN_PREV_MATCH, BTN_MATCH_NEXT, BTN_END_CHAT, BTN_SKIP, BTN_LIKE,
             BTN_CONTINUE, BTN_18_YES, BTN_GENDER_MALE, BTN_GENDER_FEMALE,
-            BTN_AGREE_CONTINUE, BTN_READ_AGREEMENT, BTN_SEND_GIFT
+            BTN_AGREE_CONTINUE, BTN_READ_AGREEMENT, BTN_SEND_GIFT, BTN_UNLOCK_REPLY
         } or text.startswith("💖 Matches")
         
         if text.startswith("/") or is_bot_button:
@@ -3629,7 +3640,7 @@ def text_handler(message):
         safe_send_message(bot, user_id, "Choose a section.", reply_markup=settings_keyboard())
         return
 
-    if text in {"/buy", BTN_BUY, BTN_GET_VIP, BTN_VIP}:
+    if text in {"/buy", BTN_BUY, BTN_GET_VIP, BTN_VIP, BTN_UNLOCK_REPLY}:
         # Check if user is already VIP
         if user["paid"]:
             send_vip_already_message(user_id)
