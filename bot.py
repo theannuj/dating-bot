@@ -777,10 +777,10 @@ def format_vip_expiry_date(user):
 def build_vip_status_lines(user):
     if is_vip_active(user):
         return [
-            "VIP: Active 💎",
-            f"\u23F3 {get_vip_remaining_days(user)} days remaining",
+            "💎 <b>Premium: Active</b>",
+            f"⏳ <i>{get_vip_remaining_days(user)} days remaining</i>",
         ]
-    return ["VIP: Not Active"]
+    return ["💎 <b>Premium: Not Active</b>"]
 
 
 def prepare_user_record(payload):
@@ -1265,8 +1265,8 @@ def chat_limit_message(user_id):
 def unlock_vip_usage_message(user_id):
     user = get_user(user_id)
     if user.get("vip_start_date") is not None:
-        return "<b>You've reached your chat limit.\nRenew VIP to continue 🔓</b>"
-    return "<b>You've used your free chat.\nUnlock VIP to continue 🔓</b>"
+        return "<b>You've reached your chat limit.\nRenew Premium to continue 🔓</b>"
+    return "<b>You've used your free chat.\nGet Premium to continue 🔓</b>"
 
 
 def is_visible_in_inbox(user_id, match_id):
@@ -1485,13 +1485,20 @@ def send_match_card(user_id, match_id):
 
     state = get_chat_state(user_id, match_id)
     unread = get_unread_count(user_id, match_id)
-    preview = get_last_message_preview(user_id, match_id, limit=80)
-    lines = [f"<b>{profile['name']}</b>, {profile['age']} 🙂"]
+    
+    # 🔥 CLEAN & PROFESSIONAL FORMATTING
+    lines = [f"<b>{profile['name']}</b>, {profile['age']} 🙂\n"]
+    
     if unread:
-        lines.append(f"Unread: {unread}")
-    lines.append(preview)
+        lines.append(f"💬 <b>Unread messages:</b> {unread}\n")
+        
     if state == "locked":
-        lines.extend(["", "Upgrade to reply and unlock full chats 🔓"])
+        lines.append("🔒 <b>Chat Locked</b>")
+        lines.append("<i>She is waiting for your reply...</i>\n")
+        lines.append("💎 <b>Upgrade to Premium to continue</b>")
+    else:
+        preview = get_last_message_preview(user_id, match_id, limit=80)
+        lines.append(f"<i>{preview}</i>")
 
     user["current_match_id"] = match_id
     user["active_view"] = "match"
@@ -2230,22 +2237,23 @@ def open_likes_you(user_id):
             user_id,
             profile["photo"],
             caption=(
-                f"{profile['name']}, {profile['age']}\n"
-                "\nThis person liked you first."
+                f"<b>{profile['name']}</b>, {profile['age']}\n\n"
+                "💖 This person liked you first."
             ),
             reply_markup=build_keyboard([BTN_SKIP, BTN_LIKE], [BTN_MATCHES, BTN_MAIN_MENU]),
+            parse_mode="HTML"
         )
     else:
         safe_send_photo(bot, 
             user_id,
             profile["photo"],
             caption=(
-                f"{profile['name']}, {profile['age']}\n"
-                "\nAvailable in VIP to view and reply."
+                f"<b>{profile['name']}</b>, {profile['age']}\n\n"
+                "🔒 <i>Available in Premium to view and reply.</i>"
             ),
             reply_markup=likes_locked_keyboard(),
+            parse_mode="HTML"
         )
-
 
 def show_matches(user_id):
     user = get_user(user_id)
@@ -3089,11 +3097,11 @@ def callback_handler(call):
     # --- HELP MENU LOGIC ---
     if call.data.startswith("help_"):
         if call.data == "help_matches":
-            text = "<b>How to get matches? ✨</b>\n\nBrowse through profiles and hit '💚' if you like someone. If they like you back, boom... it's a match! 🔥\n\n<i>Tip: If you don't want to wait, VIP members can directly see who liked them in the '👀 Likes' section.</i>"
+            text = "<b>How to get matches? ✨</b>\n\nBrowse through profiles and hit '💚' if you like someone. If they like you back, boom... it's a match! 🔥\n\n<i>Tip: If you don't want to wait, Premium members can directly see who liked them in the '👀 Likes' section.</i>"
         elif call.data == "help_chat":
-            text = "<b>How chatting works? 💬</b>\n\nGood news: <b>Your first chat with any match is completely FREE!</b> 🎉\n\nTo keep conversations focused, free members can chat with <b>one person at a time</b>.\n\nWant to talk to a new match? Just use the 'End Chat' button in your current conversation to free up your slot for the next person.\n\n<i>(Or upgrade to VIP to talk to multiple people at the exact same time! 😉)</i>"
+            text = "<b>How chatting works? 💬</b>\n\nGood news: <b>Your first chat with any match is completely FREE!</b> 🎉\n\nTo keep conversations focused, free members can chat with <b>one person at a time</b>.\n\nWant to talk to a new match? Just use the 'End Chat' button in your current conversation to free up your slot for the next person.\n\n<i>(Or upgrade to Premium to talk to multiple people at the exact same time! 😉)</i>"
         elif call.data == "help_vip":
-            text = "<b>Why upgrade to VIP? 🚀</b>\n\nVIP is for those who don't want to wait! Here is what you get:\n\n🔓 <b>Multiple Chats:</b> Hold conversations with several matches at the same time.\n👀 <b>See Your Admirers:</b> Instantly reveal who liked your profile.\n⚡ <b>Skip The Line:</b> Get faster connections.\n\nTap 'Unlock Chat' in the Main Menu to upgrade!"
+            text = "<b>Why upgrade to Premium? 🚀</b>\n\nPremium is for those who don't want to wait! Here is what you get:\n\n🔓 <b>Multiple Chats:</b> Hold conversations with several matches at the same time.\n👀 <b>See Your Admirers:</b> Instantly reveal who liked your profile.\n⚡ <b>Skip The Line:</b> Get faster connections.\n\nTap 'Get Premium' in the Main Menu to upgrade!"
         elif call.data == "help_safety":
             text = "<b>Safety & Privacy 🛡️</b>\n\nPlease be respectful to your matches. Bad behavior may lead to a permanent ban.\n\nIf you ever want to start fresh, change your photo, or delete your data, you can easily reset your entire profile anytime by sending the <b>/reset</b> command."
         
@@ -3438,7 +3446,7 @@ def callback_handler(call):
             pass
 
         safe_send_message(bot, call.message.chat.id, f"✅ User {user_id} approved successfully\nPlan: {plan_label}\nValid till: {time.strftime('%d %b %Y', time.localtime(end_ts))}")
-        safe_send_message(bot, user_id, f"<b>💎 VIP Activated!\n\nPlan: {plan_label}\n⏳ Valid till: {time.strftime('%d %b %Y', time.localtime(end_ts))}</b>", reply_markup=main_menu_keyboard(user_id), parse_mode="HTML")
+        safe_send_message(bot, user_id, f"<b>💎 Premium Activated!\n\nPlan: {plan_label}\n⏳ Valid till: {time.strftime('%d %b %Y', time.localtime(end_ts))}</b>", reply_markup=main_menu_keyboard(user_id), parse_mode="HTML")
         safe_answer_callback_query(bot,call.id, "Approved")
         send_next_pending_to_admin(call.message.chat.id)
         return
@@ -3664,17 +3672,16 @@ def text_handler(message):
     if text == BTN_MY_PROFILE:
         vip_lines = build_vip_status_lines(user)
         caption = "\n".join([
-            "Profile summary",
-            "",
-            f"Name: {user['name']}",
-            f"Gender: {user['gender']}",
-            f"City: {user['city']}",
+            "<b>👤 Profile summary</b>\n",
+            f"<b>Name:</b> {html.escape(user['name'])}",
+            f"<b>Gender:</b> {user['gender']}",
+            f"<b>City:</b> {html.escape(user['city'])}\n",
             *vip_lines,
         ])
         if user["photo"]:
-            safe_send_photo(bot, user_id, user["photo"], caption=caption, reply_markup=settings_keyboard())
+            safe_send_photo(bot, user_id, user["photo"], caption=caption, reply_markup=settings_keyboard(), parse_mode="HTML")
         else:
-            safe_send_message(bot, user_id, caption, reply_markup=settings_keyboard())
+            safe_send_message(bot, user_id, caption, reply_markup=settings_keyboard(), parse_mode="HTML")
         return
 
     if text == BTN_HOW_IT_WORKS or text.lower() == "/help":
