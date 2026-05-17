@@ -2736,11 +2736,24 @@ def send_admin_support_tickets(admin_id):
 
 
 def process_ticket_reply(message, ticket_id, target_user_id):
-    if message.text and message.text.lower() == 'cancel':
-        safe_send_message(bot, message.chat.id, "Reply cancelled.", reply_markup=admin_menu_keyboard())
+    text = message.text.strip() if message.text else ""
+
+    # 🔥 NAYA CODE: Check karo ki admin ne galti se koi menu button toh nahi daba diya
+    is_admin_button = text in {
+        BTN_ADMIN_CHATS, BTN_ADMIN_REFRESH, BTN_ADMIN_UNREAD, 
+        BTN_ADMIN_PANEL, BTN_ADMIN_STATS, BTN_ADMIN_PENDING, 
+        BTN_ADMIN_BACK, BTN_ADMIN_SUPPORT
+    }
+    
+    if text.lower() == 'cancel' or text.startswith("/") or is_admin_button:
+        safe_send_message(bot, message.chat.id, "❌ Reply cancelled.", reply_markup=admin_menu_keyboard())
+        
+        # Agar admin ne button dabaya tha, toh us button ka menu khol do
+        if is_admin_button:
+            admin_menu_handler(message)
         return
         
-    reply_text = message.text or "[Media received]" 
+    reply_text = text or "[Media received]" 
     
     conn = get_db_connection()
     if not conn: 
