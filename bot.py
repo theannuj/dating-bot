@@ -73,7 +73,7 @@ DISCLAIMER_TEXT = """📄 <b>Terms & Disclaimer</b>
 
 <b>7. Service Availability</b>
 • We do not guarantee uninterrupted or error-free service.  
-• Features may change at any time without notice.
+• Features may change at any time without notice. 
 
 <b>8. Age Requirement</b>
 • You must be 18+ to use this service.  
