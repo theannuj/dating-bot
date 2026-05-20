@@ -557,15 +557,27 @@ def handle_rate_limit(e):
     return 0
 
 def safe_send_message(bot, *args, **kwargs):
+    chat_id = args[0] if args else kwargs.get("chat_id")
     for attempt in range(3):
         try:
             return bot.send_message(*args, **kwargs)
         except Exception as e:
+            error_msg = str(e).lower()
             retry_after = handle_rate_limit(e)
             if retry_after > 0:
                 time.sleep(retry_after)
                 continue
-            print(f"❌ send_message error: {e}", flush=True)
+            
+            # 🔥 REAL FIX: Agar user ne block kiya hai, toh use memory se delete karo
+            if "blocked by the user" in error_msg or "user is deactivated" in error_msg or "chat not found" in error_msg:
+                if chat_id:
+                    LAST_ACTIVITY_TIME.pop(chat_id, None)
+                    LAST_ENGAGEMENT_PING.pop(chat_id, None)
+                print(f"🚫 User {chat_id} blocked the bot. Removed from active memory.", flush=True)
+                return None
+                
+            # Baaki saari genuine errors normally print hongi
+            print(f"❌ send_message error (User {chat_id}): {e}", flush=True)
             return None
     return None
 
@@ -574,27 +586,45 @@ def safe_send_photo(bot, chat_id, photo, **kwargs):
         try:
             return bot.send_photo(chat_id, photo, **kwargs)
         except Exception as e:
+            error_msg = str(e).lower()
             retry_after = handle_rate_limit(e)
             if retry_after > 0:
                 time.sleep(retry_after)
                 continue
-            print(f"❌ Bad photo skipped (chat_id={chat_id}): {e}", flush=True)
+            
+            # 🔥 REAL FIX
+            if "blocked by the user" in error_msg or "user is deactivated" in error_msg or "chat not found" in error_msg:
+                LAST_ACTIVITY_TIME.pop(chat_id, None)
+                LAST_ENGAGEMENT_PING.pop(chat_id, None)
+                print(f"🚫 User {chat_id} blocked the bot. Removed from active memory.", flush=True)
+                return None
+                
+            print(f"❌ send_photo error (chat_id={chat_id}): {e}", flush=True)
             return safe_send_message(bot, chat_id, "Profile loaded")
     return None
 
 def safe_send_chat_action(bot, *args, **kwargs):
-    target = args[0] if args else kwargs.get("chat_id")
+    chat_id = args[0] if args else kwargs.get("chat_id")
     for attempt in range(2):
         try:
             return bot.send_chat_action(*args, **kwargs)
         except Exception as e:
+            error_msg = str(e).lower()
             retry_after = handle_rate_limit(e)
             if retry_after > 0:
                 time.sleep(retry_after)
                 continue
+                
+            # 🔥 REAL FIX
+            if "blocked by the user" in error_msg or "user is deactivated" in error_msg or "chat not found" in error_msg:
+                if chat_id:
+                    LAST_ACTIVITY_TIME.pop(chat_id, None)
+                    LAST_ENGAGEMENT_PING.pop(chat_id, None)
+                return None
+                
             return None
     return None
-
+    
 def safe_edit_message_text(bot, text, chat_id, message_id, **kwargs):
     for attempt in range(3):
         try:
