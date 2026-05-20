@@ -26,10 +26,10 @@ PAYMENT_ADMINS = [MAIN_ADMIN_ID]
 CHAT_ADMINS = [MAIN_ADMIN_ID]
 PAYMENT_LINK = "https://tinyurl.com/SwipeSecretly"
 VIP_PLAN_DAYS = {
-    "1m": ("1 Month", 30),
-    "3m": ("3 Months", 90),
-    "6m": ("6 Months", 180),
-    "1y": ("1 Year", 365),
+    "1m": ("1 Month", 30, 5),
+    "3m": ("3 Months", 90, 15),
+    "6m": ("6 Months", 180, 30),
+    "1y": ("1 Year", 365, 60),
 }
 
 
@@ -624,7 +624,7 @@ def safe_send_chat_action(bot, *args, **kwargs):
                 
             return None
     return None
-    
+
 def safe_edit_message_text(bot, text, chat_id, message_id, **kwargs):
     for attempt in range(3):
         try:
@@ -771,11 +771,18 @@ def sync_user_vip_state(user, now_ts=None):
     user.setdefault("vip_end_date", None)
     active = is_vip_active(user, now_ts=now_ts)
     user["paid"] = active
-    user["chat_limit"] = 5 if active else 1
+    
+    # 🔥 NAYA EXPIRY & LIMIT LOGIC
     if active:
         user["payment_status"] = "approved"
-    elif user.get("payment_status") == "approved" and user.get("vip_end_date"):
-        user["payment_status"] = "expired"
+        # Purane active users jinki limit set nahi thi unhe default 5 de do
+        if "chat_limit" not in user or user["chat_limit"] < 5:
+            user["chat_limit"] = 5
+    else:
+        # ⚠️ Expiry hone par limit wapas Free User (1) ho jayegi
+        user["chat_limit"] = 1
+        if user.get("payment_status") == "approved" and user.get("vip_end_date"):
+            user["payment_status"] = "expired"
     return active
 
 
@@ -791,7 +798,7 @@ def get_vip_remaining_days(user, now_ts=None):
 def get_vip_plan_label(user):
     duration_seconds = get_vip_end_timestamp(user) - get_vip_start_timestamp(user)
     duration_days = int(round(duration_seconds / 86400)) if duration_seconds > 0 else 0
-    for label, days in VIP_PLAN_DAYS.values():
+    for label, days, added_limits in VIP_PLAN_DAYS.values():
         if duration_days == days:
             return label
     return "Custom"
@@ -2211,12 +2218,29 @@ def delayed_moderation_success(user_id):
     send_agreement(user_id)
 
  
-def send_vip_already_message(user_id):
+def send_premium_topup_message(user_id):
     user = get_user(user_id)
     if user.get("awaiting_payment"):
         user["awaiting_payment"] = False
         flush_loaded_users()
-    safe_send_message(bot, user_id, "<b>✅ You already have VIP access.</b>", parse_mode="HTML")
+        
+    chats_left = get_chats_left(user_id)
+    exp_date = format_vip_expiry_date(user)
+    
+    msg = (
+        f"💎 <b>You are already a Premium member!</b>\n"
+        f"⏳ Valid till: {exp_date}\n"
+        f"💬 Chats left: {chats_left} / {user.get('chat_limit', 5)}\n\n"
+        f"<b>Want to chat with more matches?</b>\n"
+        f"Upgrade your limit and extend your validity! 👇\n\n"
+        f"💳 <b>Secure Payment Link:</b>\n"
+        f"{PAYMENT_LINK}\n\n"
+        f"📌 <b>Steps:</b>\n"
+        f"1. Make payment\n"
+        f"2. Send screenshot here\n"
+        f"3. Limits & validity will be added instantly!"
+    )
+    safe_send_message(bot, user_id, msg, reply_markup=buy_keyboard(), parse_mode="HTML")
 
 
 def chat_locked_keyboard():
@@ -2986,11 +3010,6 @@ def photo_handler(message):
             safe_send_message(bot, user_id, inactive_chat_message(), parse_mode="HTML")
             return
     if user["awaiting_payment"]:
-        # Block if already VIP
-        if user["paid"]:
-            send_vip_already_message(user_id)
-            return
-        
         # Initialize payment_status if not exists
         if "payment_status" not in user:
             user["payment_status"] = "none"
@@ -3000,23 +3019,14 @@ def photo_handler(message):
             safe_send_message(bot, user_id, "⏳ Your payment is already under review. Please wait.")
             return
         
-        # Check if already approved
-        if user["paid"]:
-            send_vip_already_message(user_id)
-            return
-        
         # Get user info for admin notification
         first_name = message.from_user.first_name or "User"
         username = message.from_user.username or "N/A"
         
-        # Enhanced caption with user info and status
-        caption = f"""🧾 Payment Proof Received
-
-User ID: {user_id}
-Name: {first_name}
-Username: @{username}
-
-Status: 🟡 Pending"""
+        # 🔥 Naya Caption Logic (Top-Up ke sath)
+        caption = f"🧾 Payment Proof Received\n\nUser ID: {user_id}\nName: {first_name}\nUsername: @{username}\n\nStatus: 🟡 Pending"
+        if user.get("paid"):
+            caption += " (Top-Up / Upgrade Request)"
         
         for admin in PAYMENT_ADMINS:
             safe_send_photo(bot, 
@@ -3035,10 +3045,6 @@ Status: 🟡 Pending"""
         safe_send_message(bot, user_id, "Screenshot received ✅\n\nWe’re verifying it… please wait a moment", reply_markup=main_menu_keyboard(user_id))
         return
     
-    # Block if user is already VIP and sends photo without being in payment flow
-    if user["paid"] and not is_admin(user_id):
-        send_vip_already_message(user_id)
-        return
 
     # SECRET ADMIN FEATURE: Agar admin random photo bheje, toh File ID de do
     if is_admin(user_id):
@@ -3438,7 +3444,7 @@ def callback_handler(call):
         parts = call.data.split("_")
         plan_key = parts[1]
         user_id = parts[2]
-        plan_label, _ = VIP_PLAN_DAYS[plan_key]
+        plan_label, _, _ = VIP_PLAN_DAYS[plan_key]  # 🔥 BUG FIXED: Added 3rd underscore
         
         markup = InlineKeyboardMarkup()
         markup.row(
@@ -3462,15 +3468,20 @@ def callback_handler(call):
         parts = call.data.split("_")
         plan_key = parts[1]
         user_id = int(parts[2])
-        plan_label, duration_days = VIP_PLAN_DAYS[plan_key]
+        plan_label, duration_days, added_limits = VIP_PLAN_DAYS[plan_key] # 🔥 BUG FIXED: Added limits
         user = get_user(user_id)
         now_ts = get_current_timestamp()
-        end_ts = now_ts + (duration_days * 86400)
 
-        user["vip_start_date"] = now_ts
-        user["vip_end_date"] = end_ts
+        # 🔥 TOP-UP & EXTENSION LOGIC (New limits added)
+        if user.get("paid") and user.get("vip_end_date") and user["vip_end_date"] > now_ts:
+            user["vip_end_date"] = user["vip_end_date"] + (duration_days * 86400)
+            user["chat_limit"] = user.get("chat_limit", 1) + added_limits
+        else:
+            user["vip_start_date"] = now_ts
+            user["vip_end_date"] = now_ts + (duration_days * 86400)
+            user["chat_limit"] = user.get("chat_limit", 1) + added_limits
+
         user["paid"] = True
-        user["chat_limit"] = 5
         user["awaiting_payment"] = False
         user["payment_status"] = "approved"
         try:
@@ -3487,9 +3498,10 @@ def callback_handler(call):
             bot.edit_message_reply_markup(call.message.chat.id, call.message.message_id, reply_markup=None)
         except:
             pass
-
-        safe_send_message(bot, call.message.chat.id, f"✅ User {user_id} approved successfully\nPlan: {plan_label}\nValid till: {time.strftime('%d %b %Y', time.localtime(end_ts))}")
-        safe_send_message(bot, user_id, f"<b>💎 Premium Activated!\n\nPlan: {plan_label}\n⏳ Valid till: {time.strftime('%d %b %Y', time.localtime(end_ts))}</b>", reply_markup=main_menu_keyboard(user_id), parse_mode="HTML")
+            
+        chats_left = get_chats_left(user_id)
+        safe_send_message(bot, call.message.chat.id, f"✅ User {user_id} approved successfully\nPlan: {plan_label}\nNew Limit: {user['chat_limit']}\nValid till: {time.strftime('%d %b %Y', time.localtime(user['vip_end_date']))}")
+        safe_send_message(bot, user_id, f"<b>💎 Premium Activated / Upgraded!</b>\n\n<b>Plan:</b> {plan_label}\n<b>Chats Available:</b> {chats_left} / {user['chat_limit']}\n<b>⏳ Valid till:</b> {time.strftime('%d %b %Y', time.localtime(user['vip_end_date']))}", reply_markup=main_menu_keyboard(user_id), parse_mode="HTML")
         safe_answer_callback_query(bot,call.id, "Approved")
         send_next_pending_to_admin(call.message.chat.id)
         return
@@ -3519,7 +3531,7 @@ def callback_handler(call):
             pass
 
         if user["paid"]:
-            send_vip_already_message(user_id)
+            send_premium_topup_message(user_id) # 🔥 NAME FIXED
         else:
             safe_send_message(bot, user_id, "Payment wasn't approved. Please send a clear screenshot again.", reply_markup=buy_keyboard())
         safe_answer_callback_query(bot,call.id, "Rejected")
@@ -3544,7 +3556,7 @@ def callback_handler(call):
         user["payment_proof_photo_id"] = None
         flush_loaded_users()
         if user["paid"]:
-            send_vip_already_message(user_id)
+            send_premium_topup_message(user_id) # 🔥 NAME FIXED
         else:
             safe_send_message(bot, user_id, "Payment wasn't approved. Please send a clear screenshot again.", reply_markup=buy_keyboard())
         safe_answer_callback_query(bot,call.id, "Rejected")
@@ -3552,8 +3564,6 @@ def callback_handler(call):
         # Auto-open next pending user
         send_next_pending_to_admin(call.message.chat.id)
         return
-
-    safe_answer_callback_query(bot,call.id, "Unknown action")
   
 
 
@@ -3692,18 +3702,13 @@ def text_handler(message):
         return
 
     if text in {"/buy", BTN_BUY, BTN_GET_VIP, BTN_VIP, BTN_UNLOCK_REPLY}:
-        # Check if user is already VIP
         if user["paid"]:
-            send_vip_already_message(user_id)
+            send_premium_topup_message(user_id)
             return
-
         safe_send_message(bot, user_id, unlock_text(), reply_markup=buy_keyboard(), parse_mode="HTML")
         return
 
     if text == BTN_SEND_PAYMENT:
-        if user["paid"]:
-            send_vip_already_message(user_id)
-            return
         if is_on_cooldown(user_id):
             safe_send_message(bot, user_id, "Please wait a moment ⏳")
             return
