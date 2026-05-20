@@ -2228,17 +2228,20 @@ def send_premium_topup_message(user_id):
     exp_date = format_vip_expiry_date(user)
     
     msg = (
-        f"💎 <b>You are already a Premium member!</b>\n"
+        "<b>"
+        f"💎 Premium Account Active\n"
         f"⏳ Valid till: {exp_date}\n"
         f"💬 Chats left: {chats_left} / {user.get('chat_limit', 5)}\n\n"
-        f"<b>Want to chat with more matches?</b>\n"
+        f"Want to chat with more matches?\n"
         f"Upgrade your limit and extend your validity! 👇\n\n"
-        f"💳 <b>Secure Payment Link:</b>\n"
+        f"💳 Secure Payment Link:\n"
         f"{PAYMENT_LINK}\n\n"
-        f"📌 <b>Steps:</b>\n"
+        f"📌 Steps:\n"
         f"1. Make payment\n"
-        f"2. Send screenshot here\n"
-        f"3. Limits & validity will be added instantly!"
+        f"2. Send screenshot\n"
+        f"3. Limits & validity will be updated\n\n"
+        f"⚠️ After payment, send screenshot below to upgrade Premium"
+        "</b>"
     )
     safe_send_message(bot, user_id, msg, reply_markup=buy_keyboard(), parse_mode="HTML")
 
@@ -3468,18 +3471,21 @@ def callback_handler(call):
         parts = call.data.split("_")
         plan_key = parts[1]
         user_id = int(parts[2])
-        plan_label, duration_days, added_limits = VIP_PLAN_DAYS[plan_key] # 🔥 BUG FIXED: Added limits
+        plan_label, duration_days, added_limits = VIP_PLAN_DAYS[plan_key] 
         user = get_user(user_id)
         now_ts = get_current_timestamp()
 
-        # 🔥 TOP-UP & EXTENSION LOGIC (New limits added)
+        # 🔥 TOP-UP & EXTENSION LOGIC
         if user.get("paid") and user.get("vip_end_date") and user["vip_end_date"] > now_ts:
+            # Active Top-Up (Limits add hongi)
             user["vip_end_date"] = user["vip_end_date"] + (duration_days * 86400)
             user["chat_limit"] = user.get("chat_limit", 1) + added_limits
         else:
+            # 🔥 FRESH START (New User ya Expired Renew) - BUG FIXED HERE
             user["vip_start_date"] = now_ts
             user["vip_end_date"] = now_ts + (duration_days * 86400)
-            user["chat_limit"] = user.get("chat_limit", 1) + added_limits
+            user["chat_limit"] = added_limits
+            user["total_chats_used"] = 0  # Purana kachra 0 kar diya!
 
         user["paid"] = True
         user["awaiting_payment"] = False
@@ -3493,7 +3499,6 @@ def callback_handler(call):
                 thread["state"] = "available"
         flush_loaded_users()
 
-        # 🔥 SAFETY FIX: Approval ke baad screenshot se buttons delete kar do
         try:
             bot.edit_message_reply_markup(call.message.chat.id, call.message.message_id, reply_markup=None)
         except:
