@@ -539,6 +539,7 @@ LAST_ACTION_TIME = {}
 LAST_TEXT_TIME = {}
 LAST_ACTIVITY_TIME = {}
 LAST_ENGAGEMENT_PING = {}
+LAST_CALLBACK_TIME = {}
 COOLDOWN_SECONDS = 2.5
 INACTIVITY_MIN_SECONDS = 10 * 60
 INACTIVITY_MAX_SECONDS = 15 * 60
@@ -2579,7 +2580,7 @@ def vip_command_handler(message):
     touch_user_activity(user_id)
     user = get_user(user_id)
     if user["paid"]:
-        send_vip_already_message(user_id)
+        send_premium_topup_message(user_id)
         return
     safe_send_message(bot, user_id, unlock_text(), reply_markup=buy_keyboard(), parse_mode="HTML")
 
@@ -3062,6 +3063,14 @@ def photo_handler(message):
 @bot.callback_query_handler(func=lambda call: True)
 def callback_handler(call):
 
+    # 🔥 ANTI-SPAM LOCK: User ko double-click se rokne ke liye
+    user_id = call.message.chat.id
+    now = time.time()
+    if now - LAST_CALLBACK_TIME.get(user_id, 0) < 1.0:
+        safe_answer_callback_query(bot, call.id, "Wait a second... ⏳")
+        return
+    LAST_CALLBACK_TIME[user_id] = now
+
     safe_answer_callback_query(bot,call.id)
 
     # --- SUPPORT SYSTEM: Admin Buttons Logic ---
@@ -3286,18 +3295,30 @@ def callback_handler(call):
             return
         match_id = int(match_id_str)
         state = get_chat_state(user_id, match_id)
-        if state != "active":
-            if not can_start_new_chat(user_id):
-                safe_send_message(bot, user_id, unlock_vip_usage_message(user_id), reply_markup=chat_limit_keyboard(), parse_mode="HTML")
-                safe_answer_callback_query(bot,call.id, "No chats left")
-                return
-            if not can_activate_chat(user_id, match_id):
-                reply_markup = chat_limit_keyboard() if not get_user(user_id)["paid"] else main_menu_keyboard(user_id)
-                safe_send_message(bot, user_id, chat_limit_message(user_id), reply_markup=reply_markup, parse_mode="HTML")
-                safe_answer_callback_query(bot,call.id, "Cannot start chat")
-                return
-            set_chat_state(user_id, match_id, "active")
-        bot.edit_message_text("Opening chat...", user_id, call.message.message_id)
+        
+        # 🔥 FIX: Agar chat already active hai, toh wapas edit mat karo
+        if state == "active":
+            open_match_chat(user_id, match_id, show_history=True)
+            safe_answer_callback_query(bot, call.id, "Chat already opened")
+            return
+
+        if not can_start_new_chat(user_id):
+            safe_send_message(bot, user_id, unlock_vip_usage_message(user_id), reply_markup=chat_limit_keyboard(), parse_mode="HTML")
+            safe_answer_callback_query(bot,call.id, "No chats left")
+            return
+        if not can_activate_chat(user_id, match_id):
+            reply_markup = chat_limit_keyboard() if not get_user(user_id)["paid"] else main_menu_keyboard(user_id)
+            safe_send_message(bot, user_id, chat_limit_message(user_id), reply_markup=reply_markup, parse_mode="HTML")
+            safe_answer_callback_query(bot,call.id, "Cannot start chat")
+            return
+            
+        set_chat_state(user_id, match_id, "active")
+        
+        try:
+            bot.edit_message_text("Opening chat...", user_id, call.message.message_id)
+        except Exception:
+            pass 
+            
         open_match_chat(user_id, match_id, show_history=True)
         safe_answer_callback_query(bot,call.id, "Chat opened")
         return
