@@ -3971,6 +3971,7 @@ def configure_webhook():
 
 # 🔥 DEDUPLICATION CACHE: Telegram ke duplicate messages ko rokne ke liye
 PROCESSED_UPDATES = {}
+WEBHOOK_LOCK = threading.Lock()  # 🔥 NAYA DARWAZA (LOCK)
 
 @app.route(f"/{TOKEN}", methods=["POST"])
 def webhook():
@@ -3979,19 +3980,19 @@ def webhook():
         json_str = request.get_data(cache=False, as_text=False).decode("utf-8")
         update = telebot.types.Update.de_json(json_str)
         
-        # 🛡️ ANTI-DUPLICATE SYSTEM: Check karo agar ye message pehle hi process ho chuka hai
         update_id = update.update_id
-        if update_id in PROCESSED_UPDATES:
-            # Agar ID pehle se list me hai, toh chup-chaap OK bol kar wapas bhej do
-            return "OK", 200
-            
-        # Nayi ID ko list me save karo
-        PROCESSED_UPDATES[update_id] = True
         
-        # Cache ko limit me rakho taaki RAM full na ho (Aakhiri 5000 messages yaad rakhega)
-        if len(PROCESSED_UPDATES) > 5000:
-            oldest_key = next(iter(PROCESSED_UPDATES))
-            del PROCESSED_UPDATES[oldest_key]
+        # 🔥 LOCK SYSTEM START: Ek baar me ek hi thread list check karega
+        with WEBHOOK_LOCK:
+            if update_id in PROCESSED_UPDATES:
+                return "OK", 200  # Duplicate ko bahar se hi reject kar diya
+                
+            PROCESSED_UPDATES[update_id] = True
+            
+            if len(PROCESSED_UPDATES) > 5000:
+                oldest_key = next(iter(PROCESSED_UPDATES))
+                del PROCESSED_UPDATES[oldest_key]
+        # 🔥 LOCK SYSTEM END (Ab actual message process hone jayega)
 
         # Naye message ko process karne bhejo
         bot.process_new_updates([update])
