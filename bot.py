@@ -3817,18 +3817,33 @@ def text_handler(message):
         if get_chat_state(user_id, match_id) != "active":
             safe_send_message(bot, user_id, inactive_chat_message(), parse_mode="HTML")
             return
+            
         chats_left = get_chats_left(user_id)
         markup = InlineKeyboardMarkup()
         markup.row(
             InlineKeyboardButton(BTN_CONFIRM_END_CHAT, callback_data="userend_yes"),
             InlineKeyboardButton(BTN_CANCEL_END_CHAT, callback_data="userend_cancel"),
         )
-        safe_send_message(bot, 
-            user_id,
-            f"<b>Want to end this conversation? 🚪</b>\n\nThis chat will be closed permanently, and it will count towards your chat limit.\n(Chats left: {chats_left} / {user['chat_limit']})\n\nReady for a new connection?",
-            reply_markup=markup,
-            parse_mode="HTML"
-        )
+        
+        # 🔥 SMART LOGIC: Free vs Premium Messages
+        if not user["paid"] and chats_left <= 1:
+            # FREE USER WARNING (Perfected)
+            msg_text = (
+                "⚠️ <b>WAIT! This is your ONLY free chat.</b>\n\n"
+                "If you end this chat, you'll need <b>Premium</b> to talk to anyone else.\n"
+                "<i>(Give her a minute, she might reply!)</i>\n\n"
+                "<b>End chat and upgrade to Premium?</b>"
+            )
+        else:
+            # PREMIUM USER MESSAGE
+            msg_text = (
+                "🚪 <b>End this conversation?</b>\n\n"
+                "This chat will be closed permanently.\n"
+                f"💬 Chats left: {chats_left} / {user['chat_limit']}\n\n"
+                "Do you want to end this and talk to someone else?"
+            )
+
+        safe_send_message(bot, user_id, msg_text, reply_markup=markup, parse_mode="HTML")
         return
 
     if text == BTN_LIKE:
