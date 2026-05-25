@@ -600,6 +600,14 @@ def safe_send_message(bot, *args, **kwargs):
                 if chat_id:
                     LAST_ACTIVITY_TIME.pop(chat_id, None)
                     LAST_ENGAGEMENT_PING.pop(chat_id, None)
+                    # 🔥 AUTO-CLEAN LOGIC: DB me hamesha ke liye Block mark kar do
+                    try:
+                        user = get_user(chat_id)
+                        if not user.get("is_blocked"):
+                            user["is_blocked"] = True
+                            flush_loaded_users()
+                    except Exception:
+                        pass
                 print(f"🚫 User {chat_id} blocked the bot. Removed from active memory.", flush=True)
                 return None
                 
@@ -621,8 +629,17 @@ def safe_send_photo(bot, chat_id, photo, **kwargs):
             
             # 🔥 REAL FIX
             if "blocked by the user" in error_msg or "user is deactivated" in error_msg or "chat not found" in error_msg:
-                LAST_ACTIVITY_TIME.pop(chat_id, None)
-                LAST_ENGAGEMENT_PING.pop(chat_id, None)
+                if chat_id:
+                    LAST_ACTIVITY_TIME.pop(chat_id, None)
+                    LAST_ENGAGEMENT_PING.pop(chat_id, None)
+                    # 🔥 AUTO-CLEAN LOGIC: DB me hamesha ke liye Block mark kar do
+                    try:
+                        user = get_user(chat_id)
+                        if not user.get("is_blocked"):
+                            user["is_blocked"] = True
+                            flush_loaded_users()
+                    except Exception:
+                        pass
                 print(f"🚫 User {chat_id} blocked the bot. Removed from active memory.", flush=True)
                 return None
                 
