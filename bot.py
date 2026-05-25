@@ -1565,8 +1565,20 @@ def send_match_card(user_id, match_id):
 def process_broadcast_input(message, target):
     text = message.text or message.caption or ""
     
-    if text.lower() == 'cancel' or text.startswith("/"):
+    # 🔥 CHECK: Agar koi bhi admin button dabaya gaya hai, toh bot use text nahi manega
+    is_admin_button = text in {
+        BTN_ADMIN_CHATS, BTN_ADMIN_REFRESH, BTN_ADMIN_UNREAD, 
+        BTN_ADMIN_PANEL, BTN_ADMIN_STATS, BTN_ADMIN_PENDING, 
+        BTN_ADMIN_BACK, BTN_ADMIN_SUPPORT, BTN_ADMIN_BROADCAST,
+        "❌ Cancel Broadcast"
+    }
+    
+    if text.lower() == 'cancel' or text.startswith("/") or is_admin_button:
         safe_send_message(bot, message.chat.id, "❌ Broadcast cancelled.", reply_markup=admin_panel_keyboard())
+        
+        # Agar Back, Stats wagaira dabaya tha, toh seedha us function ko call kar do
+        if text in {BTN_ADMIN_STATS, BTN_ADMIN_PENDING, BTN_ADMIN_BROADCAST, BTN_ADMIN_BACK, BTN_ADMIN_CHATS, BTN_ADMIN_UNREAD, BTN_ADMIN_SUPPORT}:
+            admin_menu_handler(message)
         return
         
     if message.content_type not in ["text", "photo"]:
@@ -1761,7 +1773,7 @@ def admin_menu_keyboard():
 
 
 def admin_panel_keyboard():
-    return build_keyboard([BTN_ADMIN_STATS, BTN_ADMIN_PENDING], [BTN_ADMIN_BROADCAST], [BTN_ADMIN_BACK])
+    return build_keyboard([BTN_ADMIN_STATS, BTN_ADMIN_PENDING], [BTN_ADMIN_BROADCAST, BTN_ADMIN_BACK])
 
 
 
@@ -3184,7 +3196,12 @@ def callback_handler(call):
     # --- BROADCAST SYSTEM LOGIC ---
     if call.data.startswith("broadcast_setup_"):
         target = call.data.split("_")[2]
-        msg = safe_send_message(bot, call.message.chat.id, f"📝 Please send the message (Text or Photo) you want to broadcast to <b>{target.upper()}</b> users:\n\n<i>(Type 'cancel' to abort)</i>", parse_mode="HTML")
+        
+        # 🔥 Naya Cancel Button Keyboard
+        markup = ReplyKeyboardMarkup(resize_keyboard=True)
+        markup.row("❌ Cancel Broadcast")
+        
+        msg = safe_send_message(bot, call.message.chat.id, f"📝 Please send the message (Text or Photo) you want to broadcast to <b>{target.upper()}</b> users:\n\n<i>(Or tap Cancel below)</i>", reply_markup=markup, parse_mode="HTML")
         bot.register_next_step_handler(msg, process_broadcast_input, target)
         safe_answer_callback_query(bot, call.id)
         return
