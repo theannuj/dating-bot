@@ -438,6 +438,7 @@ BTN_CONFIRM_END_CHAT = "✅ Yes, End Chat"
 BTN_CANCEL_END_CHAT = "❌ Cancel"
 BTN_START_OVER = "Start Over"
 BTN_ADMIN_SUPPORT = "📩 Support Tickets"
+BTN_ADMIN_BROADCAST = "📢 Broadcast"
 MAX_CHAT_MESSAGES = 30
 CHAT_PREVIEW_MESSAGES = 8
 
@@ -535,6 +536,7 @@ app = Flask(__name__)
 chat_map = {}
 admin_active_chat = {}
 admin_notifications = {}
+admin_broadcast_preview = {}
 LAST_ACTION_TIME = {}
 LAST_TEXT_TIME = {}
 LAST_ACTIVITY_TIME = {}
@@ -1328,7 +1330,12 @@ def get_last_message_ts(user_id, match_id):
 
 def format_chat_history(match_name, messages):
     if not messages:
-        return f"Chat with {match_name}\n\nNo messages yet. Say hi when you're ready."
+        safe_name = html.escape(match_name)
+        return (
+            f"💬 <b>Chat with {safe_name}</b>\n\n"
+            "<i>This is the beginning of your conversation.\n"
+            "Drop a message to get her attention! ✨</i>"
+        )
 
     lines = []
     for item in messages:
@@ -1492,7 +1499,8 @@ def build_user_inbox_markup(user_id, matches):
             continue
         unread = get_unread_count(user_id, match_id)
         preview = get_last_message_preview(user_id, match_id, limit=26)
-        label = profile["name"]
+        # 🔥 Added Green Dot here
+        label = f"🟢 {profile['name']}"
         if unread:
             label += f" ({unread})"
         label += f" - {preview}"
@@ -1506,6 +1514,9 @@ def send_matches_inbox(user_id):
     user["active_view"] = "inbox"
     user["chat_open"] = False
     flush_loaded_users()
+    
+    # 🔥 SMART DELIVERY: Purane queued promo messages yahan dikhenge
+    deliver_pending_broadcasts(user_id)
 
     if not matches:
         safe_send_message(bot, user_id, "<b>Hmm… no one caught your vibe yet 😏</b>\n\nKeep exploring profiles and hit '💚' to get more matches!", reply_markup=main_menu_keyboard(user_id), parse_mode="HTML")
@@ -1524,8 +1535,8 @@ def send_match_card(user_id, match_id):
     state = get_chat_state(user_id, match_id)
     unread = get_unread_count(user_id, match_id)
     
-    # 🔥 CLEAN & PROFESSIONAL FORMATTING
-    lines = [f"<b>{profile['name']}</b>, {profile['age']} 🙂\n"]
+    # 🔥 CLEAN & PROFESSIONAL FORMATTING (Added Green Dot)
+    lines = [f"🟢 <b>{profile['name']}</b>, {profile['age']}\n"]
     
     if unread:
         lines.append(f"💬 <b>Unread messages:</b> {unread}\n")
@@ -1550,6 +1561,89 @@ def send_match_card(user_id, match_id):
         reply_markup=match_nav_keyboard(),
         parse_mode="HTML",
     )
+
+def process_broadcast_input(message, target):
+    text = message.text or message.caption or ""
+    
+    if text.lower() == 'cancel' or text.startswith("/"):
+        safe_send_message(bot, message.chat.id, "❌ Broadcast cancelled.", reply_markup=admin_panel_keyboard())
+        return
+        
+    if message.content_type not in ["text", "photo"]:
+        safe_send_message(bot, message.chat.id, "❌ Please send only Text or a Photo. Broadcast cancelled.", reply_markup=admin_panel_keyboard())
+        return
+        
+    file_id = message.photo[-1].file_id if message.content_type == "photo" else None
+        
+    admin_broadcast_preview[message.chat.id] = {"text": text, "photo": file_id}
+    
+    markup = InlineKeyboardMarkup()
+    markup.row(
+        InlineKeyboardButton("✅ Send Now", callback_data=f"broadcast_send_{target}"),
+        InlineKeyboardButton("❌ Cancel", callback_data="broadcast_cancel")
+    )
+    
+    preview_text = "📢 <b>BROADCAST PREVIEW</b>\n\n"
+    if file_id:
+        safe_send_photo(bot, message.chat.id, file_id, caption=preview_text + text, reply_markup=markup, parse_mode="HTML")
+    else:
+        safe_send_message(bot, message.chat.id, preview_text + text, reply_markup=markup, parse_mode="HTML")
+
+
+def run_smart_broadcast(admin_id, target, payload):
+    text = payload["text"]
+    photo_id = payload["photo"]
+    db_users = load_all_users_from_db()
+    success, failed, queued = 0, 0, 0
+    
+    for uid, user in db_users.items():
+        is_vip = user.get("paid", False)
+        if (target == "free" and is_vip) or (target == "vip" and not is_vip):
+            continue
+            
+        markup = None
+        if target == "free":
+            markup = InlineKeyboardMarkup()
+            markup.row(InlineKeyboardButton("💎 Get Premium", callback_data="buy_premium_promo"))
+        
+        in_chat = user.get("active_view") == "chat"
+        if in_chat:
+            fresh_user = get_user(uid)
+            fresh_user.setdefault("pending_broadcasts", []).append({"text": text, "photo": photo_id, "target": target})
+            flush_loaded_users()
+            queued += 1
+            continue
+        
+        try:
+            res = safe_send_photo(bot, uid, photo_id, caption=text, reply_markup=markup) if photo_id else safe_send_message(bot, uid, text, reply_markup=markup)
+            if res: success += 1
+            else: failed += 1
+        except:
+            failed += 1
+        time.sleep(0.05)
+        
+    report = f"✅ <b>Broadcast Complete!</b>\n\n🎯 Target: <b>{target.upper()}</b> Users\n🟢 Delivered Now: {success}\n⏳ Queued (in chat): {queued}\n🔴 Failed/Blocked: {failed}"
+    safe_send_message(bot, admin_id, report, parse_mode="HTML")
+
+
+def deliver_pending_broadcasts(user_id):
+    user = get_user(user_id)
+    broadcasts = user.get("pending_broadcasts", [])
+    if not broadcasts: return
+        
+    for b in broadcasts:
+        markup = None
+        if b.get("target") == "free":
+            markup = InlineKeyboardMarkup()
+            markup.row(InlineKeyboardButton("💎 Get Premium", callback_data="buy_premium_promo"))
+            
+        try:
+            if b.get("photo"): safe_send_photo(bot, user_id, b["photo"], caption=b.get("text", ""), reply_markup=markup)
+            else: safe_send_message(bot, user_id, b.get("text", ""), reply_markup=markup)
+        except Exception: pass
+            
+    user["pending_broadcasts"] = []
+    flush_loaded_users()
 
 
 def random_activity():
@@ -1667,7 +1761,7 @@ def admin_menu_keyboard():
 
 
 def admin_panel_keyboard():
-    return build_keyboard([BTN_ADMIN_STATS, BTN_ADMIN_PENDING], [BTN_ADMIN_BACK])
+    return build_keyboard([BTN_ADMIN_STATS, BTN_ADMIN_PENDING], [BTN_ADMIN_BROADCAST], [BTN_ADMIN_BACK])
 
 
 
@@ -1923,6 +2017,10 @@ def send_main_menu(user_id):
     user = get_user(user_id)
     user["active_view"] = "menu"
     flush_loaded_users()
+    
+    # 🔥 SMART DELIVERY: Purane queued promo messages yahan dikhenge
+    deliver_pending_broadcasts(user_id)
+    
     safe_send_message(bot, 
         user_id,
         "You can browse profiles, check matches, or adjust your settings here.",
@@ -2269,6 +2367,9 @@ def unlock_text():
 
 
 def open_likes_you(user_id):
+    # 🔥 MYSTERY PHOTO ID (Tumhari Canva wali blurred photo)
+    MYSTERY_PHOTO_ID = "AgACAgUAAxkBAAEDWQJqFAo7jed4DlQnCMGn1aVTRU24TgACxA1rGx9CqVSrjbipCIYBwQEAAwIAA3cAAzsE"
+    
     user = get_user(user_id)
     incoming = list(user["incoming_likes"])
     paid = user["paid"]
@@ -2291,6 +2392,7 @@ def open_likes_you(user_id):
     flush_loaded_users()
 
     if paid:
+        # 💎 PREMIUM USER: Asli photo aur Asli naam dikhega
         safe_send_photo(bot, 
             user_id,
             profile["photo"],
@@ -2302,12 +2404,14 @@ def open_likes_you(user_id):
             parse_mode="HTML"
         )
     else:
+        # 🟡 FREE USER: Blurred photo aur "Secret Match" naam dikhega
         safe_send_photo(bot, 
             user_id,
-            profile["photo"],
+            MYSTERY_PHOTO_ID,
             caption=(
-                f"<b>{profile['name']}</b>, {profile['age']}\n\n"
-                "🔒 <i>Available in Premium to view and reply.</i>"
+                f"🤫 <b>Secret Match</b>, {profile['age']}\n\n"
+                "💖 <b>Someone liked you!</b>\n"
+                "🔒 <i>Available in Premium to reveal photo and reply.</i>"
             ),
             reply_markup=likes_locked_keyboard(),
             parse_mode="HTML"
@@ -2518,11 +2622,6 @@ def open_match_chat(user_id, match_id, show_history=True):
         )
     history = get_recent_chat_history(user_id, match_id)
     safe_send_message(bot, user_id, format_chat_history(name, history), reply_markup=reply_markup, parse_mode="HTML")
-    safe_send_message(bot, 
-        user_id,
-        "Say something… don't be boring 😄",
-        reply_markup=reply_markup,
-    )
 
 
 
@@ -2800,7 +2899,7 @@ def process_ticket_reply(message, ticket_id, target_user_id):
     is_admin_button = text in {
         BTN_ADMIN_CHATS, BTN_ADMIN_REFRESH, BTN_ADMIN_UNREAD, 
         BTN_ADMIN_PANEL, BTN_ADMIN_STATS, BTN_ADMIN_PENDING, 
-        BTN_ADMIN_BACK, BTN_ADMIN_SUPPORT
+        BTN_ADMIN_BACK, BTN_ADMIN_SUPPORT, BTN_ADMIN_BROADCAST
     }
     
     if text.lower() == 'cancel' or text.startswith("/") or is_admin_button:
@@ -2840,7 +2939,7 @@ def process_ticket_reply(message, ticket_id, target_user_id):
         release_db_connection(conn)
 
 
-@bot.message_handler(func=lambda message: message.chat.id in CHAT_ADMINS and not message.reply_to_message and message.text.strip() not in {BTN_ADMIN_CHATS, BTN_ADMIN_REFRESH, BTN_ADMIN_UNREAD, BTN_ADMIN_PANEL, BTN_ADMIN_STATS, BTN_ADMIN_PENDING, BTN_ADMIN_BACK, BTN_ADMIN_SUPPORT}, content_types=["text"])
+@bot.message_handler(func=lambda message: message.chat.id in CHAT_ADMINS and not message.reply_to_message and message.text.strip() not in {BTN_ADMIN_CHATS, BTN_ADMIN_REFRESH, BTN_ADMIN_UNREAD, BTN_ADMIN_PANEL, BTN_ADMIN_STATS, BTN_ADMIN_PENDING, BTN_ADMIN_BACK, BTN_ADMIN_SUPPORT, BTN_ADMIN_BROADCAST}, content_types=["text"])
 def admin_direct_reply(message):
     admin_id = message.chat.id
 
@@ -2967,6 +3066,15 @@ def admin_menu_handler(message):
     if text == BTN_ADMIN_PENDING:
         pending_handler(message)
         return
+    if text == BTN_ADMIN_BROADCAST:
+        clear_admin_active_chat(message.chat.id)
+        markup = InlineKeyboardMarkup()
+        markup.row(
+            InlineKeyboardButton("🟡 Send to Free", callback_data="broadcast_setup_free"),
+            InlineKeyboardButton("💎 Send to VIP", callback_data="broadcast_setup_vip")
+        )
+        safe_send_message(bot, message.chat.id, "📢 <b>Broadcast Menu</b>\nWho do you want to send the message to?", reply_markup=markup, parse_mode="HTML")
+        return
     if text == BTN_ADMIN_BACK:
         clear_admin_active_chat(message.chat.id)
         safe_send_message(bot, message.chat.id, "Admin menu is ready.", reply_markup=admin_menu_keyboard())
@@ -3072,6 +3180,46 @@ def callback_handler(call):
     LAST_CALLBACK_TIME[user_id] = now
 
     safe_answer_callback_query(bot,call.id)
+
+    # --- BROADCAST SYSTEM LOGIC ---
+    if call.data.startswith("broadcast_setup_"):
+        target = call.data.split("_")[2]
+        msg = safe_send_message(bot, call.message.chat.id, f"📝 Please send the message (Text or Photo) you want to broadcast to <b>{target.upper()}</b> users:\n\n<i>(Type 'cancel' to abort)</i>", parse_mode="HTML")
+        bot.register_next_step_handler(msg, process_broadcast_input, target)
+        safe_answer_callback_query(bot, call.id)
+        return
+
+    if call.data.startswith("broadcast_send_"):
+        target = call.data.split("_")[2]
+        payload = admin_broadcast_preview.get(call.message.chat.id)
+        if not payload:
+            safe_answer_callback_query(bot, call.id, "Preview expired. Please try again.")
+            return
+        bot.edit_message_reply_markup(call.message.chat.id, call.message.message_id, reply_markup=None)
+        safe_send_message(bot, call.message.chat.id, f"🚀 <b>Broadcast Started!</b>\nSending to {target} users in background. You will get a report when done.", parse_mode="HTML")
+        import threading
+        threading.Thread(target=run_smart_broadcast, args=(call.message.chat.id, target, payload), daemon=True).start()
+        safe_answer_callback_query(bot, call.id)
+        return
+
+    if call.data == "broadcast_cancel":
+        admin_broadcast_preview.pop(call.message.chat.id, None)
+        try:
+            bot.delete_message(call.message.chat.id, call.message.message_id)
+        except: pass
+        safe_send_message(bot, call.message.chat.id, "❌ Broadcast cancelled.", reply_markup=admin_panel_keyboard())
+        safe_answer_callback_query(bot, call.id)
+        return
+        
+    if call.data == "buy_premium_promo":
+        user_id = call.message.chat.id
+        user = get_user(user_id)
+        if user["paid"]:
+            send_premium_topup_message(user_id)
+        else:
+            safe_send_message(bot, user_id, unlock_text(), reply_markup=buy_keyboard(), parse_mode="HTML")
+        safe_answer_callback_query(bot, call.id)
+        return
 
     # --- SUPPORT SYSTEM: Admin Buttons Logic ---
     if call.data == "admin_support_back":
