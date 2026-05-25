@@ -51,8 +51,8 @@ def save_trends(trends):
 
 def record_metric(metric_type):
     trends = load_trends()
-    # IST (India Time) ke hisaab se date nikalna
-    now_ist = datetime.datetime.utcnow() + datetime.timedelta(hours=5, minutes=30)
+    # IST (India Time) ke hisaab se date nikalna (Updated timezone-aware method)
+    now_ist = datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(hours=5, minutes=30)
     today = now_ist.strftime("%Y-%m-%d")
     
     if today not in trends:
@@ -2871,9 +2871,9 @@ def stats_handler(message):
 
     real_active = total_users - blocked_users
 
-    # 🔥 Last 7 days ka data nikalna
+    # 🔥 Last 7 days ka data nikalna (Updated timezone-aware method)
     trends = load_trends()
-    now_ist = datetime.datetime.utcnow() + datetime.timedelta(hours=5, minutes=30)
+    now_ist = datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(hours=5, minutes=30)
     
     trend_lines = []
     for i in range(7):
