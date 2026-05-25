@@ -5,6 +5,7 @@ import os
 import random
 import threading
 import time
+import datetime
 import traceback
 from pathlib import Path
  
@@ -37,6 +38,29 @@ VIP_PLAN_DAYS = {
 BASE_DIR = Path(__file__).resolve().parent
 PROFILES_FILE = BASE_DIR / "profiles.json"
 STATE_FILE = BASE_DIR / "bot_state.json"
+TRENDS_FILE = BASE_DIR / "trends.json"
+
+def load_trends():
+    if not TRENDS_FILE.exists(): return {}
+    try:
+        with TRENDS_FILE.open("r", encoding="utf-8") as f: return json.load(f)
+    except: return {}
+
+def save_trends(trends):
+    with TRENDS_FILE.open("w", encoding="utf-8") as f: json.dump(trends, f)
+
+def record_metric(metric_type):
+    trends = load_trends()
+    # IST (India Time) ke hisaab se date nikalna
+    now_ist = datetime.datetime.utcnow() + datetime.timedelta(hours=5, minutes=30)
+    today = now_ist.strftime("%Y-%m-%d")
+    
+    if today not in trends:
+        trends[today] = {"joins": 0, "blocks": 0}
+        
+    trends[today][metric_type] += 1
+    save_trends(trends)
+
 WEBHOOK_BASE_URL = (
     os.getenv("WEBHOOK_BASE_URL")
     or os.getenv("RAILWAY_STATIC_URL")
@@ -740,6 +764,7 @@ def default_user():
         "chat_started_notified": {},
         "vip_start_date": None,
         "vip_end_date": None,
+        "is_blocked": False,
     }
 
 
@@ -966,14 +991,17 @@ def get_user_data(user_id):
                 print(f"Bad user row for {user_id}: {e}", flush=True)
                 user = prepare_user_record(default_user())
         else:
-            user = prepare_user_record(default_user())
-            cur.execute("""
-            INSERT INTO users (user_id, data)
-            VALUES (%s, %s)
-            ON CONFLICT (user_id)
-            DO NOTHING
-            """, (user_id, serialize_user_record(user)))
-            conn.commit()
+                user = prepare_user_record(default_user())
+                cur.execute("""
+                INSERT INTO users (user_id, data)
+                VALUES (%s, %s)
+                ON CONFLICT (user_id)
+                DO NOTHING
+                """, (user_id, serialize_user_record(user)))
+                # 🔥 Agar user sach me naya hai aur DB me insert hua hai, toh Join record karo
+                if cur.rowcount > 0:
+                    record_metric("joins")
+                conn.commit()
         cur.close()
     except Exception as e:
         conn.rollback()
@@ -1657,6 +1685,25 @@ def deliver_pending_broadcasts(user_id):
     user["pending_broadcasts"] = []
     flush_loaded_users()
 
+
+# 🔥 SMART TRACKER: Ye background me block/unblock track karega
+@bot.my_chat_member_handler()
+def block_tracker_handler(message):
+    user_id = message.chat.id
+    new_status = message.new_chat_member.status
+    
+    if new_status == 'kicked':
+        user = get_user(user_id)
+        if not user.get("is_blocked"):
+            user["is_blocked"] = True
+            flush_loaded_users()
+            record_metric("blocks")
+            
+    elif new_status == 'member':
+        user = get_user(user_id)
+        if user.get("is_blocked"):
+            user["is_blocked"] = False
+            flush_loaded_users()
 
 def random_activity():
     return random.choice(ACTIVITY_TEXTS)
@@ -2779,6 +2826,7 @@ def stats_handler(message):
 
     conn = get_db_connection()
     total_users = 0
+    blocked_users = 0
     vip_users = 0
     pending_users = 0
     
@@ -2787,6 +2835,10 @@ def stats_handler(message):
             cur = conn.cursor()
             cur.execute("SELECT COUNT(*) FROM users")
             total_users = cur.fetchone()[0]
+
+            # 🔥 Blocked users ka count nikalo
+            cur.execute("SELECT COUNT(*) FROM users WHERE data LIKE '%\"is_blocked\": true%'")
+            blocked_users = cur.fetchone()[0]
 
             now_ts = get_current_timestamp()
             cur.execute("SELECT COUNT(*) FROM vip_users WHERE paid = true OR vip_end_date > %s", (now_ts,))
@@ -2800,12 +2852,37 @@ def stats_handler(message):
         finally:
             release_db_connection(conn)
 
-    stats_message = f"""📊 Stats:
-Total Users: {total_users}
-VIP Users: {vip_users}
-Pending Payments: {pending_users}"""
+    real_active = total_users - blocked_users
+
+    # 🔥 Last 7 days ka data nikalna
+    trends = load_trends()
+    now_ist = datetime.datetime.utcnow() + datetime.timedelta(hours=5, minutes=30)
     
-    safe_send_message(bot, message.chat.id, stats_message)
+    trend_lines = []
+    for i in range(7):
+        day = now_ist - datetime.timedelta(days=i)
+        day_str = day.strftime("%Y-%m-%d")
+        display_day = "Today" if i == 0 else "Yesterday" if i == 1 else day.strftime("%d %b")
+        
+        day_data = trends.get(day_str, {"joins": 0, "blocks": 0})
+        # Sirf tab dikhao jab koi activity hui ho, ya fir aaj/kal ka din ho
+        if day_data["joins"] > 0 or day_data["blocks"] > 0 or i < 2:
+            trend_lines.append(f"• {display_day}: <b>+{day_data['joins']}</b> Joins | <b>-{day_data['blocks']}</b> Blocks")
+            
+    trend_text = "\n".join(trend_lines)
+
+    stats_message = (
+        "📊 <b>OVERALL STATS</b>\n\n"
+        f"Total Registered: <b>{total_users}</b>\n"
+        f"🔴 Blocked Bot: <b>{blocked_users}</b>\n"
+        f"🟢 Real Active: <b>{real_active}</b>\n"
+        f"💎 VIP Members: <b>{vip_users}</b>\n"
+        f"⏳ Pending Payments: <b>{pending_users}</b>\n\n"
+        "📅 <b>LAST 7 DAYS TREND</b>\n"
+        f"{trend_text}"
+    )
+    
+    safe_send_message(bot, message.chat.id, stats_message, parse_mode="HTML")
 
 
 @bot.message_handler(commands=["pending"])
