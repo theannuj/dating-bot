@@ -3441,6 +3441,30 @@ def callback_handler(call):
         ticket_id = int(parts[1])
         user_id = int(parts[2])
         
+        # 🔥 FIX: Pehle check karo ticket open hai ya nahi
+        conn = get_db_connection()
+        is_open = False
+        if conn:
+            try:
+                cur = conn.cursor()
+                cur.execute("SELECT status FROM support_tickets WHERE ticket_id = %s", (ticket_id,))
+                row = cur.fetchone()
+                cur.close()
+                if row and row[0] == 'open':
+                    is_open = True
+            except Exception as e:
+                pass
+            finally:
+                release_db_connection(conn)
+                
+        if not is_open:
+            safe_answer_callback_query(bot, call.id, "⚠️ Ye ticket already close ho chuki hai!", show_alert=True)
+            try:
+                bot.edit_message_reply_markup(call.message.chat.id, call.message.message_id, reply_markup=None)
+            except:
+                pass
+            return
+        
         msg = safe_send_message(bot, call.message.chat.id, "Please type your reply for this ticket now:\n(Or type 'cancel' to abort)")
         bot.register_next_step_handler(msg, process_ticket_reply, ticket_id, user_id)
         safe_answer_callback_query(bot, call.id)
@@ -3450,12 +3474,35 @@ def callback_handler(call):
         parts = call.data.split("_")
         ticket_id = int(parts[1])
         
+        # 🔥 FIX: Check karo ticket open hai ya nahi
+        conn = get_db_connection()
+        is_open = False
+        if conn:
+            try:
+                cur = conn.cursor()
+                cur.execute("SELECT status FROM support_tickets WHERE ticket_id = %s", (ticket_id,))
+                row = cur.fetchone()
+                cur.close()
+                if row and row[0] == 'open':
+                    is_open = True
+            except Exception:
+                pass
+            finally:
+                release_db_connection(conn)
+                
+        if not is_open:
+            safe_answer_callback_query(bot, call.id, "⚠️ Ye ticket already close ho chuki hai!", show_alert=True)
+            try:
+                bot.edit_message_reply_markup(call.message.chat.id, call.message.message_id, reply_markup=None)
+            except:
+                pass
+            return
+        
         markup = InlineKeyboardMarkup()
         markup.row(
             InlineKeyboardButton("✅ Yes, Close it", callback_data=f"confirmcloseticket_{ticket_id}"),
             InlineKeyboardButton("❌ Cancel", callback_data=f"viewticket_{ticket_id}")
         )
-        # 🔥 FIX: Sirf buttons change karenge, photo ya text ko nahi chhedenge
         try:
             bot.edit_message_reply_markup(call.message.chat.id, call.message.message_id, reply_markup=markup)
         except Exception:
@@ -3473,7 +3520,7 @@ def callback_handler(call):
                 conn.commit()
                 cur.close()
                 
-                # 🔥 FIX: Purani Photo wali ticket delete karke naya Clean Text message bhejenge
+                # 🔥 FIX: Purani Photo/Text wali ticket delete karke naya Clean Text message bhejenge
                 try:
                     bot.delete_message(call.message.chat.id, call.message.message_id)
                 except Exception:
