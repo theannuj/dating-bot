@@ -2834,6 +2834,30 @@ def reset_command(message):
     bot.register_next_step_handler(message, confirm_reset)
 
 
+@bot.message_handler(commands=["ban"])
+def ban_command(message):
+    if message.chat.id not in CHAT_ADMINS: return
+    try:
+        user_id = int(message.text.split()[1])
+        user = get_user(user_id)
+        user["is_banned"] = True
+        flush_loaded_users()
+        safe_send_message(bot, message.chat.id, f"✅ User {user_id} has been silently banned.")
+    except:
+        safe_send_message(bot, message.chat.id, "⚠️ Usage: /ban <user_id>")
+
+@bot.message_handler(commands=["unban"])
+def unban_command(message):
+    if message.chat.id not in CHAT_ADMINS: return
+    try:
+        user_id = int(message.text.split()[1])
+        user = get_user(user_id)
+        user["is_banned"] = False
+        flush_loaded_users()
+        safe_send_message(bot, message.chat.id, f"✅ User {user_id} has been unbanned.")
+    except:
+        safe_send_message(bot, message.chat.id, "⚠️ Usage: /unban <user_id>")
+
 @bot.message_handler(commands=["stats"])
 def stats_handler(message):
     if message.chat.id not in CHAT_ADMINS:
@@ -3192,6 +3216,10 @@ def admin_menu_handler(message):
 @bot.message_handler(content_types=["photo"])
 def photo_handler(message):
     user_id = message.chat.id
+    
+    user = get_user(user_id)
+    if user.get("is_banned"): return # 🔥 BANNED USERS IGNORED
+    
     if not is_admin(user_id):
         touch_user_activity(user_id)
     if is_on_cooldown(user_id):
@@ -3277,8 +3305,13 @@ def photo_handler(message):
 @bot.callback_query_handler(func=lambda call: True)
 def callback_handler(call):
 
-    # 🔥 ANTI-SPAM LOCK: User ko double-click se rokne ke liye
     user_id = call.message.chat.id
+    user = get_user(user_id)
+    if user.get("is_banned"): 
+        safe_answer_callback_query(bot, call.id)
+        return # 🔥 BANNED USERS IGNORED
+
+    # 🔥 ANTI-SPAM LOCK: User ko double-click se rokne ke liye
     now = time.time()
     if now - LAST_CALLBACK_TIME.get(user_id, 0) < 1.0:
         safe_answer_callback_query(bot, call.id, "Wait a second... ⏳")
@@ -3370,6 +3403,7 @@ def callback_handler(call):
 
             markup = InlineKeyboardMarkup()
             markup.row(InlineKeyboardButton("💬 Reply to User", callback_data=f"replyticket_{ticket_id}_{user_id}"))
+            markup.row(InlineKeyboardButton("🗑️ Close (No Reply)", callback_data=f"closeticket_{ticket_id}_{user_id}"))
             markup.row(InlineKeyboardButton("🔙 Back to List", callback_data="admin_support_back"))
             
             # Professional Header Design
@@ -3410,6 +3444,36 @@ def callback_handler(call):
         msg = safe_send_message(bot, call.message.chat.id, "Please type your reply for this ticket now:\n(Or type 'cancel' to abort)")
         bot.register_next_step_handler(msg, process_ticket_reply, ticket_id, user_id)
         safe_answer_callback_query(bot, call.id)
+        return
+
+    if call.data.startswith("closeticket_"):
+        parts = call.data.split("_")
+        ticket_id = int(parts[1])
+        
+        markup = InlineKeyboardMarkup()
+        markup.row(
+            InlineKeyboardButton("✅ Yes, Close it", callback_data=f"confirmcloseticket_{ticket_id}"),
+            InlineKeyboardButton("❌ Cancel", callback_data=f"viewticket_{ticket_id}")
+        )
+        safe_edit_message_text(bot, f"Are you sure you want to close Ticket #{ticket_id} without replying?", call.message.chat.id, call.message.message_id, reply_markup=markup)
+        safe_answer_callback_query(bot, call.id)
+        return
+
+    if call.data.startswith("confirmcloseticket_"):
+        ticket_id = int(call.data.split("_")[1])
+        conn = get_db_connection()
+        if conn:
+            try:
+                cur = conn.cursor()
+                cur.execute("UPDATE support_tickets SET status = 'resolved', admin_reply = 'Closed by admin (No reply)' WHERE ticket_id = %s", (ticket_id,))
+                conn.commit()
+                cur.close()
+                safe_edit_message_text(bot, f"✅ Ticket #{ticket_id} has been closed silently.", call.message.chat.id, call.message.message_id, reply_markup=None)
+            except Exception as e:
+                print(f"Close ticket error: {e}")
+            finally:
+                release_db_connection(conn)
+        safe_answer_callback_query(bot, call.id, "Ticket Closed")
         return
     # -------------------------------------------
 
@@ -3855,6 +3919,9 @@ def callback_handler(call):
 @bot.message_handler(func=lambda message: message.chat.id not in CHAT_ADMINS, content_types=["text"])
 def text_handler(message):
     user_id = message.chat.id
+    
+    user = get_user(user_id)
+    if user.get("is_banned"): return # 🔥 BANNED USERS IGNORED
 
     # 🔥 ANTI-SPAM: Agar user 1.0 second ke andar lagataar message bhej raha hai (double click), toh ignore karo
     now = time.time()
