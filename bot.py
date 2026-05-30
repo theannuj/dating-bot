@@ -3455,8 +3455,12 @@ def callback_handler(call):
             InlineKeyboardButton("✅ Yes, Close it", callback_data=f"confirmcloseticket_{ticket_id}"),
             InlineKeyboardButton("❌ Cancel", callback_data=f"viewticket_{ticket_id}")
         )
-        safe_edit_message_text(bot, f"Are you sure you want to close Ticket #{ticket_id} without replying?", call.message.chat.id, call.message.message_id, reply_markup=markup)
-        safe_answer_callback_query(bot, call.id)
+        # 🔥 FIX: Sirf buttons change karenge, photo ya text ko nahi chhedenge
+        try:
+            bot.edit_message_reply_markup(call.message.chat.id, call.message.message_id, reply_markup=markup)
+        except Exception:
+            pass
+        safe_answer_callback_query(bot, call.id, "Are you sure? Click 'Yes' to close.", show_alert=True)
         return
 
     if call.data.startswith("confirmcloseticket_"):
@@ -3468,7 +3472,13 @@ def callback_handler(call):
                 cur.execute("UPDATE support_tickets SET status = 'resolved', admin_reply = 'Closed by admin (No reply)' WHERE ticket_id = %s", (ticket_id,))
                 conn.commit()
                 cur.close()
-                safe_edit_message_text(bot, f"✅ Ticket #{ticket_id} has been closed silently.", call.message.chat.id, call.message.message_id, reply_markup=None)
+                
+                # 🔥 FIX: Purani Photo wali ticket delete karke naya Clean Text message bhejenge
+                try:
+                    bot.delete_message(call.message.chat.id, call.message.message_id)
+                except Exception:
+                    pass
+                safe_send_message(bot, call.message.chat.id, f"✅ Ticket #{ticket_id} has been closed silently.", reply_markup=admin_menu_keyboard())
             except Exception as e:
                 print(f"Close ticket error: {e}")
             finally:
