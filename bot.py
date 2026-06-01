@@ -38,28 +38,67 @@ VIP_PLAN_DAYS = {
 BASE_DIR = Path(__file__).resolve().parent
 PROFILES_FILE = BASE_DIR / "profiles.json"
 STATE_FILE = BASE_DIR / "bot_state.json"
-TRENDS_FILE = BASE_DIR / "trends.json"
-
-def load_trends():
-    if not TRENDS_FILE.exists(): return {}
+# 🔥 Database-Backed Trends (Safe forever)
+def get_all_trends():
+    conn = get_db_connection()
+    if not conn: return {}
     try:
-        with TRENDS_FILE.open("r", encoding="utf-8") as f: return json.load(f)
-    except: return {}
-
-def save_trends(trends):
-    with TRENDS_FILE.open("w", encoding="utf-8") as f: json.dump(trends, f)
+        cur = conn.cursor()
+        cur.execute("SELECT date_str, joins, blocks, vips FROM daily_trends")
+        rows = cur.fetchall()
+        cur.close()
+        trends = {}
+        for row in rows:
+            trends[row[0]] = {"joins": row[1], "blocks": row[2], "vips": row[3]}
+        return trends
+    except Exception:
+        return {}
+    finally:
+        release_db_connection(conn)
 
 def record_metric(metric_type):
-    trends = load_trends()
-    # IST (India Time) ke hisaab se date nikalna (Updated timezone-aware method)
     now_ist = datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(hours=5, minutes=30)
     today = now_ist.strftime("%Y-%m-%d")
     
-    if today not in trends:
-        trends[today] = {"joins": 0, "blocks": 0}
-        
-    trends[today][metric_type] += 1
-    save_trends(trends)
+    conn = get_db_connection()
+    if not conn: return
+    try:
+        cur = conn.cursor()
+        if metric_type == "joins":
+            cur.execute("INSERT INTO daily_trends (date_str, joins, blocks, vips) VALUES (%s, 1, 0, 0) ON CONFLICT (date_str) DO UPDATE SET joins = daily_trends.joins + 1", (today,))
+        elif metric_type == "blocks":
+            cur.execute("INSERT INTO daily_trends (date_str, joins, blocks, vips) VALUES (%s, 0, 1, 0) ON CONFLICT (date_str) DO UPDATE SET blocks = daily_trends.blocks + 1", (today,))
+        elif metric_type == "vips":
+            cur.execute("INSERT INTO daily_trends (date_str, joins, blocks, vips) VALUES (%s, 0, 0, 1) ON CONFLICT (date_str) DO UPDATE SET vips = daily_trends.vips + 1", (today,))
+        conn.commit()
+        cur.close()
+    except Exception as e:
+        conn.rollback()
+    finally:
+        release_db_connection(conn)
+
+def init_trends_table():
+    conn = get_db_connection()
+    if not conn: return
+    try:
+        cur = conn.cursor()
+        cur.execute("""
+        CREATE TABLE IF NOT EXISTS daily_trends (
+        date_str TEXT PRIMARY KEY,
+        joins INTEGER DEFAULT 0,
+        blocks INTEGER DEFAULT 0,
+        vips INTEGER DEFAULT 0
+        )
+        """)
+        # Fallback if vips column is missing in older DB
+        try: cur.execute("ALTER TABLE daily_trends ADD COLUMN vips INTEGER DEFAULT 0")
+        except: pass
+        conn.commit()
+        cur.close()
+    except Exception as e:
+        conn.rollback()
+    finally:
+        release_db_connection(conn)
 
 WEBHOOK_BASE_URL = (
     os.getenv("WEBHOOK_BASE_URL")
@@ -338,6 +377,7 @@ def run_schema_migrations():
     init_users_table()
     init_vip_table()
     init_support_table()
+    init_trends_table()
 
 
 def has_open_ticket(user_id):
@@ -2858,72 +2898,92 @@ def unban_command(message):
     except:
         safe_send_message(bot, message.chat.id, "⚠️ Usage: /unban <user_id>")
 
-@bot.message_handler(commands=["stats"])
-def stats_handler(message):
-    if message.chat.id not in CHAT_ADMINS:
-        safe_send_message(bot, message.chat.id, "This command is for admins only.")
-        return
-    clear_admin_active_chat(message.chat.id)
-
+# 🔥 DASHBOARD GENERATOR FUNCTION (SaaS Style)
+def get_dashboard_data(view_type="weekly"):
     conn = get_db_connection()
-    total_users = 0
-    blocked_users = 0
-    vip_users = 0
-    pending_users = 0
-    
+    total_users = blocked_users = vip_users = pending_users = 0
     if conn:
         try:
             cur = conn.cursor()
             cur.execute("SELECT COUNT(*) FROM users")
             total_users = cur.fetchone()[0]
-
-            # 🔥 Blocked users ka count nikalo
             cur.execute("SELECT COUNT(*) FROM users WHERE data LIKE '%\"is_blocked\": true%'")
             blocked_users = cur.fetchone()[0]
-
             now_ts = get_current_timestamp()
             cur.execute("SELECT COUNT(*) FROM vip_users WHERE paid = true OR vip_end_date > %s", (now_ts,))
             vip_users = cur.fetchone()[0]
-
             cur.execute("SELECT COUNT(*) FROM vip_users WHERE payment_status = 'pending'")
             pending_users = cur.fetchone()[0]
             cur.close()
-        except Exception as e:
-            print(f"Stats DB error: {e}", flush=True)
-        finally:
-            release_db_connection(conn)
+        except: pass
+        finally: release_db_connection(conn)
 
     real_active = total_users - blocked_users
-
-    # 🔥 Last 7 days ka data nikalna (Updated timezone-aware method)
-    trends = load_trends()
+    trends = get_all_trends()
     now_ist = datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(hours=5, minutes=30)
     
-    trend_lines = []
-    for i in range(7):
-        day = now_ist - datetime.timedelta(days=i)
-        day_str = day.strftime("%Y-%m-%d")
-        display_day = "Today" if i == 0 else "Yesterday" if i == 1 else day.strftime("%d %b")
-        
-        day_data = trends.get(day_str, {"joins": 0, "blocks": 0})
-        # Sirf tab dikhao jab koi activity hui ho, ya fir aaj/kal ka din ho
-        if day_data["joins"] > 0 or day_data["blocks"] > 0 or i < 2:
-            trend_lines.append(f"• {display_day}: <b>+{day_data['joins']}</b> Joins | <b>-{day_data['blocks']}</b> Blocks")
-            
-    trend_text = "\n".join(trend_lines)
-
-    stats_message = (
-        "📊 <b>OVERALL STATS</b>\n\n"
-        f"Total Registered: <b>{total_users}</b>\n"
-        f"🔴 Blocked Bot: <b>{blocked_users}</b>\n"
-        f"🟢 Real Active: <b>{real_active}</b>\n"
-        f"💎 VIP Members: <b>{vip_users}</b>\n"
-        f"⏳ Pending Payments: <b>{pending_users}</b>\n\n"
-        "📅 <b>LAST 7 DAYS TREND</b>\n"
-        f"{trend_text}"
+    # OVERALL STATS FORMATTING (Monospace)
+    dashboard = (
+        "📊 <b>OVERALL STATS</b>\n"
+        "<pre>"
+        "========================\n"
+        f"Total Users  : {total_users}\n"
+        f"Real Active  : {real_active}\n"
+        f"Blocked Bot  : {blocked_users}\n"
+        f"VIP Members  : {vip_users}\n"
+        f"Pending Pay  : {pending_users}\n"
+        "========================</pre>\n"
     )
+
+    if view_type == "weekly":
+        dashboard += "📅 <b>LAST 7 DAYS TREND</b>\n<pre>"
+        dashboard += "Date   | Join | Drop | VIP\n"
+        dashboard += "--------------------------\n"
+        for i in range(7):
+            day = now_ist - datetime.timedelta(days=i)
+            day_str = day.strftime("%Y-%m-%d")
+            display_day = "Today " if i == 0 else "Yest. " if i == 1 else day.strftime("%d %b")
+            data = trends.get(day_str, {"joins": 0, "blocks": 0, "vips": 0})
+            if data["joins"] > 0 or data["blocks"] > 0 or i < 2:
+                # Proper table alignment
+                dashboard += f"{display_day:<6} | +{data['joins']:<3} | -{data['blocks']:<3} | +{data['vips']:<2}\n"
+        dashboard += "</pre>"
+        
+    elif view_type == "monthly":
+        dashboard += "📅 <b>MONTHLY REPORT</b>\n<pre>"
+        dashboard += "Month  | Join | Drop | VIP\n"
+        dashboard += "--------------------------\n"
+        monthly_data = {}
+        # Aggregate all days into months
+        for date_str, data in trends.items():
+            month_key = date_str[:7] # e.g., '2026-05'
+            if month_key not in monthly_data:
+                monthly_data[month_key] = {"joins": 0, "blocks": 0, "vips": 0}
+            monthly_data[month_key]["joins"] += data["joins"]
+            monthly_data[month_key]["blocks"] += data["blocks"]
+            monthly_data[month_key]["vips"] += data.get("vips", 0)
+            
+        # Sort months descending
+        sorted_months = sorted(monthly_data.keys(), reverse=True)[:6] # Last 6 months
+        for m_key in sorted_months:
+            m_obj = datetime.datetime.strptime(m_key, "%Y-%m")
+            m_display = m_obj.strftime("%b %y") # e.g., 'May 26'
+            m_data = monthly_data[m_key]
+            dashboard += f"{m_display:<6} | +{m_data['joins']:<3} | -{m_data['blocks']:<3} | +{m_data['vips']:<2}\n"
+        dashboard += "</pre>"
+
+    return dashboard
+
+@bot.message_handler(commands=["stats"])
+def stats_handler(message):
+    if message.chat.id not in CHAT_ADMINS: return
+    clear_admin_active_chat(message.chat.id)
     
-    safe_send_message(bot, message.chat.id, stats_message, parse_mode="HTML")
+    markup = InlineKeyboardMarkup()
+    markup.row(InlineKeyboardButton("📅 View Monthly Report", callback_data="statsview_monthly"))
+    
+    stats_text = get_dashboard_data("weekly")
+    safe_send_message(bot, message.chat.id, stats_text, parse_mode="HTML", reply_markup=markup)
 
 
 @bot.message_handler(commands=["pending"])
@@ -3319,6 +3379,19 @@ def callback_handler(call):
     LAST_CALLBACK_TIME[user_id] = now
 
     safe_answer_callback_query(bot,call.id)
+
+    # 🔥 STATS DASHBOARD BUTTONS LOGIC (Monthly / Weekly Switch)
+    if call.data.startswith("statsview_"):
+        view_type = call.data.split("_")[1]
+        stats_text = get_dashboard_data(view_type)
+        markup = InlineKeyboardMarkup()
+        if view_type == "weekly":
+            markup.row(InlineKeyboardButton("📅 View Monthly Report", callback_data="statsview_monthly"))
+        else:
+            markup.row(InlineKeyboardButton("🔙 Back to 7-Day Trend", callback_data="statsview_weekly"))
+            
+        bot.edit_message_text(stats_text, call.message.chat.id, call.message.message_id, parse_mode="HTML", reply_markup=markup)
+        return
 
     # --- BROADCAST SYSTEM LOGIC ---
     if call.data.startswith("broadcast_setup_"):
@@ -3899,6 +3972,9 @@ def callback_handler(call):
             if thread.get("state") == "locked":
                 thread["state"] = "available"
         flush_loaded_users()
+        
+        # 🔥 RECORD VIP JOIN IN DATABASE
+        record_metric("vips")
 
         try:
             bot.edit_message_reply_markup(call.message.chat.id, call.message.message_id, reply_markup=None)
