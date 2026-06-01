@@ -90,10 +90,15 @@ def init_trends_table():
         vips INTEGER DEFAULT 0
         )
         """)
-        # Fallback if vips column is missing in older DB
-        try: cur.execute("ALTER TABLE daily_trends ADD COLUMN vips INTEGER DEFAULT 0")
-        except: pass
         conn.commit()
+        
+        # 🔥 FIX: Alter table ko alag transaction me rakha taaki clash na ho
+        try: 
+            cur.execute("ALTER TABLE daily_trends ADD COLUMN vips INTEGER DEFAULT 0")
+            conn.commit()
+        except Exception: 
+            conn.rollback() # Agar column pehle se hai toh bas ise ignore/rollback kare
+            
         cur.close()
     except Exception as e:
         conn.rollback()
@@ -2687,6 +2692,57 @@ def forward_user_message_to_admins(message):
     if user.get("active_view") == "inbox":
         send_matches_inbox(user_id)
 
+# 🔥 NAYA FUNCTION: VIP Users ki Photos/GIFs aage bhejne ke liye
+def forward_user_media_to_admins(message, file_id, media_type):
+    user_id = message.chat.id
+    user = get_user(user_id)
+    match_id = user["current_match_id"]
+    if not match_id: return
+        
+    caption = message.caption or ""
+    media_label = f"[{media_type.upper()}]"
+    chat_text = f"{media_label} {caption}".strip()
+    
+    append_chat_message(user_id, match_id, "user", chat_text)
+    user_name = user["name"] or f"User {user_id}"
+    unread_admins = []
+    
+    for admin in get_admin_recipients(user_id, match_id):
+        if not is_admin_viewing_chat(admin, user_id, match_id):
+            unread_admins.append(admin)
+            continue
+            
+        reset_admin_unread(user_id, match_id, admin)
+        admin_caption = f"<b>{html.escape(user_name)}:</b> {html.escape(caption)}"
+        
+        sent = None
+        try:
+            if media_type == "photo":
+                sent = bot.send_photo(admin, file_id, caption=admin_caption, parse_mode="HTML")
+            elif media_type == "video":
+                sent = bot.send_video(admin, file_id, caption=admin_caption, parse_mode="HTML")
+            elif media_type == "animation":
+                sent = bot.send_animation(admin, file_id, caption=admin_caption, parse_mode="HTML")
+        except Exception as e:
+            print(f"Admin media forward error: {e}")
+            
+        if not sent:
+            unread_admins.append(admin)
+            continue
+            
+        chat_map[sent.message_id] = {"user_id": user_id, "match_id": match_id, "admin_id": admin}
+        if len(chat_map) > 1000:
+            chat_map.clear()
+            
+    if unread_admins:
+        increment_admin_unread(user_id, match_id, admin_ids=unread_admins)
+        
+    send_admin_notification(user_id, match_id, chat_text)    
+    maybe_send_fomo_message(user_id, match_id)
+    
+    if user.get("active_view") == "inbox":
+        send_matches_inbox(user_id)
+
 
 def open_match_chat(user_id, match_id, show_history=True):
     state = get_chat_state(user_id, match_id)
@@ -2815,7 +2871,7 @@ def help_command_handler(message):
         InlineKeyboardButton("💬 Chat Rules", callback_data="help_chat")
     )
     markup.row(
-        InlineKeyboardButton("💎 VIP Benefits", callback_data="help_vip"),
+        InlineKeyboardButton("💎 Premium Perks", callback_data="help_vip"),
         InlineKeyboardButton("🛡️ Safety & Privacy", callback_data="help_safety")
     )
     safe_send_message(bot, message.chat.id, "Need a quick guide? Choose a topic below to see how everything works 👇", reply_markup=markup)
@@ -3273,8 +3329,8 @@ def admin_menu_handler(message):
     safe_send_message(bot, message.chat.id, "Use the admin buttons to open chats.", reply_markup=admin_menu_keyboard())
 
 
-@bot.message_handler(content_types=["photo"])
-def photo_handler(message):
+@bot.message_handler(content_types=["photo", "video", "animation"])
+def media_handler(message):
     user_id = message.chat.id
     
     user = get_user(user_id)
@@ -3285,23 +3341,32 @@ def photo_handler(message):
     if is_on_cooldown(user_id):
         safe_send_message(bot, user_id, "Please wait a moment ⏳")
         return
+        
     user = get_user(user_id)
-    file_id = message.photo[-1].file_id
-
-# SUPPORT SYSTEM: Catch Screenshot
-    if user["step"] == "awaiting_support_ticket":
+    
+    # 🔥 EXTRACT FILE ID BASED ON MEDIA TYPE
+    if message.content_type == "photo":
         file_id = message.photo[-1].file_id
-        caption = message.caption or "Screenshot attached"
-        query_text = f"[PHOTO:{file_id}] {caption}" # Saving photo ID with text
+    elif message.content_type == "video":
+        file_id = message.video.file_id
+    elif message.content_type == "animation":
+        file_id = message.animation.file_id
+
+    # SUPPORT SYSTEM: Catch Screenshot
+    if user["step"] == "awaiting_support_ticket":
+        caption = message.caption or "Media attached"
+        query_text = f"[{message.content_type.upper()}:{file_id}] {caption}" 
         create_support_ticket(user_id, query_text)
         user["step"] = "menu"
         flush_loaded_users()
         safe_send_message(bot, user_id, "✅ <b>Ticket Submitted!</b>\nYour issue has been sent to the admin.\n\n<b>Status:</b> 🟡 Under Review\n\nPlease wait, we will reply to you here shortly.", parse_mode="HTML")
-        safe_send_message(bot, MAIN_ADMIN_ID, f"🎫 New Support Ticket (Photo) from User ID: {user_id}")
+        safe_send_message(bot, MAIN_ADMIN_ID, f"🎫 New Support Ticket ({message.content_type}) from User ID: {user_id}")
         return
 
-
     if user["step"] == "photo":
+        if message.content_type != "photo":
+            safe_send_message(bot, user_id, "⚠️ Please send a valid Photo for your profile (Videos/GIFs not allowed).")
+            return
         user["photo"] = file_id
         user["step"] = "moderation"
         user["moderation_pending"] = True
@@ -3309,12 +3374,24 @@ def photo_handler(message):
         threading.Thread(target=delayed_moderation_success, args=(user_id,), daemon=True).start()
         return
 
+    # 🔥 ACTIVE CHAT LOGIC (Premium Lock & Forwarding)
     if user["chat_open"] and user["current_match_id"]:
         match_id = user["current_match_id"]
         state = get_chat_state(user_id, match_id)
         if state != "active":
             safe_send_message(bot, user_id, inactive_chat_message(), parse_mode="HTML")
             return
+            
+        # NAYA PREMIUM LOCK: Agar user Free hai toh block karo
+        if not user.get("paid"):
+            markup = InlineKeyboardMarkup()
+            markup.row(InlineKeyboardButton("💎 Get Premium", callback_data="buy_premium_promo"))
+            safe_send_message(bot, user_id, "🔒 <b>Premium Feature</b>\n\nSending Photos, Videos, and GIFs is an exclusive Premium feature!\n\nUpgrade your account to share your moments and express yourself better 😉👇", reply_markup=markup, parse_mode="HTML")
+            return
+            
+        # Agar Premium hai toh seedha Admin/Match ko forward karo
+        forward_user_media_to_admins(message, file_id, message.content_type)
+        return
     if user["awaiting_payment"]:
         # Initialize payment_status if not exists
         if "payment_status" not in user:
@@ -3615,7 +3692,7 @@ def callback_handler(call):
         elif call.data == "help_chat":
             text = "<b>How chatting works? 💬</b>\n\nGood news: <b>Your first chat with any match is completely FREE!</b> 🎉\n\nTo keep conversations focused, free members can chat with <b>one person at a time</b>.\n\nWant to talk to a new match? Just use the 'End Chat' button in your current conversation to free up your slot for the next person.\n\n<i>(Or upgrade to Premium to talk to multiple people at the exact same time! 😉)</i>"
         elif call.data == "help_vip":
-            text = "<b>Why upgrade to Premium? 🚀</b>\n\nPremium is for those who don't want to wait! Here is what you get:\n\n🔓 <b>Multiple Chats:</b> Hold conversations with several matches at the same time.\n👀 <b>See Your Admirers:</b> Instantly reveal who liked your profile.\n⚡ <b>Skip The Line:</b> Get faster connections.\n\nTap 'Get Premium' in the Main Menu to upgrade!"
+            text = "<b>Why upgrade to Premium? 🚀</b>\n\nPremium is for those who don't want to wait! Here is what you get:\n\n📸 <b>Share Media:</b> Send Photos, Videos, and GIFs directly in your chats to express yourself better.\n🔓 <b>Multiple Chats:</b> Hold conversations with several matches at the same time.\n👀 <b>See Your Admirers:</b> Instantly reveal who liked your profile.\n⚡ <b>Skip The Line:</b> Get faster connections.\n\nTap 'Get Premium' in the Main Menu to upgrade!"
         elif call.data == "help_safety":
             text = "<b>Safety & Privacy 🛡️</b>\n\nPlease be respectful to your matches. Bad behavior may lead to a permanent ban.\n\nIf you ever want to start fresh, change your photo, or delete your data, you can easily reset your entire profile anytime by sending the <b>/reset</b> command."
         
@@ -4224,7 +4301,7 @@ def text_handler(message):
             InlineKeyboardButton("💬 Chat Rules", callback_data="help_chat")
         )
         markup.row(
-            InlineKeyboardButton("💎 VIP Benefits", callback_data="help_vip"),
+            InlineKeyboardButton("💎 Premium Perks", callback_data="help_vip"),
             InlineKeyboardButton("🛡️ Safety & Privacy", callback_data="help_safety")
         )
         safe_send_message(bot, user_id, "Need a quick guide? Choose a topic below to see how everything works 👇", reply_markup=markup)
