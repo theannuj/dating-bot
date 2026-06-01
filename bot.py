@@ -2692,7 +2692,7 @@ def forward_user_message_to_admins(message):
     if user.get("active_view") == "inbox":
         send_matches_inbox(user_id)
 
-# 🔥 NAYA FUNCTION: VIP Users ki Photos/GIFs aage bhejne ke liye
+# 🔥 FIX: VIP Users ki Photos/GIFs aage bhejne ke liye (Corrected)
 def forward_user_media_to_admins(message, file_id, media_type):
     user_id = message.chat.id
     user = get_user(user_id)
@@ -2708,36 +2708,39 @@ def forward_user_media_to_admins(message, file_id, media_type):
     unread_admins = []
     
     for admin in get_admin_recipients(user_id, match_id):
-        if not is_admin_viewing_chat(admin, user_id, match_id):
+        is_viewing = is_admin_viewing_chat(admin, user_id, match_id)
+        
+        if not is_viewing:
             unread_admins.append(admin)
-            continue
             
-        reset_admin_unread(user_id, match_id, admin)
-        admin_caption = f"<b>{html.escape(user_name)}:</b> {html.escape(caption)}"
+        admin_caption = f"👤 <b>{html.escape(user_name)}:</b>\n{html.escape(caption)}"
+        
+        # 🔥 NAYA: Agar admin view nahi kar raha, toh turant photo ke niche Reply button lagao
+        markup = None
+        if not is_viewing:
+            markup = InlineKeyboardMarkup().add(InlineKeyboardButton("💬 Reply", callback_data=f"reply_{user_id}_{match_id}"))
         
         sent = None
         try:
+            # Har haal me photo admin tak bhejo
             if media_type == "photo":
-                sent = bot.send_photo(admin, file_id, caption=admin_caption, parse_mode="HTML")
+                sent = safe_send_photo(bot, admin, file_id, caption=admin_caption, parse_mode="HTML", reply_markup=markup)
             elif media_type == "video":
-                sent = bot.send_video(admin, file_id, caption=admin_caption, parse_mode="HTML")
+                sent = bot.send_video(admin, file_id, caption=admin_caption, parse_mode="HTML", reply_markup=markup)
             elif media_type == "animation":
-                sent = bot.send_animation(admin, file_id, caption=admin_caption, parse_mode="HTML")
+                sent = bot.send_animation(admin, file_id, caption=admin_caption, parse_mode="HTML", reply_markup=markup)
         except Exception as e:
             print(f"Admin media forward error: {e}")
             
-        if not sent:
-            unread_admins.append(admin)
-            continue
-            
-        chat_map[sent.message_id] = {"user_id": user_id, "match_id": match_id, "admin_id": admin}
-        if len(chat_map) > 1000:
-            chat_map.clear()
+        if sent and is_viewing:
+            chat_map[sent.message_id] = {"user_id": user_id, "match_id": match_id, "admin_id": admin}
+            if len(chat_map) > 1000:
+                chat_map.clear()
             
     if unread_admins:
         increment_admin_unread(user_id, match_id, admin_ids=unread_admins)
         
-    send_admin_notification(user_id, match_id, chat_text)    
+    # Yahan se notification line hata di kyunki Photo/GIF khud me ek notification hai
     maybe_send_fomo_message(user_id, match_id)
     
     if user.get("active_view") == "inbox":
@@ -3332,9 +3335,69 @@ def admin_menu_handler(message):
 @bot.message_handler(content_types=["photo", "video", "animation"])
 def media_handler(message):
     user_id = message.chat.id
-    
+
+    # 🔥 ADMIN MEDIA REPLY FIX: Agar admin match (user) ko photo ya GIF bhej raha hai
+    if is_admin(user_id):
+        target_user_id = None
+        target_match_id = None
+
+        if message.reply_to_message:
+            chat_context = chat_map.get(message.reply_to_message.message_id)
+            if chat_context:
+                target_user_id = chat_context["user_id"]
+                target_match_id = chat_context["match_id"]
+
+        if not target_user_id and user_id in admin_active_chat:
+            context = admin_active_chat[user_id]
+            if "user_id" in context and "match_id" in context:
+                target_user_id = context["user_id"]
+                target_match_id = context["match_id"]
+
+        if target_user_id and target_match_id:
+            if not can_admin_access_chat(user_id, target_user_id, target_match_id):
+                safe_send_message(bot, user_id, "This chat is assigned to another admin.")
+                return
+            if get_chat_state(target_user_id, target_match_id) != "active":
+                safe_send_message(bot, user_id, "⚠️ Message ignored! Yeh chat abhi 'active' nahi hai.")
+                return
+
+            if message.content_type == "photo": file_id = message.photo[-1].file_id
+            elif message.content_type == "video": file_id = message.video.file_id
+            elif message.content_type == "animation": file_id = message.animation.file_id
+
+            caption = message.caption or ""
+            chat_text = f"[{message.content_type.upper()}] {caption}".strip()
+
+            append_chat_message(target_user_id, target_match_id, "match", chat_text)
+            increment_unread(target_user_id, target_match_id)
+            reset_admin_unread(target_user_id, target_match_id, user_id)
+            mirror_admin_reply_to_main_admin(user_id, target_user_id, target_match_id, chat_text)
+
+            try:
+                profile = get_profile(target_match_id)
+                match_name = profile["name"] if profile else "Match"
+                user_caption = f"<b>{match_name}:</b> {html.escape(caption)}" if caption else ""
+
+                if message.content_type == "photo": safe_send_photo(bot, target_user_id, file_id, caption=user_caption, reply_markup=get_chat_keyboard(target_user_id, target_match_id), parse_mode="HTML")
+                elif message.content_type == "video": bot.send_video(target_user_id, file_id, caption=user_caption, reply_markup=get_chat_keyboard(target_user_id, target_match_id), parse_mode="HTML")
+                elif message.content_type == "animation": bot.send_animation(target_user_id, file_id, caption=user_caption, reply_markup=get_chat_keyboard(target_user_id, target_match_id), parse_mode="HTML")
+
+                key = (user_id, target_user_id)
+                if key in admin_notifications: del admin_notifications[key]
+            except Exception as e:
+                pass
+            return
+
+        # Agar admin generally (bina chat ke) koi photo bheje toh File ID print karo (Secret Feature)
+        if message.content_type == "photo": file_id = message.photo[-1].file_id
+        elif message.content_type == "video": file_id = message.video.file_id
+        elif message.content_type == "animation": file_id = message.animation.file_id
+        safe_send_message(bot, user_id, f"Sir, Here is the File ID:\n<code>{file_id}</code>", parse_mode="HTML")
+        return
+
+    # --- USER SIDE LOGIC ---
     user = get_user(user_id)
-    if user.get("is_banned"): return # 🔥 BANNED USERS IGNORED
+    if user.get("is_banned"): return 
     
     if not is_admin(user_id):
         touch_user_activity(user_id)
@@ -3342,15 +3405,9 @@ def media_handler(message):
         safe_send_message(bot, user_id, "Please wait a moment ⏳")
         return
         
-    user = get_user(user_id)
-    
-    # 🔥 EXTRACT FILE ID BASED ON MEDIA TYPE
-    if message.content_type == "photo":
-        file_id = message.photo[-1].file_id
-    elif message.content_type == "video":
-        file_id = message.video.file_id
-    elif message.content_type == "animation":
-        file_id = message.animation.file_id
+    if message.content_type == "photo": file_id = message.photo[-1].file_id
+    elif message.content_type == "video": file_id = message.video.file_id
+    elif message.content_type == "animation": file_id = message.animation.file_id
 
     # SUPPORT SYSTEM: Catch Screenshot
     if user["step"] == "awaiting_support_ticket":
@@ -3382,42 +3439,34 @@ def media_handler(message):
             safe_send_message(bot, user_id, inactive_chat_message(), parse_mode="HTML")
             return
             
-        # NAYA PREMIUM LOCK: Agar user Free hai toh block karo
         if not user.get("paid"):
             markup = InlineKeyboardMarkup()
             markup.row(InlineKeyboardButton("💎 Get Premium", callback_data="buy_premium_promo"))
             safe_send_message(bot, user_id, "🔒 <b>Premium Feature</b>\n\nSending Photos, Videos, and GIFs is an exclusive Premium feature!\n\nUpgrade your account to share your moments and express yourself better 😉👇", reply_markup=markup, parse_mode="HTML")
             return
             
-        # Agar Premium hai toh seedha Admin/Match ko forward karo
         forward_user_media_to_admins(message, file_id, message.content_type)
         return
+
     if user["awaiting_payment"]:
-        # Initialize payment_status if not exists
         if "payment_status" not in user:
             user["payment_status"] = "none"
-        
-        # Check if already under review
         if user.get("payment_status") == "pending":
             safe_send_message(bot, user_id, "⏳ Your payment is already under review. Please wait.")
             return
         
-        # Get user info for admin notification
+        if message.content_type != "photo":
+            safe_send_message(bot, user_id, "⚠️ Please send a Screenshot (Photo) of your payment. Videos/GIFs are not accepted.")
+            return
+
         first_name = message.from_user.first_name or "User"
         username = message.from_user.username or "N/A"
-        
-        # 🔥 Naya Caption Logic (Top-Up ke sath)
         caption = f"🧾 Payment Proof Received\n\nUser ID: {user_id}\nName: {first_name}\nUsername: @{username}\n\nStatus: 🟡 Pending"
         if user.get("paid"):
             caption += " (Top-Up / Upgrade Request)"
         
         for admin in PAYMENT_ADMINS:
-            safe_send_photo(bot, 
-                admin,
-                file_id,
-                caption=caption,
-                reply_markup=payment_markup(user_id),
-            )
+            safe_send_photo(bot, admin, file_id, caption=caption, reply_markup=payment_markup(user_id))
         
         user["awaiting_payment"] = False
         user["payment_status"] = "pending"
@@ -3426,12 +3475,6 @@ def media_handler(message):
         flush_loaded_users()
         
         safe_send_message(bot, user_id, "Screenshot received ✅\n\nWe’re verifying it… please wait a moment", reply_markup=main_menu_keyboard(user_id))
-        return
-    
-
-    # SECRET ADMIN FEATURE: Agar admin random photo bheje, toh File ID de do
-    if is_admin(user_id):
-        safe_send_message(bot, user_id, f"Sir, Here is the File ID:\n<code>{file_id}</code>", parse_mode="HTML")
         return
 
     safe_send_message(bot, user_id, "Something went wrong…\n\nPlease try again")
