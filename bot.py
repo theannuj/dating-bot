@@ -3798,9 +3798,9 @@ def callback_handler(call):
             user_id, match_id = map(int, data.split("_"))
             admin_id = call.message.chat.id
 
-            # 🔥 TRICK: Button dabte hi us notification ko delete kar do taaki koi double click na kar sake
+            # 🔥 TRICK: Message (Photo) delete mat karo, bas 'Reply' button hata do taaki double click na ho
             try:
-                bot.delete_message(admin_id, call.message.message_id)
+                bot.edit_message_reply_markup(admin_id, call.message.message_id, reply_markup=None)
             except:
                 pass
 
