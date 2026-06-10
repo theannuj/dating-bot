@@ -827,6 +827,7 @@ def default_user():
         "vip_start_date": None,
         "vip_end_date": None,
         "is_blocked": False,
+        "source": "organic",  # 🔥 Deep link parameter tracking source
     }
 
 
@@ -2803,6 +2804,16 @@ def open_match_chat(user_id, match_id, show_history=True):
 @bot.message_handler(commands=["start"])
 def start_handler(message):
     user = get_user(message.chat.id)
+    
+    # 🔥 DEEP LINK TRACKING LOGIC
+    parts = message.text.split()
+    if len(parts) > 1:
+        source_value = parts[1].strip()
+        # Agar user ka source khali hai ya 'organic' hai, toh naya dynamic source permanent save karo
+        if not user.get("source") or user.get("source") == "organic":
+            user["source"] = source_value
+            flush_loaded_users() # Instant database update
+            
     if is_admin(message.chat.id):
         clear_admin_active_chat(message.chat.id)
         safe_send_message(bot, message.chat.id, "Admin menu is ready.", reply_markup=admin_menu_keyboard())
@@ -3029,6 +3040,31 @@ def get_dashboard_data(view_type="weekly"):
             m_display = m_obj.strftime("%b %y") # e.g., 'May 26'
             m_data = monthly_data[m_key]
             dashboard += f"{m_display:<6} | +{m_data['joins']:<3} | -{m_data['blocks']:<3} | +{m_data['vips']:<2}\n"
+            dashboard += "</pre>"
+            
+    elif view_type == "source":
+        dashboard += "🔗 <b>SOURCE TRAFFIC & ROI STATS</b>\n<pre>"
+        dashboard += f"{'Source':<12} | {'Users':<5} | {'VIP':<3} | {'ROI %':<5}\n"
+        dashboard += "----------------------------------\n"
+        
+        all_users = load_all_users_from_db()
+        source_counts = {}
+        
+        # Pure database se dynamic grouping aur calculation
+        for u in all_users.values():
+            src = u.get("source", "organic")
+            if src not in source_counts:
+                source_counts[src] = {"total": 0, "vip": 0}
+            source_counts[src]["total"] += 1
+            if u.get("paid"):
+                source_counts[src]["vip"] += 1
+                
+        # Highest traffic source sabse upar dikhega
+        for src, counts in sorted(source_counts.items(), key=lambda x: x[1]["total"], reverse=True):
+            tot = counts["total"]
+            vips = counts["vip"]
+            rate = (vips / tot * 100) if tot > 0 else 0.0
+            dashboard += f"{src:<12} | {tot:<5} | {vips:<3} | {rate:.1f}%\n"
         dashboard += "</pre>"
 
     return dashboard
@@ -3040,6 +3076,7 @@ def stats_handler(message):
     
     markup = InlineKeyboardMarkup()
     markup.row(InlineKeyboardButton("📅 View Monthly Report", callback_data="statsview_monthly"))
+    markup.row(InlineKeyboardButton("🔗 View Source Stats", callback_data="statsview_source")) # 🔥 Monthly ke theek niche naya button
     
     stats_text = get_dashboard_data("weekly")
     safe_send_message(bot, message.chat.id, stats_text, parse_mode="HTML", reply_markup=markup)
@@ -3500,14 +3537,20 @@ def callback_handler(call):
 
     safe_answer_callback_query(bot,call.id)
 
-    # 🔥 STATS DASHBOARD BUTTONS LOGIC (Monthly / Weekly Switch)
+    # 🔥 STATS DASHBOARD BUTTONS LOGIC (Weekly / Monthly / Source Dynamic Navigation)
     if call.data.startswith("statsview_"):
         view_type = call.data.split("_")[1]
         stats_text = get_dashboard_data(view_type)
         markup = InlineKeyboardMarkup()
+        
         if view_type == "weekly":
             markup.row(InlineKeyboardButton("📅 View Monthly Report", callback_data="statsview_monthly"))
-        else:
+            markup.row(InlineKeyboardButton("🔗 View Source Stats", callback_data="statsview_source"))
+        elif view_type == "monthly":
+            markup.row(InlineKeyboardButton("🔙 Back to 7-Day Trend", callback_data="statsview_weekly"))
+            markup.row(InlineKeyboardButton("🔗 View Source Stats", callback_data="statsview_source"))
+        elif view_type == "source":
+            markup.row(InlineKeyboardButton("📅 View Monthly Report", callback_data="statsview_monthly"))
             markup.row(InlineKeyboardButton("🔙 Back to 7-Day Trend", callback_data="statsview_weekly"))
             
         bot.edit_message_text(stats_text, call.message.chat.id, call.message.message_id, parse_mode="HTML", reply_markup=markup)
