@@ -25,7 +25,7 @@ TOKEN = os.getenv("BOT_TOKEN")
 MAIN_ADMIN_ID = 526264365
 PAYMENT_ADMINS = [MAIN_ADMIN_ID]
 CHAT_ADMINS = [MAIN_ADMIN_ID]
-PAYMENT_LINK = "https://tinyurl.com/SwipeSecretly"
+PAYMENT_LINK = "https://tinyurl.com/SwipeSecretChats"
 VIP_PLAN_DAYS = {
     "1m": ("1 Month", 30, 5),
     "3m": ("3 Months", 90, 15),
