@@ -3474,6 +3474,17 @@ def media_handler(message):
         safe_send_message(bot, MAIN_ADMIN_ID, f"🎫 New Support Ticket ({message.content_type}) from User ID: {user_id}")
         return
 
+    # 🔥 CATCHING PHOTO FOR EDIT PROFILE
+    if user["step"] == "edit_photo":
+        if message.content_type != "photo":
+            safe_send_message(bot, user_id, "⚠️ Please send a valid Photo. Videos/GIFs not allowed.")
+            return
+        user["photo"] = file_id
+        user["step"] = "menu"
+        flush_loaded_users()
+        safe_send_message(bot, user_id, "✅ Profile photo updated successfully!", reply_markup=settings_keyboard())
+        return
+
     if user["step"] == "photo":
         if message.content_type != "photo":
             safe_send_message(bot, user_id, "⚠️ Please send a valid Photo for your profile (Videos/GIFs not allowed).")
@@ -3553,6 +3564,41 @@ def callback_handler(call):
     LAST_CALLBACK_TIME[user_id] = now
 
     safe_answer_callback_query(bot,call.id)
+
+    # 🔥 EDIT PROFILE LOGIC
+    if call.data == "edit_profile_menu":
+        markup = InlineKeyboardMarkup()
+        markup.row(InlineKeyboardButton("📸 Change Photo", callback_data="edit_start_photo"))
+        markup.row(InlineKeyboardButton("📍 Change City", callback_data="edit_start_city"), InlineKeyboardButton("🎂 Change Age", callback_data="edit_start_age"))
+        markup.row(InlineKeyboardButton("❌ Cancel", callback_data="edit_cancel"))
+        try: bot.edit_message_reply_markup(call.message.chat.id, call.message.message_id, reply_markup=markup)
+        except: pass
+        safe_answer_callback_query(bot, call.id)
+        return
+
+    if call.data.startswith("edit_start_"):
+        field = call.data.split("_")[2]
+        user = get_user(call.message.chat.id)
+        user["step"] = f"edit_{field}"
+        flush_loaded_users()
+        
+        try: bot.delete_message(call.message.chat.id, call.message.message_id)
+        except: pass
+        
+        if field == "photo": msg = "📸 <b>Please send your new Photo.</b>\n\n<i>(Or type 'cancel' to abort)</i>"
+        elif field == "city": msg = "📍 <b>Please enter your new City:</b>\n\n<i>(Or type 'cancel' to abort)</i>"
+        elif field == "age": msg = "🎂 <b>Please enter your new Age (e.g., 25):</b>\n\n<i>(Or type 'cancel' to abort)</i>"
+            
+        safe_send_message(bot, call.message.chat.id, msg, parse_mode="HTML")
+        safe_answer_callback_query(bot, call.id)
+        return
+
+    if call.data == "edit_cancel":
+        try: bot.delete_message(call.message.chat.id, call.message.message_id)
+        except: pass
+        safe_send_message(bot, call.message.chat.id, "❌ Edit cancelled.", reply_markup=settings_keyboard())
+        safe_answer_callback_query(bot, call.id)
+        return
 
     # 🔥 STATS DASHBOARD BUTTONS LOGIC (Weekly / Monthly / Source Dynamic Navigation)
     if call.data.startswith("statsview_"):
@@ -4275,6 +4321,30 @@ def text_handler(message):
             safe_send_message(bot, MAIN_ADMIN_ID, f"🎫 New Support Ticket from User ID: {user_id}")
             return
 
+    # 🔥 CATCHING TEXT FOR EDIT PROFILE (Age / City)
+    if user["step"].startswith("edit_"):
+        if text.lower() == "cancel":
+            user["step"] = "menu"
+            flush_loaded_users()
+            safe_send_message(bot, user_id, "❌ Edit cancelled.", reply_markup=settings_keyboard())
+            return
+            
+        if user["step"] == "edit_age":
+            if not text.isdigit() or int(text) < 18:
+                safe_send_message(bot, user_id, "⚠️ Please enter a valid age (18+):")
+                return
+            user["age"] = int(text)
+            user["step"] = "menu"
+            flush_loaded_users()
+            safe_send_message(bot, user_id, "✅ Age updated successfully!", reply_markup=settings_keyboard())
+            return
+            
+        if user["step"] == "edit_city":
+            user["city"] = text
+            user["step"] = "menu"
+            flush_loaded_users()
+            safe_send_message(bot, user_id, "✅ City updated successfully!", reply_markup=settings_keyboard())
+            return
 
     if text == BTN_CONTINUE:
         if user["step"] == "start":
@@ -4391,10 +4461,15 @@ def text_handler(message):
             f"<b>City:</b> {html.escape(user['city'])}\n",
             *vip_lines,
         ])
+        
+        # 🔥 NAYA: Edit Profile Inline Button
+        markup = InlineKeyboardMarkup()
+        markup.row(InlineKeyboardButton("✏️ Edit Profile", callback_data="edit_profile_menu"))
+        
         if user["photo"]:
-            safe_send_photo(bot, user_id, user["photo"], caption=caption, reply_markup=settings_keyboard(), parse_mode="HTML")
+            safe_send_photo(bot, user_id, user["photo"], caption=caption, reply_markup=markup, parse_mode="HTML")
         else:
-            safe_send_message(bot, user_id, caption, reply_markup=settings_keyboard(), parse_mode="HTML")
+            safe_send_message(bot, user_id, caption, reply_markup=markup, parse_mode="HTML")
         return
 
     if text == BTN_HOW_IT_WORKS or text.lower() == "/help":
