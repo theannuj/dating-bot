@@ -1108,9 +1108,26 @@ def get_user(user_id):
 
 
 def reset_user(user_id):
-    user = prepare_user_record(default_user())
-    save_user_data(user_id, user)
-    return user
+    # 1. Pehle purana data safely nikalenge
+    old_user = get_user(user_id)
+    
+    # 2. Ekdum naya fresh profile banayenge
+    new_user = prepare_user_record(default_user())
+    
+    # 3. SMART CARRY-FORWARD: Account ka important data wapas naye profile me transfer karenge
+    new_user["paid"] = old_user.get("paid", False)
+    new_user["payment_status"] = old_user.get("payment_status", "none")
+    new_user["vip_start_date"] = old_user.get("vip_start_date")
+    new_user["vip_end_date"] = old_user.get("vip_end_date")
+    new_user["chat_limit"] = old_user.get("chat_limit", 1)
+    new_user["total_chats_used"] = old_user.get("total_chats_used", 0)
+    new_user["source"] = old_user.get("source", "organic")
+    new_user["is_blocked"] = old_user.get("is_blocked", False)
+    new_user["is_banned"] = old_user.get("is_banned", False)
+    
+    # 4. Ab is naye protected data ko save kar denge
+    save_user_data(user_id, new_user)
+    return new_user
 
 
 def get_profile(profile_id):
@@ -3841,9 +3858,9 @@ def callback_handler(call):
             user_id, match_id = map(int, data.split("_"))
             admin_id = call.message.chat.id
 
-            # 🔥 TRICK: Message (Photo) delete mat karo, bas 'Reply' button hata do taaki double click na ho
+            # 🔥 TRICK: Button dabte hi us notification ko delete kar do taaki chat clean rahe aur double click na ho
             try:
-                bot.edit_message_reply_markup(admin_id, call.message.message_id, reply_markup=None)
+                bot.delete_message(admin_id, call.message.message_id)
             except:
                 pass
 
