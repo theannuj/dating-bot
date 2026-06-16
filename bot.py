@@ -1679,6 +1679,7 @@ def process_broadcast_input(message, target):
         BTN_ADMIN_CHATS, BTN_ADMIN_REFRESH, BTN_ADMIN_UNREAD, 
         BTN_ADMIN_PANEL, BTN_ADMIN_STATS, BTN_ADMIN_PENDING, 
         BTN_ADMIN_BACK, BTN_ADMIN_SUPPORT, BTN_ADMIN_BROADCAST,
+        BTN_ADMIN_COMMANDS,
         "❌ Cancel Broadcast"
     }
     
@@ -3238,7 +3239,8 @@ def process_ticket_reply(message, ticket_id, target_user_id):
     is_admin_button = text in {
         BTN_ADMIN_CHATS, BTN_ADMIN_REFRESH, BTN_ADMIN_UNREAD, 
         BTN_ADMIN_PANEL, BTN_ADMIN_STATS, BTN_ADMIN_PENDING, 
-        BTN_ADMIN_BACK, BTN_ADMIN_SUPPORT, BTN_ADMIN_BROADCAST
+        BTN_ADMIN_BACK, BTN_ADMIN_SUPPORT, BTN_ADMIN_BROADCAST,
+        BTN_ADMIN_COMMANDS
     }
     
     if text.lower() == 'cancel' or text.startswith("/") or is_admin_button:
@@ -3278,7 +3280,7 @@ def process_ticket_reply(message, ticket_id, target_user_id):
         release_db_connection(conn)
 
 
-@bot.message_handler(func=lambda message: message.chat.id in CHAT_ADMINS and not message.reply_to_message and message.text.strip() not in {BTN_ADMIN_CHATS, BTN_ADMIN_REFRESH, BTN_ADMIN_UNREAD, BTN_ADMIN_PANEL, BTN_ADMIN_STATS, BTN_ADMIN_PENDING, BTN_ADMIN_BACK, BTN_ADMIN_SUPPORT, BTN_ADMIN_BROADCAST}, content_types=["text"])
+@bot.message_handler(func=lambda message: message.chat.id in CHAT_ADMINS and not message.reply_to_message and message.text.strip() not in {BTN_ADMIN_CHATS, BTN_ADMIN_REFRESH, BTN_ADMIN_UNREAD, BTN_ADMIN_PANEL, BTN_ADMIN_STATS, BTN_ADMIN_PENDING, BTN_ADMIN_BACK, BTN_ADMIN_SUPPORT, BTN_ADMIN_BROADCAST, BTN_ADMIN_COMMANDS}, content_types=["text"])
 def admin_direct_reply(message):
     admin_id = message.chat.id
 
