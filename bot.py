@@ -2985,6 +2985,37 @@ def unban_command(message):
     except:
         safe_send_message(bot, message.chat.id, "⚠️ Usage: /unban <user_id>")
 
+
+@bot.message_handler(commands=["forceplan"])
+def force_plan_command(message):
+    if message.chat.id not in CHAT_ADMINS: return
+    try:
+        parts = message.text.split()
+        target_user_id = int(parts[1])
+        plan_key = parts[2].lower()
+        
+        if plan_key not in VIP_PLAN_DAYS:
+            safe_send_message(bot, message.chat.id, "⚠️ Invalid plan. Use: 1m, 3m, 6m, 1y")
+            return
+            
+        plan_label, duration_days, added_limits = VIP_PLAN_DAYS[plan_key]
+        target_user = get_user(target_user_id)
+        now_ts = get_current_timestamp()
+        
+        # 🔥 Wapas correct data par set karna (Purana double kachra overwrite ho jayega)
+        target_user["vip_start_date"] = now_ts
+        target_user["vip_end_date"] = now_ts + (duration_days * 86400)
+        target_user["chat_limit"] = added_limits
+        target_user["paid"] = True
+        target_user["payment_status"] = "approved"
+        
+        save_vip_to_db(target_user_id, target_user)
+        flush_loaded_users()
+        
+        safe_send_message(bot, message.chat.id, f"✅ Fixed! User {target_user_id} is now reset to exactly {plan_label} with {added_limits} chat limit.")
+    except Exception as e:
+        safe_send_message(bot, message.chat.id, "⚠️ Usage: /forceplan <user_id> <1m/3m/6m/1y>\nExample: /forceplan 123456789 1m")
+
 # 🔥 DASHBOARD GENERATOR FUNCTION (SaaS Style)
 def get_dashboard_data(view_type="weekly"):
     conn = get_db_connection()
@@ -4171,9 +4202,21 @@ def callback_handler(call):
         parts = call.data.split("_")
         plan_key = parts[1]
         user_id = int(parts[2])
-        plan_label, duration_days, added_limits = VIP_PLAN_DAYS[plan_key] 
         user = get_user(user_id)
+
+        # 🔥 ANTI-DOUBLE CLICK & RACE CONDITION FIX (The Pending Lock)
+        if user.get("payment_status") != "pending":
+            safe_answer_callback_query(bot, call.id, "⚠️ Ye payment already process ho chuki hai!", show_alert=True)
+            try: bot.edit_message_reply_markup(call.message.chat.id, call.message.message_id, reply_markup=None)
+            except: pass
+            return
+
+        plan_label, duration_days, added_limits = VIP_PLAN_DAYS[plan_key] 
         now_ts = get_current_timestamp()
+
+        # 🔥 NAYA: Button ko sabse pehle gayab karo taaki galti se bhi double click na ho sake
+        try: bot.edit_message_reply_markup(call.message.chat.id, call.message.message_id, reply_markup=None)
+        except: pass
 
         # 🔥 TOP-UP & EXTENSION LOGIC
         if user.get("paid") and user.get("vip_end_date") and user["vip_end_date"] > now_ts:
@@ -4190,6 +4233,7 @@ def callback_handler(call):
         user["paid"] = True
         user["awaiting_payment"] = False
         user["payment_status"] = "approved"
+        user["payment_proof_photo_id"] = None  # 🔥 Receipt approve hone ke baad isse Delete/Clear kar do
         try:
             save_vip_to_db(user_id, user)
         except Exception as e:
