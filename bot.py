@@ -4783,40 +4783,48 @@ def configure_webhook():
 PROCESSED_UPDATES = {}
 WEBHOOK_LOCK = threading.Lock()  # 🔥 NAYA DARWAZA (LOCK)
 
+# 🔥 NEW & FAST WEBHOOK: Ye Telegram ko turant 'OK' bhejega aur message background me process karega
 @app.route(f"/{TOKEN}", methods=["POST"])
+@app.route(f"/{TOKEN}/", methods=["POST"])
 def webhook():
-    clear_request_user_context()
     try:
         json_str = request.get_data(cache=False, as_text=False).decode("utf-8")
         update = telebot.types.Update.de_json(json_str)
         
         update_id = update.update_id
         
-        # 🔥 LOCK SYSTEM START: Ek baar me ek hi thread list check karega
+        # 1. Deduplication Check (Spam rokne ke liye)
         with WEBHOOK_LOCK:
             if update_id in PROCESSED_UPDATES:
-                return "OK", 200  # Duplicate ko bahar se hi reject kar diya
-                
+                return "OK", 200
             PROCESSED_UPDATES[update_id] = True
-            
             if len(PROCESSED_UPDATES) > 5000:
                 oldest_key = next(iter(PROCESSED_UPDATES))
                 del PROCESSED_UPDATES[oldest_key]
-        # 🔥 LOCK SYSTEM END (Ab actual message process hone jayega)
 
-        # Naye message ko process karne bhejo
-        bot.process_new_updates([update])
+        # 2. Background Thread Function (Main processing yahan aaram se hogi)
+        def process_update_in_background(upd):
+            clear_request_user_context()
+            try:
+                bot.process_new_updates([upd])
+            except Exception as e:
+                print(f"❌ Background Process Error: {e}", flush=True)
+            finally:
+                try:
+                    flush_loaded_users()
+                except Exception as db_err:
+                    print(f"❌ DB Save Error: {db_err}", flush=True)
+                finally:
+                    clear_request_user_context()
+
+        # 3. Message ko background me bhej do aur Telegram ko turant chhutti de do
+        threading.Thread(target=process_update_in_background, args=(update,)).start()
         
     except Exception as e:
         print(f"❌ Webhook Error: {e}", flush=True)
         traceback.print_exc()
-    finally:
-        try:
-            flush_loaded_users()
-        except Exception as db_err:
-            print(f"❌ Database Save Error in Webhook: {db_err}", flush=True)
-        finally:
-            clear_request_user_context()
+        
+    # Telegram ko 1 millisecond me OK mil jayega
     return "OK", 200
 
 
