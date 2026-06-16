@@ -4769,13 +4769,14 @@ def configure_webhook():
         try:
             bot.remove_webhook()
             time.sleep(1)
-            bot.set_webhook(url=webhook_url)
-            print(f"Webhook set: {webhook_url}")
+            # 🔥 FIX: drop_pending_updates=True lagaya hai taaki atke hue (jammed) messages delete ho jayein aur fresh connection bane
+            bot.set_webhook(url=webhook_url, drop_pending_updates=True, timeout=60)
+            print(f"✅ Webhook successfully set: {webhook_url}", flush=True)
             return
         except Exception as e:
-            print(f"set_webhook error: {e}")
+            print(f"❌ Webhook error: {e}", flush=True)
             time.sleep(1.5)
-    raise RuntimeError("Failed to configure Telegram webhook after retries.")
+    print("⚠️ Webhook setup failed, but server will continue starting.", flush=True)
 
 
 # 🔥 DEDUPLICATION CACHE: Telegram ke duplicate messages ko rokne ke liye
@@ -4821,7 +4822,8 @@ def webhook():
 
 @app.route("/", methods=["GET"])
 def healthcheck():
-    return "OK", 200
+    # 🔥 FIX: Is URL ko browser me open karke test karna
+    return "✅ BOT SERVER IS RUNNING PERFECTLY!", 200
 
 
 threading.Thread(target=inactivity_engagement_worker, daemon=True).start()
