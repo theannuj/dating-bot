@@ -623,7 +623,15 @@ def handle_rate_limit(e):
     error_msg = str(e).lower()
     if "too many requests" in error_msg or "429" in error_msg:
         match = re.search(r'retry after (\d+)', error_msg)
-        return int(match.group(1)) + 1 if match else 2
+        wait_time = int(match.group(1)) + 1 if match else 2
+        
+        # 🔥 ANTI-FREEZE LOCK: Agar wait time 10 second se zyada hai, toh server ko lagatar mat sulao
+        if wait_time > 10:
+            print(f"⚠️ Rate Limit too high ({wait_time}s). Skipping sleep to save server.", flush=True)
+            return 0  # 0 return karne se bot soyega nahi, sidha request cancel karke dusre user par focus karega
+            
+        return wait_time
+        
     # 🔥 NEW: Agar Telegram ka server slow ho ya Timeout aaye, toh 1 sec wait karke retry karo
     if "timed out" in error_msg or "connection" in error_msg or "timeout" in error_msg:
         return 1 
