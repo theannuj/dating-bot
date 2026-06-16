@@ -508,6 +508,7 @@ BTN_CANCEL_END_CHAT = "❌ Cancel"
 BTN_START_OVER = "Start Over"
 BTN_ADMIN_SUPPORT = "📩 Support Tickets"
 BTN_ADMIN_BROADCAST = "📢 Broadcast"
+BTN_ADMIN_COMMANDS = "🛠 Admin Commands" 
 MAX_CHAT_MESSAGES = 30
 CHAT_PREVIEW_MESSAGES = 8
 
@@ -1900,7 +1901,11 @@ def admin_menu_keyboard():
 
 
 def admin_panel_keyboard():
-    return build_keyboard([BTN_ADMIN_STATS, BTN_ADMIN_PENDING], [BTN_ADMIN_BROADCAST, BTN_ADMIN_BACK])
+    return build_keyboard(
+        [BTN_ADMIN_STATS, BTN_ADMIN_PENDING], 
+        [BTN_ADMIN_COMMANDS, BTN_ADMIN_BROADCAST], 
+        [BTN_ADMIN_BACK]
+    )
 
 
 
@@ -3393,6 +3398,27 @@ def admin_menu_handler(message):
     if text == BTN_ADMIN_PANEL:
         clear_admin_active_chat(message.chat.id)
         safe_send_message(bot, message.chat.id, "Choose an admin option.", reply_markup=admin_panel_keyboard())
+        return
+
+    # 🔥 CHEAT SHEET LOGIC
+    if text == BTN_ADMIN_COMMANDS:
+        cheat_sheet = (
+            "🛠 <b>ADMIN COMMANDS CHEAT SHEET</b>\n\n"
+            "In commands ko directly chat me type karein:\n\n"
+            "🚫 <b>1. Ban User</b> (Hamesha ke liye block)\n"
+            "<code>/ban UserID</code>\n"
+            "<i>Ex: /ban 123456789</i>\n\n"
+            "✅ <b>2. Unban User</b> (Block hatane ke liye)\n"
+            "<code>/unban UserID</code>\n"
+            "<i>Ex: /unban 123456789</i>\n\n"
+            "💎 <b>3. Force VIP Plan</b> (Silent Premium update/fix)\n"
+            "Plans: 1m, 3m, 6m, 1y\n"
+            "<code>/forceplan UserID Plan</code>\n"
+            "<i>Ex: /forceplan 123456789 1m</i>\n\n"
+            "🔄 <b>4. User Data Reset</b> (Test karne ke liye profile reset)\n"
+            "<code>/reset</code>"
+        )
+        safe_send_message(bot, message.chat.id, cheat_sheet, parse_mode="HTML")
         return
     if text == BTN_ADMIN_STATS:
         stats_handler(message)
