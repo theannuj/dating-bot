@@ -874,7 +874,10 @@ def sync_user_vip_state(user, now_ts=None):
     
     # 🔥 NAYA EXPIRY & LIMIT LOGIC
     if active:
-        user["payment_status"] = "approved"
+        # 🔥 BUG FIX: Agar user already 'pending' me hai (top-up kar raha hai), toh use 'approved' se overwrite mat karo!
+        if user.get("payment_status") not in ["pending", "rejected"]:
+            user["payment_status"] = "approved"
+            
         # Purane active users jinki limit set nahi thi unhe default 5 de do
         if "chat_limit" not in user or user["chat_limit"] < 5:
             user["chat_limit"] = 5
@@ -3020,15 +3023,58 @@ def force_plan_command(message):
         target_user["vip_start_date"] = now_ts
         target_user["vip_end_date"] = now_ts + (duration_days * 86400)
         target_user["chat_limit"] = added_limits
+        target_user["total_chats_used"] = 0  # 🔥 BUG FIX: Used chats ko wapas 0 karna bahut zaroori hai!
         target_user["paid"] = True
         target_user["payment_status"] = "approved"
         
         save_vip_to_db(target_user_id, target_user)
         flush_loaded_users()
         
-        safe_send_message(bot, message.chat.id, f"✅ Fixed! User {target_user_id} is now reset to exactly {plan_label} with {added_limits} chat limit.")
+        record_metric("vips")  # 🔥 NAYA: Dashboard stats me VIP join count karne ke liye
+        
+        safe_send_message(bot, message.chat.id, f"✅ Fixed! User {target_user_id} is now reset to exactly {plan_label} with {added_limits} chat limit. (Chats used reset to 0)")
     except Exception as e:
         safe_send_message(bot, message.chat.id, "⚠️ Usage: /forceplan <user_id> <1m/3m/6m/1y>\nExample: /forceplan 123456789 1m")
+
+
+@bot.message_handler(commands=["check"])
+def check_user_command(message):
+    if message.chat.id not in CHAT_ADMINS: return
+    try:
+        user_id = int(message.text.split()[1])
+        u = get_user(user_id)
+        name = u.get("name", "Unknown")
+        status = u.get("payment_status", "none")
+        paid = "🟢 Yes" if u.get("paid") else "🔴 No"
+        
+        limit = u.get("chat_limit", 1)
+        used = u.get("total_chats_used", 0)
+        left = max(0, limit - used)
+        
+        start_dt = "-"
+        end_dt = "-"
+        if u.get("vip_start_date"):
+            start_dt = time.strftime('%d %b %Y', time.localtime(u.get("vip_start_date")))
+        if u.get("vip_end_date"):
+            end_dt = time.strftime('%d %b %Y', time.localtime(u.get("vip_end_date")))
+        
+        info = (
+            f"🔍 <b>Live Profile Check: {user_id}</b>\n\n"
+            f"👤 <b>Name:</b> {html.escape(name)}\n"
+            f"💎 <b>VIP Active:</b> {paid}\n"
+            f"🧾 <b>Payment Status:</b> <b>{status}</b>\n\n"
+            f"💬 <b>Chat Status:</b>\n"
+            f"• Max Limit: {limit}\n"
+            f"• Chats Used: {used}\n"
+            f"• <b>Chats Left:</b> <b>{left}</b>\n\n"
+            f"📅 <b>Validity:</b>\n"
+            f"• Start: {start_dt}\n"
+            f"• Expiry: {end_dt}\n"
+        )
+        safe_send_message(bot, message.chat.id, info, parse_mode="HTML")
+    except Exception as e:
+        safe_send_message(bot, message.chat.id, "⚠️ Usage: /check <user_id>")
+
 
 # 🔥 DASHBOARD GENERATOR FUNCTION (SaaS Style)
 def get_dashboard_data(view_type="weekly"):
@@ -3426,7 +3472,9 @@ def admin_menu_handler(message):
             "<code>/forceplan UserID Plan</code>\n"
             "<i>Ex: /forceplan 123456789 1m</i>\n\n"
             "🔄 <b>4. User Data Reset</b> (Test karne ke liye profile reset)\n"
-            "<code>/reset</code>"
+            "<code>/reset</code>\n\n"
+            "🔍 <b>5. Check User</b> (Live kundli check karein)\n"
+            "<code>/check UserID</code>"
         )
         safe_send_message(bot, message.chat.id, cheat_sheet, parse_mode="HTML")
         return
