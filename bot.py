@@ -3611,24 +3611,8 @@ def media_handler(message):
         threading.Thread(target=delayed_moderation_success, args=(user_id,), daemon=True).start()
         return
 
-    # 🔥 ACTIVE CHAT LOGIC (Premium Lock & Forwarding)
-    if user["chat_open"] and user["current_match_id"]:
-        match_id = user["current_match_id"]
-        state = get_chat_state(user_id, match_id)
-        if state != "active":
-            safe_send_message(bot, user_id, inactive_chat_message(), parse_mode="HTML")
-            return
-            
-        if not user.get("paid"):
-            markup = InlineKeyboardMarkup()
-            markup.row(InlineKeyboardButton("💎 Get Premium", callback_data="buy_premium_promo"))
-            safe_send_message(bot, user_id, "🔒 <b>Premium Feature</b>\n\nSending Photos, Videos, and GIFs is an exclusive Premium feature!\n\nUpgrade your account to share your moments and express yourself better 😉👇", reply_markup=markup, parse_mode="HTML")
-            return
-            
-        forward_user_media_to_admins(message, file_id, message.content_type)
-        return
-
-    if user["awaiting_payment"]:
+    # 🔥 PAYMENT SCREENSHOT CATCHER (Isko hamesha chat se upar rakhna hai)
+    if user.get("awaiting_payment"):
         if "payment_status" not in user:
             user["payment_status"] = "none"
         if user.get("payment_status") == "pending":
@@ -3655,6 +3639,23 @@ def media_handler(message):
         flush_loaded_users()
         
         safe_send_message(bot, user_id, "Screenshot received ✅\n\nWe’re verifying it… please wait a moment", reply_markup=main_menu_keyboard(user_id))
+        return
+
+    # 🔥 ACTIVE CHAT LOGIC (Premium Lock & Forwarding)
+    if user.get("chat_open") and user.get("current_match_id"):
+        match_id = user["current_match_id"]
+        state = get_chat_state(user_id, match_id)
+        if state != "active":
+            safe_send_message(bot, user_id, inactive_chat_message(), parse_mode="HTML")
+            return
+            
+        if not user.get("paid"):
+            markup = InlineKeyboardMarkup()
+            markup.row(InlineKeyboardButton("💎 Get Premium", callback_data="buy_premium_promo"))
+            safe_send_message(bot, user_id, "🔒 <b>Premium Feature</b>\n\nSending Photos, Videos, and GIFs is an exclusive Premium feature!\n\nUpgrade your account to share your moments and express yourself better 😉👇", reply_markup=markup, parse_mode="HTML")
+            return
+            
+        forward_user_media_to_admins(message, file_id, message.content_type)
         return
 
     safe_send_message(bot, user_id, "Something went wrong…\n\nPlease try again")
