@@ -1913,10 +1913,10 @@ def admin_menu_keyboard():
 
 
 def admin_panel_keyboard():
+    # 🔥 Naya Layout: Row 1 me 3 buttons (Stats, Pending, Back), Row 2 me 2 buttons
     return build_keyboard(
-        [BTN_ADMIN_STATS, BTN_ADMIN_PENDING], 
-        [BTN_ADMIN_COMMANDS, BTN_ADMIN_BROADCAST], 
-        [BTN_ADMIN_BACK]
+        [BTN_ADMIN_STATS, BTN_ADMIN_PENDING, BTN_ADMIN_BACK], 
+        [BTN_ADMIN_COMMANDS, BTN_ADMIN_BROADCAST]
     )
 
 
